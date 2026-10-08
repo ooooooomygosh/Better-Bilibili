@@ -1,0 +1,21 @@
+{
+ "scope": "Mocked Chrome APIs, synthetic B 站-shaped markup; not logged-in Bilibili",
+ "results": [
+  {
+   "test": "wrapped native control is found and the whole wrapper is hidden",
+   "passed": true
+  },
+  {
+   "test": "toolbar 换一批 reaches the handler on the inner button and records the new batch",
+   "passed": true
+  },
+  {
+   "test": "a second refresh after the hidden wrapper still works",
+   "passed": true
+  },
+  {
+   "test": "no timeout message and no uncaught errors",
+   "passed": true
+  }
+ ]
+}

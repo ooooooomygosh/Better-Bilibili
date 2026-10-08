@@ -1,4 +1,4 @@
-/* BiliThrottle 2.0.0 — isolated world. Native Vue cards stay mounted and retain their handlers.
+/* BiliThrottle 2.0.1 — isolated world. Native Vue cards stay mounted and retain their handlers.
  * Native refresh is the only source of fresh recommendations: no private API, prefetch loop,
  * synthetic scroll, raw-HTML snapshots or automatic document reload.
  */
@@ -12,7 +12,7 @@
   const OWN = '[data-btr-flow-owned]';
   const QUIET_MS = 600, REFRESH_TIMEOUT = 10000;
   let settings = {...core.defaults}, ready = false, snapshots = [], index = -1, liveReady = false;
-  let grid = null, bar = null, shadow = null, view = null, refs = {}, nativeRefresh = null;
+  let grid = null, bar = null, shadow = null, view = null, refs = {}, nativeRefresh = null, nativeTarget = null;
   let gridObserver = null, mountObserver = null, resizeObserver = null, themeObserver = null;
   let settleTimer, deadlineTimer, saveTimer, mountTimer, routeTimer, paintTimer;
   let busy = false, transaction = null, generation = 0, issuingNative = false;
@@ -267,17 +267,38 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
       (r.type!=='attributes'||['href','src','data-src'].includes(r.attributeName))))return;
     candidateKey='';clearTimeout(settleTimer);settleTimer=setTimeout(settle,QUIET_MS);
   }
+  const REFRESH_TEXT=/^\s*换\s*[一1]\s*[换批]\s*$/;
+  const REFRESH_WRAP='.feed-roll-btn,.flexible-roll-btn,.roll-btn,.refresh-btn,button,[role="button"]';
+  // B 站 wraps the control as div.feed-roll-btn > button.roll-btn > svg + span「换一换」, with the
+  // handler on the inner button. Clicking a wrapper never reaches a child's handler, so the click
+  // target is the innermost element showing the text: its click bubbles through every ancestor.
   function findRefresh() {
     const scope=grid?.closest('.recommended-container_floor-aside,.recommended-container');
     if(!scope)return null;
-    const candidates=scope.querySelectorAll('.roll-btn,.refresh-btn,.feed-roll-btn,button,[role="button"]');
-    return [...candidates].find(n=>!owns(n)&&!/BTR/.test(n.textContent)&&/^(?:\s*换\s*[一1]\s*[换批]\s*)$/.test(n.textContent||'')&&
-      !n.disabled&&n.getAttribute('aria-disabled')!=='true'&&(n.hasAttribute('data-btr-native-refresh')||n.getClientRects().length));
+    const walker=document.createTreeWalker(scope,NodeFilter.SHOW_TEXT);
+    const seen=new Set();
+    for(let t=walker.nextNode();t;t=walker.nextNode()) {
+      if(!t.data.includes('换'))continue;
+      let leaf=t.parentElement;
+      // Climb while the text is split across siblings (e.g. <span>换一</span><span>换</span>).
+      while(leaf&&leaf!==scope&&!REFRESH_TEXT.test(leaf.textContent||''))leaf=leaf.parentElement;
+      if(!leaf||leaf===scope||seen.has(leaf)||owns(leaf)||leaf.closest('.feed-card,.bili-video-card'))continue;
+      seen.add(leaf);
+      const control=leaf.closest('button,[role="button"]');
+      if(control?.disabled||control?.getAttribute('aria-disabled')==='true')continue;
+      const wrap=leaf.closest('.feed-roll-btn,.flexible-roll-btn')||leaf.closest(REFRESH_WRAP)||leaf;
+      if(!scope.contains(wrap))continue;
+      // Our own hiding makes the control rect-less; otherwise skip controls the site keeps hidden.
+      if(!wrap.hasAttribute('data-btr-native-refresh')&&!leaf.getClientRects().length)continue;
+      return {target:leaf,wrap};
+    }
+    return null;
   }
   function tagRefresh() {
     const next=findRefresh();
-    if(nativeRefresh&&nativeRefresh!==next)nativeRefresh.removeAttribute('data-btr-native-refresh');
-    nativeRefresh=next;if(next&&bar)next.setAttribute('data-btr-native-refresh','');
+    if(nativeRefresh&&nativeRefresh!==next?.wrap)nativeRefresh.removeAttribute('data-btr-native-refresh');
+    nativeRefresh=next?.wrap||null;nativeTarget=next?.target||null;
+    if(next&&bar)next.wrap.setAttribute('data-btr-native-refresh','');
   }
   function begin() {
     if(busy||!active()||!grid)return false;
@@ -298,15 +319,20 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     tagRefresh();
     if(!nativeRefresh){notify('未找到原生换一换；没有刷新页面，请使用 B 站原生按钮或手动刷新。',true);return;}
     if(!begin())return;
-    try {issuingNative=true;nativeRefresh.click();scheduleSettle();}
+    try {
+      issuingNative=true;
+      if(typeof nativeTarget.click==='function')nativeTarget.click();
+      else nativeTarget.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));
+      scheduleSettle();
+    }
     catch(_){finishTransaction();notify('原生换一换未能执行，请稍后重试。',true);}
     finally {issuingNative=false;}
   }
   function nativeClick(event) {
     if(!active()||owns(event.target))return;
-    const hit=event.target?.closest?.('.roll-btn,.refresh-btn,.feed-roll-btn,button,[role="button"]');
-    if(!hit || (hit!==nativeRefresh&&hit!==findRefresh()))return;
-    if(issuingNative)return;
+    if(issuingNative||!event.target?.closest)return;
+    const hit=nativeRefresh?.contains(event.target)?nativeRefresh:findRefresh()?.wrap;
+    if(!hit?.contains(event.target))return;
     if(busy){event.preventDefault();event.stopImmediatePropagation();return;}
     begin();scheduleSettle();
   }
@@ -336,7 +362,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     clearTimeout(settleTimer);clearTimeout(mountTimer);clearTimeout(paintTimer);finishTransaction();
     gridObserver?.disconnect();mountObserver?.disconnect();resizeObserver?.disconnect();
     gridObserver=mountObserver=resizeObserver=null;closeHistory();bar?.remove();bar=shadow=null;refs={};grid=null;
-    nativeRefresh?.removeAttribute('data-btr-native-refresh');nativeRefresh=null;clearMarks();
+    nativeRefresh?.removeAttribute('data-btr-native-refresh');nativeRefresh=nativeTarget=null;clearMarks();
     toggle('data-btr-home-ui',false);toggle('data-btr-oled',false);
   }
   function syncRoute() {
