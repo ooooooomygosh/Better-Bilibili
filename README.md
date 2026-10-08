@@ -91,7 +91,7 @@ scripts/build.sh    打包为 dist/BTR-Flow-<版本>.zip
 ```bash
 node --test extension/tests/core.test.cjs extension/tests/update.test.cjs extension/tests/focus.test.cjs
 ./scripts/build.sh                       # 生成 dist/BTR-Flow-<版本>.zip
-git tag v1.2.0 && git push origin v1.2.0 # 自动构建并发布 Release
+# 修改 extension/manifest.json 的 version 并推送到 main，即自动构建并发布对应 Release
 ```
 
 ## 隐私
