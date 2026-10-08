@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Unit tests
+        run: node --test extension/tests/core.test.cjs extension/tests/update.test.cjs extension/tests/focus.test.cjs
+      - name: Check tag matches manifest version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: test "v$(node -p "require('./extension/manifest.json').version")" = "${GITHUB_REF_NAME}"
+      - name: Package
+        id: pkg
+        run: |
+          ./scripts/build.sh
+          echo "version=$(node -p "require('./extension/manifest.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Extract release notes
+        run: awk '/^## /{n++} n==1' extension/CHANGELOG.md > release-notes.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.pkg.outputs.version }}
+          name: BTR Flow ${{ steps.pkg.outputs.version }}
+          body_path: release-notes.md
+          files: |
+            dist/BTR-Flow-${{ steps.pkg.outputs.version }}.zip
+            dist/BTR-Flow-${{ steps.pkg.outputs.version }}.zip.sha256

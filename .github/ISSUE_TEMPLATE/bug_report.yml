@@ -1,0 +1,31 @@
+name: 问题反馈
+description: 播放、首页、专注模式或设置页出现异常
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: 插件版本
+      description: 在 chrome://extensions 的 BTR Flow 卡片上查看
+      placeholder: "1.2.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 出问题的部分
+      options: [视频播放 / 加速, 直播, 首页净化 / 换一批 / 历史, 专注模式, 设置页 / 弹窗, 其他]
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: 浏览器与版本
+      placeholder: "Chrome 141 / Edge 141"
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤与实际表现
+      description: 附上出问题的页面类型（不要贴含登录信息的完整链接）。播放问题请在页内设置面板点击「复制 Debug 诊断」后粘贴。
+    validations:
+      required: true
