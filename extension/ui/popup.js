@@ -9,7 +9,7 @@ for(const k of ['enabled','strategy','mode'])$(k).addEventListener('change',asyn
  try{await chrome.storage.sync.set({[k]:k==='enabled'?$(k).checked:$(k).value});$('message').textContent='已保存。新请求使用更新后的策略。';}catch(e){$('message').textContent=e.message;}
 });
 $('options').onclick=()=>chrome.runtime.openOptionsPage();
-$('native').onclick=async()=>{try{await chrome.tabs.sendMessage(tab.id,{type:'openSettings'});window.close();}catch(_){$('message').textContent='请先打开或刷新 B 站页面。';}};
+$('quick').onclick=async()=>{try{await chrome.tabs.sendMessage(tab.id,{type:'flow-quick-open'});window.close();}catch(_){$('message').textContent='请先打开或刷新 B 站页面，快捷面板在页面右下角。';}};
 async function update(){
  try{
   if(!tab?.id)return;const d=await chrome.tabs.sendMessage(tab.id,{type:'flow-get-state'}),s=d.stats,t=d.telemetry;

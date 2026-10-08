@@ -8,7 +8,7 @@
   const feed = globalThis.__BTR_FEED_CORE__;
   if (!feed || globalThis.__BTR_HOME_INFINITE__) return;
 
-  const GAP_MS = 700, TIMEOUT_MS = 10000, KEY_TTL = 12 * 3600000, MAX_FAILS = 3;
+  const GAP_MS = 700, TIMEOUT_MS = 10000, KEY_TTL = 12 * 3600000, MAX_FAILS = 3, PAGE = 12, STAGGER_MS = 250;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const CSS = `
 :host{display:block;box-sizing:border-box;margin-top:8px;font:13px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--btr-text,#18191c)}
@@ -32,6 +32,8 @@
 .meta{color:var(--btr-muted,#9499a0);font-size:13px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .meta .followed{color:#fb7299;margin-right:4px}
 .foot{display:flex;justify-content:center;align-items:center;gap:10px;min-height:72px;color:var(--btr-muted,#9499a0);font-size:13px}
+.foot .why{font:11px ui-monospace,Menlo,monospace;opacity:.75;padding:2px 6px;border-radius:4px;background:var(--btr-chip,rgba(251,114,153,.1))}
+.foot{flex-wrap:wrap}
 .foot button{font:inherit;padding:6px 16px;border-radius:999px;border:1px solid var(--btr-line,rgba(128,128,128,.3));background:transparent;color:inherit;cursor:pointer;transition:border-color .16s ease,color .16s ease}
 .foot button:hover{border-color:#fb7299;color:#fb7299}
 .dots{display:inline-flex;gap:5px}.dots i{width:6px;height:6px;border-radius:50%;background:#fb7299;animation:btr-dot 1s ease-in-out infinite}
@@ -59,8 +61,8 @@
 
   function create(host) {
     let box = null, shadow = null, list = null, foot = null, side = null, sentinel = null;
-    let near = null, current = null, sections = [];
-    let batches = 0, idx = 1, loading = false, paused = false, fails = 0, timer = 0, keys = null;
+    let current = null, sections = [];
+    let batches = 0, idx = 1, loading = false, paused = false, fails = 0, timer = 0, keys = null, buffer = [];
     const seen = new Set();
 
     async function wbiKeys(force) {
@@ -79,20 +81,24 @@
 
     async function getJSON(url) {
       const ctrl = new AbortController(), t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-      try { const r = await fetch(url, {credentials: 'include', signal: ctrl.signal}); return await r.json(); }
-      finally { clearTimeout(t); }
+      try {
+        const r = await fetch(url, {credentials: 'include', signal: ctrl.signal});
+        if (!r.ok) { const e = new Error(`HTTP ${r.status}`); e.kind = r.status === 412 || r.status === 429 ? 'risk' : 'error'; e.code = r.status; throw e; }
+        return await r.json();
+      } finally { clearTimeout(t); }
     }
 
-    // One "thread": a signed request first; the unsigned legacy endpoint only if signing itself is the problem.
-    async function request(n, size) {
-      const params = feed.rcmdParams(n, size, innerWidth, innerHeight);
+    // One request asks for exactly what B 站's own homepage asks for (12 cards); bigger batches are
+    // several such requests merged, never a larger page size the server would reject.
+    async function request(n) {
+      const params = feed.rcmdParams(n, PAGE, innerWidth, innerHeight);
       let json = await getJSON(`${feed.RCMD}?${feed.signWbi(params, await wbiKeys(false))}`);
       if (feed.classify(json) === 'error') {
         json = await getJSON(`${feed.RCMD}?${feed.signWbi(params, await wbiKeys(true))}`);
-        if (feed.classify(json) === 'error') json = await getJSON(`${feed.RCMD_LEGACY}?fresh_type=3&version=1&ps=${size}&fresh_idx=${n}&fresh_idx_1h=${n}`);
+        if (feed.classify(json) === 'error') json = await getJSON(`${feed.RCMD_LEGACY}?fresh_type=3&version=1&ps=${PAGE}&fresh_idx=${n}&fresh_idx_1h=${n}`);
       }
       const kind = feed.classify(json);
-      if (kind !== 'ok') { const e = new Error(kind); e.kind = kind; throw e; }
+      if (kind !== 'ok') { const e = new Error(String(json?.message || kind)); e.kind = kind; e.code = json?.code; throw e; }
       return json.data?.item || json.data?.items || [];
     }
 
@@ -100,31 +106,49 @@
       for (const a of host.nativeLinks()) { const m = String(a).match(/BV[0-9A-Za-z]{10}/); if (m) seen.add(m[0]); }
     }
 
-    async function round() {
-      clearTimeout(timer);
-      if (loading || paused || !box?.isConnected || !host.enabled()) return;
-      loading = true; status('loading'); side?.classList.add('loading');
-      const s = host.settings(), lanes = Array.from({length: s.homeInfiniteThreads}, () => idx++);
-      nativeSeen();
-      const results = await Promise.allSettled(lanes.map(n => request(n, s.homeInfiniteSize)));
-      loading = false; side?.classList.remove('loading');
-      if (!box?.isConnected || !host.enabled()) return;
-      let added = 0, risk = false;
-      for (const r of results) {
-        if (r.status === 'fulfilled') {
-          const cards = feed.cards(r.value, seen);
-          if (cards.length) { append(cards); added++; }
-        } else if (r.reason?.kind === 'risk') risk = true;
-      }
-      if (risk) { paused = true; status('risk'); return; }
-      if (!added) {
-        if (++fails >= MAX_FAILS) { paused = true; status('error'); return; }
-      } else fails = 0;
-      status('idle');
-      timer = setTimeout(() => { if (near) round(); }, GAP_MS);
+    // Run `count` requests with at most `lanes` in flight, starts staggered like a person scrolling.
+    async function pool(count, lanes) {
+      const ids = Array.from({length: count}, () => idx++), out = new Array(count);
+      let next = 0;
+      const worker = async (w) => {
+        await new Promise(r => setTimeout(r, w * STAGGER_MS));
+        while (next < count) {
+          const i = next++;
+          try { out[i] = {ok: true, items: await request(ids[i])}; } catch (e) { out[i] = {ok: false, error: e}; }
+        }
+      };
+      await Promise.all(Array.from({length: Math.min(lanes, count)}, (_, w) => worker(w)));
+      return out;
     }
 
-    function status(kind) {
+    const isNear = () => !!sentinel?.isConnected && sentinel.getBoundingClientRect().top < innerHeight * 2.5;
+
+    async function round() {
+      clearTimeout(timer);
+      if (loading || paused || !box?.isConnected || !host.enabled() || !isNear()) return;
+      loading = true; status('loading'); side?.classList.add('loading');
+      const s = host.settings(), size = s.homeInfiniteSize, lanes = s.homeInfiniteThreads;
+      const count = Math.max(lanes, Math.ceil(Math.max(0, size - buffer.length) / PAGE));
+      nativeSeen();
+      const results = await pool(count, lanes);
+      loading = false; side?.classList.remove('loading');
+      if (!box?.isConnected || !host.enabled()) return;
+      let fresh = 0, risk = null, error = null;
+      for (const r of results) {
+        if (r.ok) { const cards = feed.cards(r.items, seen); fresh += cards.length; buffer.push(...cards); }
+        else if (r.error?.kind === 'risk') risk = r.error;
+        else error = r.error;
+      }
+      while (buffer.length >= size) append(buffer.splice(0, size));
+      if (risk) { paused = true; status('risk', risk); return; }
+      if (!fresh) {
+        if (++fails >= MAX_FAILS) { paused = true; status('error', error); return; }
+      } else fails = 0;
+      status('idle');
+      timer = setTimeout(round, GAP_MS);
+    }
+
+    function status(kind, err) {
       if (!foot) return;
       foot.replaceChildren();
       if (kind === 'loading') {
@@ -132,6 +156,8 @@
         foot.append(dots, el('span', null, `正在同时加载 ${host.settings().homeInfiniteThreads} 批推荐…`));
       } else if (kind === 'risk' || kind === 'error') {
         foot.append(el('span', null, kind === 'risk' ? 'B 站暂时限制了推荐请求，已暂停自动加载，过一会儿再试。' : '暂时没取到新推荐，已暂停自动加载。'));
+        // Show B 站's own answer so a report says exactly what went wrong.
+        if (err) foot.append(el('code', 'why', `B 站返回 ${err.code ?? ''} ${String(err.message || '').slice(0, 60)}`.trim()));
         const retry = el('button', null, '重试'); retry.type = 'button';
         retry.onclick = () => { paused = false; fails = 0; round(); };
         foot.append(retry);
@@ -218,8 +244,8 @@
         side.addEventListener('click', jump);
         side.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jump(); } });
         shadow.append(list, foot, sentinel, side);
-        near = null;
-        new IntersectionObserver(es => { near = es.some(e => e.isIntersecting) || null; if (near) round(); }, {rootMargin: '0px 0px 150% 0px'}).observe(sentinel);
+
+        new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) round(); }, {rootMargin: '0px 0px 150% 0px'}).observe(sentinel);
         current = new IntersectionObserver(track, {rootMargin: '-45% 0px -45% 0px'});
         status('idle');
       }
@@ -247,7 +273,7 @@
       clearTimeout(timer);
       if (!box) return;
       box.remove(); box = shadow = list = foot = side = sentinel = null; current?.disconnect(); current = null;
-      sections = []; visible.clear(); seen.clear(); batches = 0; paused = false; fails = 0; loading = false; near = null;
+      sections = []; visible.clear(); seen.clear(); buffer = []; batches = 0; paused = false; fails = 0; loading = false;
     }
 
     return {sync, stop, theme, get batches() { return batches; }};

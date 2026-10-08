@@ -204,8 +204,8 @@
     .btr-launcher:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
     .btr-launcher.dragging { cursor: grabbing; opacity: 1; transform: scale(1.1); transition: opacity 160ms ease, transform 160ms ease; }
     @media (max-width: 700px) { .btr-launcher { width: 40px; height: 40px; font-size: 12px; } }
-    /* The homepage has its own toolbar entry; the host's inline all:initial!important defeats page CSS, so hide from inside. */
-    :host-context(html[data-btr-home-ui]) .btr-launcher { display: none !important; }
+    /* The quick panel (and the homepage toolbar) replace this launcher; the host's inline all:initial!important defeats page CSS, so hide from inside. */
+    :host-context(html[data-btr-home-ui]) .btr-launcher, :host-context(html[data-btr-quick]) .btr-launcher { display: none !important; }
   `;
 
   let current = null;
@@ -216,7 +216,7 @@
     const safely = (f) => { try { return f(); } catch (_) { return "不可读取"; } };
     const parse = (s) => { try { return JSON.parse(s); } catch (_) { return String(s); } };
     const sections = [
-      ["环境", {BiliThrottle:"2.1.0",upstream:"2026.10.4.1",package:"BiliThrottle / MV3 extension",browser:navigator.userAgent,page:location.origin+location.pathname,at:new Date().toISOString()}],
+      ["环境", {BiliThrottle:"2.2.0",upstream:"2026.10.4.1",package:"BiliThrottle / MV3 extension",browser:navigator.userAgent,page:location.origin+location.pathname,at:new Date().toISOString()}],
       ["设置",latestSettings || "未加载"]
     ];
     if (root.__biliThreadRipperDebug?.report) sections.push(["视频接管",safely(()=>parse(root.__biliThreadRipperDebug.report()))]);

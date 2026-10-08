@@ -6,11 +6,15 @@
    "passed": true
   },
   {
-   "test": "two lanes request concurrently with distinct page indices, WBI-signed",
+   "test": "unfilled skeleton slots after the last real card are hidden",
    "passed": true
   },
   {
-   "test": "batches are numbered after the native batch; duplicates, ads and live rooms are dropped",
+   "test": "two lanes request concurrently with distinct page indices, WBI-signed, always ps=12 like the site",
+   "passed": true
+  },
+  {
+   "test": "a 24-card batch merges two 12-card requests; numbered after the native batch; duplicates, ads, live dropped",
    "passed": true
   },
   {
@@ -18,7 +22,7 @@
    "passed": true
   },
   {
-   "test": "scrolling keeps appending batches (2 -> 10) and the indicator follows",
+   "test": "scrolling keeps appending batches (2 -> 4) and the indicator follows",
    "passed": true
   },
   {
@@ -27,6 +31,10 @@
   },
   {
    "test": "retry resumes loading",
+   "passed": true
+  },
+  {
+   "test": "36 cards × 3 lanes and 12 cards × 1 lane both keep loading, still ps=12",
    "passed": true
   },
   {
