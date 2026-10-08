@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "BTR Flow · 线程撕裂者增强版",
   "short_name": "BTR Flow",
-  "version": "1.1.0",
-  "description": "保留原生播放器和首页：多 CDN / Range 加速、轮播净化、推荐批次回看与可选纯黑。非官方维护分支。",
+  "version": "1.2.0",
+  "description": "保留原生播放器和首页：多 CDN / Range 加速、轮播净化、推荐批次回看、专注模式（每日观看额度与番茄钟休息）与可选纯黑。非官方维护分支。",
   "minimum_chrome_version": "114",
   "permissions": [
     "storage"
@@ -120,9 +120,22 @@
       ],
       "run_at": "document_start",
       "world": "ISOLATED"
+    },
+    {
+      "matches": [
+        "https://www.bilibili.com/*",
+        "https://m.bilibili.com/*",
+        "https://live.bilibili.com/*"
+      ],
+      "js": [
+        "src/focus-core.js",
+        "src/focus-guard.js"
+      ],
+      "run_at": "document_idle",
+      "world": "ISOLATED"
     }
   ],
-  "version_name": "1.1.0 · upstream 2026.10.4.1 backport",
+  "version_name": "1.2.0 · upstream 2026.10.4.1 backport",
   "optional_permissions": [
     "proxy"
   ],

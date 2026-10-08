@@ -1,4 +1,4 @@
-/* BTR Flow 1.1.0 — isolated world. Native Vue cards stay mounted and retain their handlers.
+/* BTR Flow 1.2.0 — isolated world. Native Vue cards stay mounted and retain their handlers.
  * Native refresh is the only source of fresh recommendations: no private API, prefetch loop,
  * synthetic scroll, raw-HTML snapshots or automatic document reload.
  */
@@ -66,6 +66,12 @@ button:disabled{opacity:.35;cursor:default}.count{font-size:12px;opacity:.64;min
 .refresh{border-color:var(--btr-border,rgba(128,128,128,.25))}.status{margin-right:auto;opacity:.72;font-size:12px;max-width:56%;overflow-wrap:anywhere}.status.error{opacity:1}.history-head{display:flex;gap:12px;align-items:center;justify-content:space-between;margin:0 0 14px;opacity:.75}.history-head p{margin:0;font-size:12px}
 .grid{display:grid;grid-template-columns:repeat(var(--btr-columns,5),minmax(0,1fr));column-gap:var(--btr-gap,20px);row-gap:24px;padding-bottom:20px}
 .card{color:inherit;text-decoration:none;display:block;min-width:0}.cover{position:relative;aspect-ratio:16/9;background:var(--btr-placeholder,rgba(128,128,128,.10));border-radius:6px;overflow:hidden}.cover img{width:100%;height:100%;object-fit:cover;display:block}.duration{position:absolute;right:8px;bottom:5px;font-size:12px;color:white;text-shadow:0 1px 3px black;background:#0008;border-radius:3px;padding:0 3px}.title{font-size:15px;line-height:22px;margin-top:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:44px}.card:hover .title{color:var(--brand_blue,#00aeec)}.meta{opacity:.64;font-size:12px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;margin-top:4px}
+button{transition:background-color .16s ease,color .16s ease,border-color .16s ease,opacity .16s ease,transform .12s ease}button:active:not(:disabled){transform:scale(.97)}
+.refresh{border-radius:999px;padding:4px 14px}.refresh[aria-busy=true]{color:var(--brand_blue,#00aeec)}
+.status:not(:empty){animation:btr-in .22s ease-out}
+#btr-flow-history{animation:btr-in .26s cubic-bezier(.2,.75,.25,1)}.card .cover img{transition:transform .3s cubic-bezier(.2,.75,.25,1)}.card:hover .cover img{transform:scale(1.04)}.title{transition:color .16s ease}
+@keyframes btr-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 @media(max-width:680px){.toolbar{gap:2px}.status{max-width:100%;flex-basis:100%}.history-head{align-items:flex-start}.grid{row-gap:18px}.title{font-size:14px}}
 `;
   function mountSkin() { if(root()&&!skin.isConnected)root().append(skin); }
@@ -159,7 +165,7 @@ button:disabled{opacity:.35;cursor:default}.count{font-size:12px;opacity:.64;min
     refs.next.disabled=busy||index<0||index>=snapshots.length-1;
     refs.count.textContent=snapshots.length?`${index+1} / ${snapshots.length}`:'—';
     refs.count.title='本标签页保存的推荐批次；不是分页请求';
-    refs.refresh.textContent=busy?'更新中…':'换一批';refs.refresh.disabled=busy;
+    refs.refresh.textContent=busy?'更新中…':'换一批';refs.refresh.disabled=busy;refs.refresh.setAttribute('aria-busy',String(busy));
     refs.status.textContent=status;refs.status.classList.toggle('error',statusError);
     refs.nav.setAttribute('aria-busy',String(busy));
   }

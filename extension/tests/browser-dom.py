@@ -137,11 +137,14 @@ with sync_playwright() as p:
  # Actual options markup and JS with mock browser APIs; never activates a real proxy.
  option=ctx.new_page();option.on('pageerror',lambda e:errors.append(str(e)))
  markup=(ROOT/'ui/options.html').read_text();markup=re.sub(r'<script[^>]*>.*?</script>','',markup,flags=re.S);markup=re.sub(r'<link[^>]*>','',markup)
- option.set_content(markup);option.add_style_tag(content=(ROOT/'ui/common.css').read_text());script(option,'tests/browser-shim.js');script(option,'src/home-core.js');script(option,'src/proxy-core.js')
+ option.set_content(markup);option.add_style_tag(content=(ROOT/'ui/common.css').read_text());script(option,'tests/browser-shim.js');script(option,'src/home-core.js');script(option,'src/focus-core.js');script(option,'src/proxy-core.js')
  option.evaluate("code=>new Function('chrome',code)(window.chromeMock)",(ROOT/'ui/options.js').read_text())
  option.select_option('#homeTheme','oled');option.locator('#homeHideBanner').check();option.get_by_role('button',name='保存设置',exact=True).click()
  assert option.evaluate('fixtureStorage.all.sync.homeTheme')=='oled' and option.evaluate('fixtureStorage.all.sync.homeHideBanner')
  ok('options save all new homepage switches and theme selection')
+ option.locator('#focusEnabled').check();option.locator('#focusDailyMinutes').fill('45');option.locator('#focusDailyVideos').fill('3');option.get_by_role('button',name='保存设置',exact=True).click()
+ option.wait_for_function('fixtureStorage.all.sync.focusDailyMinutes===45');assert option.evaluate('fixtureStorage.all.sync.focusEnabled===true&&fixtureStorage.all.sync.focusDailyVideos===3')
+ ok('options save focus mode limits as numbers')
  assert option.evaluate('permissionRequests')==0;option.locator('#enableProxy').click();assert '勾选' in option.locator('#proxyStatus').inner_text()
  option.locator('#proxyConsent').check();option.locator('#proxyUrl').fill('https://user:pass@example.com/');option.locator('#enableProxy').click();assert '账号密码' in option.locator('#proxyStatus').inner_text();assert option.evaluate('permissionRequests')==0
  ok('proxy stays opt-in; consent and credential rejection precede mock permission requests')

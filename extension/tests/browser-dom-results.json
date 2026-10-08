@@ -1,5 +1,5 @@
 {
-  "browser": "144.0.7559.96",
+  "browser": "141.0.7390.37",
   "environment": "Local fixture DOM only, mocked Chrome APIs; NOT installed extension or live Bilibili; proxy never enabled",
   "tests": [
     {
@@ -100,6 +100,10 @@
     },
     {
       "test": "options save all new homepage switches and theme selection",
+      "passed": true
+    },
+    {
+      "test": "options save focus mode limits as numbers",
       "passed": true
     },
     {

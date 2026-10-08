@@ -1,5 +1,7 @@
 "use strict";
 
+importScripts("focus-core.js");
+
 const BADGE_COLOR = "#fb7299";
 
 function setThreadBadge(tabId, enabled, activeThreads) {
@@ -46,4 +48,34 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 chrome.runtime.onMessage.addListener((message, sender) => {
   if (sender.id === chrome.runtime.id && message?.type === 'flow-open-options') chrome.runtime.openOptionsPage();
   return false;
+});
+
+// Focus mode: the service worker is the only writer of today's usage, so several B 站 tabs
+// cannot overwrite each other's counts. Requests are applied strictly one after another.
+const focus = self.__BTR_FOCUS_CORE__;
+let focusChain = Promise.resolve();
+function focusRun(change, id) {
+  const run = focusChain.then(async () => {
+    const now = Date.now();
+    const s = focus.settings(await chrome.storage.sync.get(focus.defaults));
+    const {focusUsage} = await chrome.storage.local.get("focusUsage");
+    const next = change ? change(focusUsage, now, s) : focus.usage(focusUsage, now, s);
+    if (change) await chrome.storage.local.set({focusUsage: next});
+    return {...focus.evaluate(next, now, s, id), enabled: s.focusEnabled, strict: s.focusStrict};
+  });
+  focusChain = run.catch(() => {});
+  return run;
+}
+
+chrome.runtime.onMessage.addListener((message, sender, reply) => {
+  if (sender.id !== chrome.runtime.id || typeof message?.type !== "string" || !message.type.startsWith("focus-")) return false;
+  const id = typeof message.id === "string" ? message.id.slice(0, 120) : null;
+  let job;
+  if (message.type === "focus-tick") job = focusRun((u, now, s) => focus.tick(u, now, s, message.seconds, id), id);
+  else if (message.type === "focus-check") job = focusRun(null, id);
+  else if (message.type === "focus-snooze") job = focusRun((u, now, s) => focus.snooze(u, now, s, message.kind), id);
+  else if (message.type === "focus-close-tab" && Number.isInteger(sender.tab?.id)) { chrome.tabs.remove(sender.tab.id).catch(() => {}); return false; }
+  else return false;
+  job.then(reply, (error) => reply({error: String(error?.message || error)}));
+  return true;
 });

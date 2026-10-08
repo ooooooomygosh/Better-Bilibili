@@ -1,11 +1,12 @@
 'use strict';
 const $=id=>document.getElementById(id);
-const defaults={enabled:true,liveEnabled:true,autoConcurrency:true,smartPolicy:true,strategy:'auto',mode:'auto',maxAutoThreads:32,memoryBudgetMB:64,takeover:'full',...globalThis.__BTR_HOME_CORE__.defaults};
+const defaults={enabled:true,liveEnabled:true,autoConcurrency:true,smartPolicy:true,strategy:'auto',mode:'auto',maxAutoThreads:32,memoryBudgetMB:64,takeover:'full',...globalThis.__BTR_HOME_CORE__.defaults,...globalThis.__BTR_FOCUS_CORE__.defaults};
+const focusCore=globalThis.__BTR_FOCUS_CORE__;
 function populate(s){for(const[k,v]of Object.entries(defaults))if(typeof v==='boolean')$(k).checked=s[k];else $(k).value=String(s[k]);}
-chrome.storage.sync.get(defaults).then(s=>populate({...s,...globalThis.__BTR_HOME_CORE__.settings(s)})).catch(e=>$('saved').textContent=e.message);
-$('settings').onsubmit=async e=>{e.preventDefault();try{const out={};for(const[k,v]of Object.entries(defaults))out[k]=typeof v==='boolean'?$(k).checked:typeof v==='number'?Number($(k).value):$(k).value;await chrome.storage.sync.set(out);$('saved').textContent='已保存。下载策略在后续请求中生效；若更换播放内核，请刷新视频页。';}catch(err){$('saved').textContent=err.message;}};
-$('restore').onclick=async()=>{try{await chrome.storage.sync.set(defaults);populate(defaults);$('saved').textContent='已恢复默认设置；没有改动代理或清除历史。';}catch(e){$('saved').textContent=e.message;}};
-$('clearHistory').onclick=async()=>{try{await chrome.storage.local.set({flowHistoryClearedAt:Date.now()});const all=await chrome.storage.local.get(null);const keys=Object.keys(all).filter(k=>k.startsWith('flowHistory:'));await chrome.storage.local.remove(keys);$('saved').textContent=`已清空 ${keys.length} 组推荐历史；之后刷到的推荐仍会记录，关闭“保存推荐批次”可停止。`;}catch(e){$('saved').textContent=e.message;}};
+chrome.storage.sync.get(defaults).then(s=>populate({...s,...globalThis.__BTR_HOME_CORE__.settings(s),...focusCore.settings(s)})).catch(e=>$('saved').textContent=e.message);
+$('settings').onsubmit=async e=>{e.preventDefault();try{const out={};for(const[k,v]of Object.entries(defaults))out[k]=typeof v==='boolean'?$(k).checked:typeof v==='number'?Number($(k).value):$(k).value;Object.assign(out,focusCore.settings(out));populate(out);await chrome.storage.sync.set(out);$('saved').classList.remove('dirty');$('saved').textContent='已保存。下载策略在后续请求中生效；若更换播放内核，请刷新视频页。';}catch(err){$('saved').textContent=err.message;}};
+$('restore').onclick=async()=>{try{await chrome.storage.sync.set(defaults);populate(defaults);$('saved').classList.remove('dirty');$('saved').textContent='已恢复默认设置；没有改动代理或清除历史。';}catch(e){$('saved').textContent=e.message;}};
+$('clearHistory').onclick=async()=>{if(!confirm('确定清空本扩展保存的全部推荐历史？此操作无法撤销。'))return;try{await chrome.storage.local.set({flowHistoryClearedAt:Date.now()});const all=await chrome.storage.local.get(null);const keys=Object.keys(all).filter(k=>k.startsWith('flowHistory:'));await chrome.storage.local.remove(keys);$('saved').textContent=`已清空 ${keys.length} 组推荐历史；之后刷到的推荐仍会记录，关闭“保存推荐批次”可停止。`;}catch(e){$('saved').textContent=e.message;}};
 const proxyCall=(method,details)=>new Promise((resolve,reject)=>{chrome.proxy.settings[method](details,result=>{const e=chrome.runtime.lastError;if(e)reject(new Error(e.message));else resolve(result);});});
 async function proxyState(){
  const data=await chrome.storage.local.get('flowProxy');if(data.flowProxy?.url)$('proxyUrl').value=data.flowProxy.url;
@@ -28,3 +29,12 @@ $('disableProxy').onclick=async()=>{try{
  await chrome.storage.local.remove('flowProxy');$('proxyStatus').textContent='已清除本扩展代理设置，并撤销本扩展代理权限。';
 }catch(e){$('proxyStatus').textContent=e.message;}};
 proxyState().catch(e=>$('proxyStatus').textContent=e.message);
+$('settings').addEventListener('change',()=>{$('saved').classList.add('dirty');$('saved').textContent='有未保存的更改，点击“保存设置”后生效。';});
+for(const b of document.querySelectorAll('[data-preset]'))b.onclick=()=>{const[m,v,w,r]=b.dataset.preset.split(',');$('focusDailyMinutes').value=m;$('focusDailyVideos').value=v;$('focusSessionMinutes').value=w;$('focusBreakMinutes').value=r;$('focusEnabled').checked=true;$('settings').dispatchEvent(new Event('change'));};
+async function focusUsage(){try{const r=await chrome.runtime.sendMessage({type:'focus-check'});if(!r||r.error)return;const box=$('focusUsage');box.replaceChildren();
+ const bar=(label,value,limit,text)=>{const row=document.createElement('div');row.className='usage-row';const head=document.createElement('div');head.className='usage-head';const l=document.createElement('span');l.textContent=label;const t=document.createElement('b');t.textContent=text;head.append(l,t);const track=document.createElement('div');track.className='meter';const fill=document.createElement('i');fill.style.width=limit?Math.min(100,value/limit*100)+'%':'0%';if(limit&&value>=limit)fill.className='full';track.append(fill);row.append(head,track);box.append(row);};
+ bar('今日观看',r.seconds,r.timeLimit,r.timeLimit?`${focusCore.fmt(r.seconds)} / ${focusCore.fmt(r.timeLimit)}`:focusCore.fmt(r.seconds));
+ bar('今日视频',r.videos,r.videoLimit,r.videoLimit?`${r.videos} / ${r.videoLimit} 个`:`${r.videos} 个`);
+ if(r.snoozes){const p=document.createElement('p');p.className='hint';p.textContent=`今天已延长 / 跳过 ${r.snoozes} 次`;box.append(p);}
+}catch(_){}}
+focusUsage();setInterval(focusUsage,5000);
