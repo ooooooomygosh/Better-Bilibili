@@ -55,10 +55,13 @@
 |---|---|---|
 | ⚡ | **视频加载加速** | 多 CDN / Range 并发下载、自动线程数、按时长 / 码率 / 倍速调整缓冲；播放出问题可切到「兼容模式」，只保留 Range 加速。 |
 | 🧹 | **首页净化** | 移除大图活动轮播和它留下的空位，隐藏带明确广告标记的卡片；季节横幅可以选择收起。不重排、不改动原生卡片。 |
+| ♾️ | **无限下滑**（2.1 新增） | 开启后快到底时自动并发加载 1–3 批推荐（每批 12 / 24 / 30 个），按「第 N 批」接在下面，右侧显示当前第几批；去重、过滤广告，遇到限流自动暂停。默认关闭。 |
 | ↩️ | **换一批可回看** | 推荐区上方的操作行：上一批 · 批次 · 下一批 · 换一批。历史只存在本机，每个标签页最多 25 批。 |
 | 🌑 | **OLED 纯黑** | 仅在 B 站原生深色模式下，把首页主要底色改为 `#000`；不反色，不动封面和视频。 |
 | 🌐 | **可选代理分流** | 默认关闭；明确授权后，只让 B 站域名走你自己的代理。 |
 | 🎛️ | **页内面板** | 视频页右下角的「节流」按钮：CDN 路线、播放内核、线程数、诊断复制。 |
+
+<p align="center"><img src="docs/screenshots/infinite.png" width="760" alt="无限下滑：按批次拼接的推荐和右侧的批次提示"></p>
 
 ## 安装
 
@@ -97,14 +100,14 @@ scripts/build.sh    打包为 dist/BiliThrottle-<版本>.zip
 ### 开发
 
 ```bash
-node --test extension/tests/core.test.cjs extension/tests/update.test.cjs extension/tests/focus.test.cjs
+node --test extension/tests/core.test.cjs extension/tests/update.test.cjs extension/tests/focus.test.cjs extension/tests/feed.test.cjs
 ./scripts/build.sh   # 生成 dist/BiliThrottle-<版本>.zip
 # 修改 extension/manifest.json 的 version 并推送到 main，即自动构建并发布对应 Release
 ```
 
 ## 隐私
 
-必需权限只有 `storage`。推荐历史和节流阀用量都只保存在本机，不上传任何数据；代理权限只在你明确授权后才申请。详见[隐私说明](extension/docs/PRIVACY.zh-CN.md)。
+必需权限只有 `storage`。推荐历史和节流阀用量都只保存在本机，不上传任何数据；开启「无限下滑」后，扩展会以你的登录状态请求 B 站自己的首页推荐接口；代理权限只在你明确授权后才申请。详见[隐私说明](extension/docs/PRIVACY.zh-CN.md)。
 
 ## 致谢与许可
 

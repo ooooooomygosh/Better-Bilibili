@@ -29,7 +29,7 @@ jobs:
           if gh release view "$v" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "exists=true" >> "$GITHUB_OUTPUT"; else echo "exists=false" >> "$GITHUB_OUTPUT"; fi
       - name: Unit tests
         if: steps.check.outputs.exists == 'false'
-        run: node --test extension/tests/core.test.cjs extension/tests/update.test.cjs extension/tests/focus.test.cjs
+        run: node --test extension/tests/core.test.cjs extension/tests/update.test.cjs extension/tests/focus.test.cjs extension/tests/feed.test.cjs
       - name: Check tag matches manifest version
         if: steps.check.outputs.exists == 'false' && startsWith(github.ref, 'refs/tags/')
         run: test "v$(node -p "require('./extension/manifest.json').version")" = "${GITHUB_REF_NAME}"

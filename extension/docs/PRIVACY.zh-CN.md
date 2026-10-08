@@ -33,3 +33,8 @@
 Debug 面板的“复制诊断信息”仅在用户点击时生成文本并尝试写入剪贴板；没有自动上传端点。媒体下载 URL 整段隐藏，其他 URL 查询／片段与常见敏感字段做脱敏；公开页面路径、浏览器版本、设置和调试事件仍可能体现使用情况，分享前应检查。剪贴板不可用时显示只读文本供手动复制。
 
 根据上游修复，升级时会一次性移除五个明确的旧编码错误缓存键，而不是清空 B 站全部本地数据或 Cookie：enableHEVCError、enableAV1Error、decodeHEVCError、decodeAV1Error、bilibili_decode_error_obj。接管运行期间仅拦截这几类失败标记，防止插件接管错误被站点长期误记为浏览器不支持编码。
+
+## 2.1.0 无限下滑与节流阀
+
+- **无限下滑**（默认关闭）：开启后，扩展会在首页向 `api.bilibili.com` 的首页推荐接口与 `nav` 接口发请求，与 B 站网页自己加载推荐时用的是同一组接口；请求附带你在 B 站的登录 Cookie，由浏览器按 B 站自身的 CORS 规则发送，扩展不读取、不保存 Cookie。签名用的两段公开 key 会缓存在本机 `chrome.storage.local`（`flowWbiKeys`，12 小时有效）。推荐结果只显示在页面上，不写入存储。
+- **节流阀**：观看用量（秒数、视频 BV 号、重置时间）只保存在本机 `chrome.storage.local`（`focusUsage`），不上传。

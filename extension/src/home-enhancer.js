@@ -1,4 +1,4 @@
-/* BiliThrottle 2.0.1 — isolated world. Native Vue cards stay mounted and retain their handlers.
+/* BiliThrottle 2.1.0 — isolated world. Native Vue cards stay mounted and retain their handlers.
  * Native refresh is the only source of fresh recommendations: no private API, prefetch loop,
  * synthetic scroll, raw-HTML snapshots or automatic document reload.
  */
@@ -53,6 +53,8 @@ html[data-btr-home-clean][data-btr-hide-banner] .bili-header .bili-header__bar{b
 html[data-btr-home-clean][data-btr-hide-banner] .bili-header .bili-header__bar :is(.entry-title,.download-entry,.default-entry,.loc-entry,.right-entry-icon,.right-entry-text){color:var(--text1,#18191c)!important}
 html[data-btr-home-ui] [data-btr-native-refresh],html[data-btr-home-ui] #__bilibili_thread_ripper_launcher__{display:none!important}
 html[data-btr-history-open] [data-btr-grid]{display:none!important}
+/* Infinite feed replaces the site's own lazy loader, so content never shifts above the reader. */
+html[data-btr-infinite] .load-more-anchor{display:none!important}
 html[data-btr-oled]{--bg1:#000;--bg2:#000;--bg3:#000;--bg1_float:#000;--bg2_float:#000}
 html[data-btr-oled] :is(body,#i_cecream,#app,.bili-header__bar,.bili-header__channel,.header-channel,.channel-link,.channel-link__right,.channel-link__left,.bili-video-card,.bili-video-card__info,.feed-card,.v-popover-content,.search-panel,.nav-search-content,.nav-search-input){background-color:#000!important}
 `;
@@ -97,9 +99,20 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     if(had)root().setAttribute('data-btr-oled','');
     return dark;
   }
+  let lastDark=false, lastColumns={count:5,gap:'20px'};
+  const infinite=globalThis.__BTR_HOME_INFINITE__?.create({
+    anchor:()=>grid?.closest('.recommended-container_floor-aside,.recommended-container')||grid,
+    nativeLinks:()=>grid?[...grid.querySelectorAll('a[href*="/video/BV"]')].map(a=>a.href):[],
+    enabled:()=>active()&&settings.homeInfinite&&!!grid?.isConnected,
+    settings:()=>settings,
+    hidden:()=>root().hasAttribute('data-btr-history-open'),
+    theme:()=>({dark:lastDark,oled:root().hasAttribute('data-btr-oled')}),
+    columns:()=>lastColumns
+  });
   function theme() {
     if(!document.body)return;
-    const dark=detectDark(); toggle('data-btr-oled',active()&&settings.homeTheme==='oled'&&dark);
+    const dark=detectDark(); lastDark=dark; toggle('data-btr-oled',active()&&settings.homeTheme==='oled'&&dark);
+    infinite?.theme();
     if(bar) {
       bar.style.setProperty('--btr-text',dark?'#e3e5e7':'#18191c');
       bar.style.setProperty('--btr-placeholder',root().hasAttribute('data-btr-oled')?'#000':dark?'#222':'#f1f2f3');
@@ -110,7 +123,8 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     mountSkin(); toggle('data-btr-home-clean',active());
     toggle('data-btr-hide-carousel',active()&&settings.homeHideCarousel);
     toggle('data-btr-hide-banner',active()&&settings.homeHideBanner);
-    toggle('data-btr-hide-ads',active()&&settings.homeHideAds); theme();
+    toggle('data-btr-hide-ads',active()&&settings.homeHideAds);
+    toggle('data-btr-infinite',active()&&settings.homeInfinite); theme();
   }
   function isAd(node) {
     // Explicit promotion badges only. Never classify by video title or link keywords.
@@ -177,6 +191,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     const count=parts[0]==='none'?Math.max(1,Math.floor(grid.clientWidth/250)):parts.length;
     bar.style.setProperty('--btr-columns',String(Math.max(1,Math.min(10,count))));
     bar.style.setProperty('--btr-gap',cs.columnGap==='normal'?'20px':cs.columnGap);
+    lastColumns={count:Math.max(1,Math.min(10,count)),gap:cs.columnGap==='normal'?'20px':cs.columnGap};infinite?.theme();
   }
   function ensureBar() {
     if(!grid?.parentElement)return;
@@ -194,9 +209,9 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
       shadow.append(refs.nav);
     }
     if(bar.parentNode!==grid.parentNode||bar.nextElementSibling!==grid)grid.before(bar);
-    toggle('data-btr-home-ui',true); columnCount();render();theme();
+    toggle('data-btr-home-ui',true); columnCount();render();theme();infinite?.sync();
   }
-  function closeHistory() {view?.remove();view=null;toggle('data-btr-history-open',false);}
+  function closeHistory() {view?.remove();view=null;toggle('data-btr-history-open',false);infinite?.sync();}
   function show(wanted) {
     if(busy||wanted<0||wanted>=snapshots.length||!bar)return;
     const wasHistory=!!view; if(!wasHistory)liveScroll=window.scrollY;
@@ -216,7 +231,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
       if(c.duration)cover.append(el('span',c.duration,'duration'));
       a.append(cover,el('div',c.title,'title'),el('div',[c.author,c.stats].filter(Boolean).join(' · '),'meta'));cards.append(a);
     }
-    view.append(cards);shadow.append(view);toggle('data-btr-history-open',true);
+    view.append(cards);shadow.append(view);toggle('data-btr-history-open',true);infinite?.sync();
     // History lives in normal flow, never covers the search, navigation or bottom video row.
     if(bar.getBoundingClientRect().top<64)bar.scrollIntoView({block:'start',behavior:'instant'});
   }
@@ -344,7 +359,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     gridObserver?.disconnect();resizeObserver?.disconnect();grid?.removeAttribute('data-btr-grid');
     if(transaction){finishTransaction();notify('推荐区域已重建，正在读取当前内容。');}
     grid=next;candidateKey='';
-    if(!grid){bar?.remove();toggle('data-btr-home-ui',false);return;}
+    if(!grid){bar?.remove();toggle('data-btr-home-ui',false);infinite?.sync();return;}
     grid.setAttribute('data-btr-grid','');ensureBar();tagRefresh();collect();
     gridObserver=new MutationObserver(scheduleSettle);
     gridObserver.observe(grid,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['href','src','data-src']});
@@ -363,7 +378,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     gridObserver?.disconnect();mountObserver?.disconnect();resizeObserver?.disconnect();
     gridObserver=mountObserver=resizeObserver=null;closeHistory();bar?.remove();bar=shadow=null;refs={};grid=null;
     nativeRefresh?.removeAttribute('data-btr-native-refresh');nativeRefresh=nativeTarget=null;clearMarks();
-    toggle('data-btr-home-ui',false);toggle('data-btr-oled',false);
+    toggle('data-btr-home-ui',false);toggle('data-btr-oled',false);infinite?.stop();
   }
   function syncRoute() {
     applySkin();
