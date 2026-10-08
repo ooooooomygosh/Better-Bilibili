@@ -1,4 +1,4 @@
-/* BTR Flow 1.2.0 — isolated world. Native Vue cards stay mounted and retain their handlers.
+/* BiliThrottle 2.0.0 — isolated world. Native Vue cards stay mounted and retain their handlers.
  * Native refresh is the only source of fresh recommendations: no private API, prefetch loop,
  * synthetic scroll, raw-HTML snapshots or automatic document reload.
  */
@@ -189,7 +189,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
       refs.next=button('下一批 →',()=>show(index+1),'前进到已保存的下一批');
       refs.count=el('span','—','count');
       refs.refresh=button('换一批',refresh,'使用 B 站原生换一换，不刷新整个页面');refs.refresh.className='refresh';
-      refs.settings=button('设置',()=>chrome.runtime.sendMessage({type:'flow-open-options'}).catch(()=>notify('请从扩展图标打开增强设置。',true)),'BTR Flow 设置');
+      refs.settings=button('设置',()=>chrome.runtime.sendMessage({type:'flow-open-options'}).catch(()=>notify('请从扩展图标打开增强设置。',true)),'哔哩节流阀设置');
       refs.nav.append(refs.status,refs.back,refs.count,refs.next,el('span',null,'separator'),refs.refresh,refs.settings);
       shadow.append(refs.nav);
     }

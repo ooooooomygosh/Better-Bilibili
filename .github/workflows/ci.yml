@@ -24,5 +24,5 @@ jobs:
         run: ./scripts/build.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: BTR-Flow-extension
+          name: BiliThrottle-extension
           path: dist/*.zip

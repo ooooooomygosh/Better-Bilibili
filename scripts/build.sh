@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Package extension/ as dist/BTR-Flow-<version>.zip (folder BTR-Flow-<version>/ inside, manifest.json at its top).
+# Package extension/ as dist/BiliThrottle-<version>.zip (folder BiliThrottle-<version>/ inside, manifest.json at its top).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="$(node -p "require('$ROOT/extension/manifest.json').version")"
-NAME="BTR-Flow-$VERSION"
+NAME="BiliThrottle-$VERSION"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 cp -r "$ROOT/extension" "$STAGE/$NAME"

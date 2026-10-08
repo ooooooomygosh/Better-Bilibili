@@ -2,7 +2,7 @@
   "use strict";
 
   const CHANNEL = "__BILI_RANGE_ACCELERATOR_V1__";
-  const VERSION = "1.2.0";
+  const VERSION = "2.0.0";
   const notices = globalThis.__BTR_NOTIFICATION_VIEW__;
   const ERROR_NOTICE_ID = "__bilibili_thread_ripper_error_notice__";
   const ERROR_NOTICE_STYLE_ID = "__bilibili_thread_ripper_error_notice_style__";
@@ -150,7 +150,7 @@
       summary.className = "btr-error-summary";
       const title = document.createElement("p");
       title.className = "btr-error-title";
-      title.textContent = "BTR 提示";
+      title.textContent = "节流阀提示";
       const description = document.createElement("p");
       description.className = "btr-error-description";
       description.textContent = "没能接管这个视频。";

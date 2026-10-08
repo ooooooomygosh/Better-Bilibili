@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "BTR Flow · 线程撕裂者增强版",
-  "short_name": "BTR Flow",
-  "version": "1.2.0",
-  "description": "保留原生播放器和首页：多 CDN / Range 加速、轮播净化、推荐批次回看、专注模式（每日观看额度与番茄钟休息）与可选纯黑。非官方维护分支。",
+  "name": "哔哩节流阀 · BiliThrottle",
+  "short_name": "BiliThrottle",
+  "version": "2.0.0",
+  "description": "B 站的油门和刹车：多 CDN 加速加载、首页净化、换一批可回看，再加上像 Claude Code 一样的 5 小时与每周观看额度。",
   "minimum_chrome_version": "114",
   "permissions": [
     "storage"
@@ -12,7 +12,7 @@
     "service_worker": "src/service-worker.js"
   },
   "action": {
-    "default_title": "BTR Flow · 控制台",
+    "default_title": "哔哩节流阀",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",
@@ -135,7 +135,7 @@
       "world": "ISOLATED"
     }
   ],
-  "version_name": "1.2.0 · upstream 2026.10.4.1 backport",
+  "version_name": "2.0.0 · 油门帮你踩，刹车也帮你踩",
   "optional_permissions": [
     "proxy"
   ],
