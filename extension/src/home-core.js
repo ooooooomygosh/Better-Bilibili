@@ -2,7 +2,8 @@
 (function (root) {
   'use strict';
   const MAX_SNAPSHOTS = 25, MAX_CARDS = 36, TTL = 7 * 86400000;
-  const defaults = Object.freeze({homeEnabled:true, homeHistory:true, homeTheme:'native', homeHideCarousel:true, homeHideBanner:false, homeHideAds:true});
+  const defaults = Object.freeze({homeEnabled:true, homeHistory:true, homeTheme:'native', homeHideCarousel:true, homeHideBanner:false, homeHideAds:true,
+    homeInfinite:false, homeInfiniteSize:24, homeInfiniteThreads:2});
   function settings(raw = {}) {
     const out = {...defaults};
     for (const k of Object.keys(defaults)) {
@@ -10,6 +11,9 @@
     }
     // 1.0's light/dark/auto/off all return to Bilibili's own theme, never force a theme on upgrade.
     out.homeTheme = raw.homeTheme === 'oled' ? 'oled' : 'native';
+    const num = (v, lo, hi, d) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d; };
+    out.homeInfiniteSize = num(raw.homeInfiniteSize, 6, 30, defaults.homeInfiniteSize);
+    out.homeInfiniteThreads = num(raw.homeInfiniteThreads, 1, 3, defaults.homeInfiniteThreads);
     return out;
   }
   const text = (s, n) => String(s || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n);

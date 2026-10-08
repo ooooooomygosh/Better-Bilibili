@@ -1,6 +1,6 @@
 {
   "name": "BiliThrottle (哔哩节流阀)",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "build_date": "2026-10-08",
   "distribution": "Unofficial Chrome/Edge MV3 fork; not an upstream extension release",
   "input": "BTR-Flow-1.0.0(1).zip",
@@ -20,16 +20,17 @@
     "hide_seasonal_banner": false,
     "theme": "native",
     "history": true,
-    "focus_mode_enabled": false
+    "focus_mode_enabled": false,
+    "infinite_feed": false
   },
   "proxy_enabled_by_default": false,
   "automatic_updates": false,
   "testing": {
-    "node_core_passed": 78,
+    "node_core_passed": 89,
     "renderer_home_options_fixture_passed": 30,
     "renderer_branch_diagnostics_fixture_passed": 9,
     "real_mse_synthetic_media_passed": "not re-run for 1.2.0 (open-source Chromium lacks H.264); 7 passed on 1.1.0",
-    "total_passed": 121,
+    "total_passed": 141,
     "real_bilibili_e2e_verified": false,
     "real_HDR_HiRes_hardware_verified": false,
     "firefox_safari_verified": false,
@@ -38,7 +39,9 @@
     "browser": "Chromium 141 (Playwright chromium-1194)",
     "node": "22.22.0",
     "installed_extension_focus_e2e_passed": "loaded unpacked in Chromium (Playwright chromium-1194) on a routed fixture page: 5-hour window block + reset countdown, play() re-block, snooze, weekly block, automatic lift at window reset, Pomodoro countdown, in-page panel opens",
-    "renderer_native_refresh_wrapper_passed": 4
+    "renderer_native_refresh_wrapper_passed": 4,
+    "renderer_infinite_feed_passed": 9,
+    "installed_extension_infinite_e2e": "loaded unpacked; content-script fetch to api.bilibili.com with page cookies and CORS on a routed homepage: 8 batches over 8 signed requests, no errors; launcher hidden on home, opens on video page"
   },
-  "previous_version": "2.0.0"
+  "previous_version": "2.0.1"
 }
