@@ -1,10 +1,10 @@
-哔哩节流阀 BiliThrottle 2.0.0（原名 BTR Flow）— 新增像 Claude Code 一样的 5 小时窗口与每周观看额度，可从 BTR Flow 1.x 覆盖升级，设置保留
+哔哩节流阀 BiliThrottle 2.0.1（原名 BTR Flow）— 新增像 Claude Code 一样的 5 小时窗口与每周观看额度，可从 BTR Flow 1.x 覆盖升级，设置保留
 
 此包是非官方 Chrome / Edge MV3 分支，适用修复回移至上游 2026.10.4.1。
 作者已停止发布独立扩展，转为用户脚本；本包不是作者官方扩展，不自动更新。
 
 已有 1.0.0：
-1. 解压，打开 BiliThrottle-2.0.0 文件夹，确认里面直接有 manifest.json。
+1. 解压，打开 BiliThrottle-2.0.1 文件夹，确认里面直接有 manifest.json。
 2. 将里面的文件覆盖到原来加载的 BTR Flow 目录，保持原目录路径。
 3. 在 chrome://extensions/ 或 edge://extensions/ 点击 BTR Flow 的重新加载。
 4. 刷新已打开的 B 站标签页，或关闭后重新打开。

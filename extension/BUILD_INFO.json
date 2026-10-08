@@ -1,6 +1,6 @@
 {
   "name": "BiliThrottle (哔哩节流阀)",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "build_date": "2026-10-08",
   "distribution": "Unofficial Chrome/Edge MV3 fork; not an upstream extension release",
   "input": "BTR-Flow-1.0.0(1).zip",
@@ -29,7 +29,7 @@
     "renderer_home_options_fixture_passed": 30,
     "renderer_branch_diagnostics_fixture_passed": 9,
     "real_mse_synthetic_media_passed": "not re-run for 1.2.0 (open-source Chromium lacks H.264); 7 passed on 1.1.0",
-    "total_passed": 117,
+    "total_passed": 121,
     "real_bilibili_e2e_verified": false,
     "real_HDR_HiRes_hardware_verified": false,
     "firefox_safari_verified": false,
@@ -37,7 +37,8 @@
     "reason_for_install_e2e_gap": "Managed Chromium blocked extension management and live Bilibili pages; not bypassed",
     "browser": "Chromium 141 (Playwright chromium-1194)",
     "node": "22.22.0",
-    "installed_extension_focus_e2e_passed": "loaded unpacked in Chromium (Playwright chromium-1194) on a routed fixture page: 5-hour window block + reset countdown, play() re-block, snooze, weekly block, automatic lift at window reset, Pomodoro countdown, in-page panel opens"
+    "installed_extension_focus_e2e_passed": "loaded unpacked in Chromium (Playwright chromium-1194) on a routed fixture page: 5-hour window block + reset countdown, play() re-block, snooze, weekly block, automatic lift at window reset, Pomodoro countdown, in-page panel opens",
+    "renderer_native_refresh_wrapper_passed": 4
   },
-  "previous_version": "1.2.0 (BTR Flow)"
+  "previous_version": "2.0.0"
 }

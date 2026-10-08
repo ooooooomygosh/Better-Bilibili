@@ -1,4 +1,4 @@
-# 哔哩节流阀 BiliThrottle 2.0.0
+# 哔哩节流阀 BiliThrottle 2.0.1
 
 > 油门帮你踩，刹车也帮你踩。（原名 BTR Flow）
 
@@ -18,7 +18,7 @@
 
 ## 已经在用 BTR Flow 1.x：这样更新
 
-1. 解压本包，找到 `BiliThrottle-2.0.0` 文件夹，里面应直接包含 `manifest.json`、`src`、`ui`。
+1. 解压本包，找到 `BiliThrottle-2.0.1` 文件夹，里面应直接包含 `manifest.json`、`src`、`ui`。
 2. 将这个文件夹内的文件覆盖到**原来加载的扩展目录**。不要先卸载原扩展，也不要同时加载第二个目录。保持原路径有助于保留扩展 ID、设置和本地历史。
 3. 在 Chrome 的 `chrome://extensions/` 或 Edge 的 `edge://extensions/` 找到 BTR Flow，点击「重新加载」。
 4. **刷新已经打开的 B 站标签页，或关闭后重新打开。** 仅重新加载扩展不会清除旧页面里已经注入的播放器代码。
