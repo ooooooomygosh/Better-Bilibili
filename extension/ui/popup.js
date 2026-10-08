@@ -19,12 +19,11 @@ async function update(){
  }catch(_){$('profile').textContent='请在 B 站页面使用；刚安装后需要刷新页面。';}
 }
 async function focus(){
- try{const r=await chrome.runtime.sendMessage({type:'focus-check'}),box=$('focusUsage');if(!r||r.error||!r.enabled){box.replaceChildren();return;}
-  const f=globalThis.__BTR_FOCUS_CORE__,rows=[];
-  if(r.timeLimit)rows.push(['今日观看',r.seconds/r.timeLimit,`${f.fmt(r.seconds)} / ${f.fmt(r.timeLimit)}`]);else rows.push(['今日观看',0,f.fmt(r.seconds)]);
-  if(r.videoLimit)rows.push(['今日视频',r.videos/r.videoLimit,`${r.videos} / ${r.videoLimit} 个`]);
-  box.replaceChildren(...rows.map(([label,ratio,text])=>{const row=document.createElement('div'),head=document.createElement('div'),l=document.createElement('span'),b=document.createElement('b'),m=document.createElement('div'),i=document.createElement('i');
-   head.className='usage-head';l.textContent=label;b.textContent=text;head.append(l,b);m.className='meter';i.style.width=Math.min(100,ratio*100)+'%';if(ratio>=1)i.className='full';m.append(i);row.append(head,m);return row;}));
+ try{const r=await chrome.runtime.sendMessage({type:'focus-check'}),box=$('focusUsage');if(!r||r.error||!r.enabled||!r.window){box.replaceChildren();return;}
+  const f=globalThis.__BTR_FOCUS_CORE__,row=(label,m,extra='')=>{const el=document.createElement('div'),head=document.createElement('div'),l=document.createElement('span'),b=document.createElement('b'),bar=document.createElement('div'),i=document.createElement('i'),foot=document.createElement('div');
+   head.className='usage-head';l.textContent=label;b.textContent=m.limit?`${m.percent}%`:f.fmt(m.seconds);head.append(l,b);bar.className='meter';i.style.width=(m.limit?m.percent:0)+'%';if(m.limit&&m.seconds>=m.limit)i.className='full';bar.append(i);
+   foot.className='usage-foot';foot.textContent=`${f.fmtReset(m.resetAt)}${m.resetAt?' 重置':''}${extra}`;el.append(head,bar,foot);return el;};
+  box.replaceChildren(row('5 小时窗口',r.window,r.videoLimit?` · 视频 ${r.videos}/${r.videoLimit}`:''),row('本周',r.week));
  }catch(_){}
 }
 focus();setInterval(focus,3000);

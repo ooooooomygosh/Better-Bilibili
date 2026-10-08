@@ -103,7 +103,7 @@
       "passed": true
     },
     {
-      "test": "options save focus mode limits as numbers",
+      "test": "options save 5-hour window and weekly limits as numbers",
       "passed": true
     },
     {

@@ -146,7 +146,7 @@
     } else node.setAttribute("role", "status");
     const heading = document.createElement("span");
     heading.className = "heading";
-    heading.textContent = entry.level === "error" && !settings.debugNotices ? "BTR 提示" : "BTR Debug";
+    heading.textContent = entry.level === "error" && !settings.debugNotices ? "节流阀提示" : "节流阀 Debug";
     const detail = document.createElement("span");
     detail.className = "detail";
     detail.textContent = [plainText(entry.title, 80), plainText(entry.detail)].filter(Boolean).join("\n");

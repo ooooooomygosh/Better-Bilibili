@@ -30,11 +30,13 @@ $('disableProxy').onclick=async()=>{try{
 }catch(e){$('proxyStatus').textContent=e.message;}};
 proxyState().catch(e=>$('proxyStatus').textContent=e.message);
 $('settings').addEventListener('change',()=>{$('saved').classList.add('dirty');$('saved').textContent='有未保存的更改，点击“保存设置”后生效。';});
-for(const b of document.querySelectorAll('[data-preset]'))b.onclick=()=>{const[m,v,w,r]=b.dataset.preset.split(',');$('focusDailyMinutes').value=m;$('focusDailyVideos').value=v;$('focusSessionMinutes').value=w;$('focusBreakMinutes').value=r;$('focusEnabled').checked=true;$('settings').dispatchEvent(new Event('change'));};
-async function focusUsage(){try{const r=await chrome.runtime.sendMessage({type:'focus-check'});if(!r||r.error)return;const box=$('focusUsage');box.replaceChildren();
- const bar=(label,value,limit,text)=>{const row=document.createElement('div');row.className='usage-row';const head=document.createElement('div');head.className='usage-head';const l=document.createElement('span');l.textContent=label;const t=document.createElement('b');t.textContent=text;head.append(l,t);const track=document.createElement('div');track.className='meter';const fill=document.createElement('i');fill.style.width=limit?Math.min(100,value/limit*100)+'%':'0%';if(limit&&value>=limit)fill.className='full';track.append(fill);row.append(head,track);box.append(row);};
- bar('今日观看',r.seconds,r.timeLimit,r.timeLimit?`${focusCore.fmt(r.seconds)} / ${focusCore.fmt(r.timeLimit)}`:focusCore.fmt(r.seconds));
- bar('今日视频',r.videos,r.videoLimit,r.videoLimit?`${r.videos} / ${r.videoLimit} 个`:`${r.videos} 个`);
- if(r.snoozes){const p=document.createElement('p');p.className='hint';p.textContent=`今天已延长 / 跳过 ${r.snoozes} 次`;box.append(p);}
-}catch(_){}}
+for(const b of document.querySelectorAll('[data-preset]'))b.onclick=()=>{const[m,w,v,sm,br]=b.dataset.preset.split(',');$('focusWindowMinutes').value=m;$('focusWeeklyHours').value=w;$('focusWindowVideos').value=v;$('focusSessionMinutes').value=sm;$('focusBreakMinutes').value=br;$('focusEnabled').checked=true;$('settings').dispatchEvent(new Event('change'));};
+// Usage bars styled after Claude Code's /usage: percentage used plus when each period resets.
+function usageRows(r,f){
+ const rows=[];const add=(label,m,extra)=>{const row=document.createElement('div');row.className='usage-row';const head=document.createElement('div');head.className='usage-head';const l=document.createElement('span');l.textContent=label;const t=document.createElement('b');t.textContent=m.limit?`已用 ${m.percent}%`:`已看 ${f.fmt(m.seconds)}`;head.append(l,t);const track=document.createElement('div');track.className='meter';const fill=document.createElement('i');fill.style.width=(m.limit?m.percent:0)+'%';if(m.limit&&m.seconds>=m.limit)fill.className='full';track.append(fill);const foot=document.createElement('div');foot.className='usage-foot';foot.textContent=(m.limit?`${f.fmt(m.seconds)} / ${f.fmt(m.limit)}`:'不限')+(extra||'')+` · ${f.fmtReset(m.resetAt)}${m.resetAt?' 重置':''}`;row.append(head,track,foot);rows.push(row);};
+ add('当前 5 小时窗口',r.window,r.videoLimit?` · 视频 ${r.videos}/${r.videoLimit}`:'');add('本周',r.week);
+ if(r.snoozes){const p=document.createElement('p');p.className='hint';p.textContent=`这个窗口里已经“再看”了 ${r.snoozes} 次`;rows.push(p);}
+ return rows;
+}
+async function focusUsage(){try{const r=await chrome.runtime.sendMessage({type:'focus-check'});if(!r||r.error||!r.window)return;$('focusUsage').replaceChildren(...usageRows(r,focusCore));}catch(_){}}
 focusUsage();setInterval(focusUsage,5000);

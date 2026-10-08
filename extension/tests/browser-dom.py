@@ -142,9 +142,9 @@ with sync_playwright() as p:
  option.select_option('#homeTheme','oled');option.locator('#homeHideBanner').check();option.get_by_role('button',name='保存设置',exact=True).click()
  assert option.evaluate('fixtureStorage.all.sync.homeTheme')=='oled' and option.evaluate('fixtureStorage.all.sync.homeHideBanner')
  ok('options save all new homepage switches and theme selection')
- option.locator('#focusEnabled').check();option.locator('#focusDailyMinutes').fill('45');option.locator('#focusDailyVideos').fill('3');option.get_by_role('button',name='保存设置',exact=True).click()
- option.wait_for_function('fixtureStorage.all.sync.focusDailyMinutes===45');assert option.evaluate('fixtureStorage.all.sync.focusEnabled===true&&fixtureStorage.all.sync.focusDailyVideos===3')
- ok('options save focus mode limits as numbers')
+ option.locator('#focusEnabled').check();option.locator('#focusWindowMinutes').fill('45');option.locator('#focusWeeklyHours').fill('6');option.get_by_role('button',name='保存设置',exact=True).click()
+ option.wait_for_function('fixtureStorage.all.sync.focusWindowMinutes===45');assert option.evaluate('fixtureStorage.all.sync.focusEnabled===true&&fixtureStorage.all.sync.focusWeeklyHours===6')
+ ok('options save 5-hour window and weekly limits as numbers')
  assert option.evaluate('permissionRequests')==0;option.locator('#enableProxy').click();assert '勾选' in option.locator('#proxyStatus').inner_text()
  option.locator('#proxyConsent').check();option.locator('#proxyUrl').fill('https://user:pass@example.com/');option.locator('#enableProxy').click();assert '账号密码' in option.locator('#proxyStatus').inner_text();assert option.evaluate('permissionRequests')==0
  ok('proxy stays opt-in; consent and credential rejection precede mock permission requests')

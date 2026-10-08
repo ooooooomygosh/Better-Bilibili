@@ -21,7 +21,12 @@
   });
   const mainVideos = () => [...document.querySelectorAll('video')].filter(v => v.offsetWidth >= MIN_WIDTH || document.fullscreenElement?.contains(v));
   const playing = () => mainVideos().some(v => !v.paused && !v.ended && v.readyState >= 2);
-  const blocked = () => !!(settings.focusEnabled && state?.block && (state.block.kind !== 'break' || state.block.until > Date.now()));
+  const blocked = () => {
+    const b = state?.block;
+    if (!settings.focusEnabled || !b) return false;
+    const end = b.until || b.resetAt; // A limit lifts by itself once its period resets.
+    return !end || end > Date.now();
+  };
 
   function pauseAll() {
     for (const v of mainVideos()) if (!v.paused) { try { v.pause(); } catch (_) {} }
@@ -38,7 +43,8 @@
       for (const mins of [5, 1]) {
         if (res.remaining <= mins * 60 && res.remaining > 0 && !warned.has(mins)) {
           warned.add(mins); for (const m of [5, 1]) if (m >= mins) warned.add(m);
-          toast(`今日观看额度还剩 ${Math.max(1, Math.ceil(res.remaining / 60))} 分钟`);
+          const which = res.week.remaining != null && res.week.remaining <= res.remaining ? '本周' : '这 5 小时';
+          toast(`${which}的额度还剩 ${Math.max(1, Math.ceil(res.remaining / 60))} 分钟`);
         }
       }
     }
@@ -61,7 +67,8 @@
     const id = core.videoId(location.href);
     if (id !== currentId) { flush(); currentId = id; check(); }
     if (!id) return;
-    if (blocked()) { if (playing()) pauseAll(); if (state.block.kind === 'break') renderCountdown(); return; }
+    if (state?.block && state.block.kind !== 'break' && !blocked()) { state = {...state, block: null}; hide(); warned.clear(); check(); }
+    if (blocked()) { if (playing()) pauseAll(); renderCountdown(); return; }
     if (shownKind === 'break-done') return;
     if (!playing()) { flush(); return; }
     if (pendingId !== id) { flush(); pendingId = id; }
@@ -92,8 +99,11 @@
 .icon{width:56px;height:56px;margin:0 auto 12px;border-radius:16px;display:grid;place-items:center;background:#fff0f5;color:#fb7299}
 h2{margin:0 0 6px;font-size:20px;line-height:1.35}
 p{margin:0;color:#61666d;font-size:13.5px}
-.stats{display:flex;justify-content:center;gap:18px;margin:16px 0 4px;font-size:12px;color:#9499a0}
-.stats b{display:block;color:#18191c;font-size:16px;font-variant-numeric:tabular-nums}
+.reset{display:inline-block;margin:14px 0 2px;padding:4px 12px;border-radius:999px;background:#fff0f5;color:#e8618a;font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.meters{display:grid;gap:12px;margin:16px 0 0;text-align:left}
+.meter-head{display:flex;justify-content:space-between;font-size:12px;color:#61666d}.meter-head b{color:#18191c;font-variant-numeric:tabular-nums}
+.meter{height:6px;margin:5px 0 3px;border-radius:999px;background:#f1f2f3;overflow:hidden}.meter i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#ff9dbd,#fb7299)}
+.meter-row small{font-size:11px;color:#9499a0}
 .actions{display:flex;flex-direction:column;gap:8px;margin-top:20px}
 button{font:inherit;border:0;border-radius:12px;padding:10px 14px;cursor:pointer;transition:background-color .16s ease,transform .12s ease,opacity .16s ease}
 button:active{transform:scale(.98)}
@@ -104,7 +114,7 @@ button:focus-visible{outline:2px solid #fb7299;outline-offset:2px}
 .toast{position:fixed;left:50%;bottom:32px;z-index:2147483646;transform:translateX(-50%);padding:10px 18px;border-radius:999px;background:rgba(24,25,28,.92);color:#fff;font:13px/1.4 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.25);pointer-events:none}
 @media (prefers-color-scheme:dark){
 .card{background:#1f2026;color:#e3e5e7}.ring .track{stroke:#2f3035}.icon{background:#3a1b27}
-p,.stats{color:#9499a0}.stats b{color:#e3e5e7}
+p,.meter-head{color:#9499a0}.meter-head b{color:#e3e5e7}.meter{background:#2f3035}.reset{background:#3a1b27;color:#ff9dbd}
 .ghost{background:#2f3035;color:#e3e5e7}.ghost:hover{background:#3a3b41}
 }`;
   const ICON = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M12 2v3"/></svg>';
@@ -123,8 +133,6 @@ p,.stats{color:#9499a0}.stats b{color:#e3e5e7}
   function btn(text, cls, fn) { const b = el('button', cls, text); b.type = 'button'; b.addEventListener('click', fn); return b; }
   const mmss = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
 
-  function stat(label, value) { const d = el('div'); d.append(el('b', null, value), label); return d; }
-
   function build(kind) {
     const s = state, strict = settings.focusStrict;
     const c = el('div', 'card'); c.setAttribute('role', 'alertdialog'); c.setAttribute('aria-modal', 'true');
@@ -141,25 +149,36 @@ p,.stats{color:#9499a0}.stats b{color:#e3e5e7}
     } else if (kind === 'break-done') {
       const icon = el('div', 'icon'); icon.innerHTML = ICON; c.append(icon);
       title.textContent = '休息结束';
-      body.textContent = '新的一轮专注观看开始了。';
+      body.textContent = '油门重新可用，新一轮番茄钟开始计时。';
       actions.append(btn('继续观看', 'primary', () => { hide(); check(); }));
     } else {
       const icon = el('div', 'icon'); icon.innerHTML = ICON; c.append(icon);
-      if (kind === 'time') {
-        title.textContent = '今天的观看时间到了';
-        body.textContent = '额度已经用完。合上视频，去做点别的吧——明天额度会自动重置。';
+      if (kind === 'window') {
+        title.textContent = '这 5 小时的额度用完啦';
+        body.textContent = `这一轮已经看了 ${core.fmt(s.window.seconds)}。B 站不会跑掉，去喝口水、走两步，额度到点自动回来。`;
+      } else if (kind === 'week') {
+        title.textContent = '本周额度见底了';
+        body.textContent = `这周已经看了 ${core.fmt(s.week.seconds)}。剩下的好视频，留给下周的你。`;
       } else {
-        title.textContent = '今天的视频数量到了';
-        body.textContent = '已经看够今天设定的视频数。新的视频会被暂停，明天自动重置。';
+        title.textContent = '这一轮的视频数量到了';
+        body.textContent = `已经看了 ${s.videos} 个视频。正在看的可以看完，新视频要等额度重置。`;
       }
-      const stats = el('div', 'stats');
-      stats.append(stat('今日观看', core.fmt(s.seconds)), stat('今日视频', s.videoLimit ? `${s.videos} / ${s.videoLimit}` : String(s.videos)));
+      const meters = el('div', 'meters');
+      const row = (label, m) => {
+        const r = el('div', 'meter-row'), head = el('div', 'meter-head');
+        head.append(el('span', null, label), el('b', null, m.limit ? `${m.percent}%` : core.fmt(m.seconds)));
+        const bar = el('div', 'meter'), fill = el('i'); fill.style.width = `${m.limit ? m.percent : 0}%`; bar.append(fill);
+        r.append(head, bar, el('small', null, `${core.fmtReset(m.resetAt)} 重置`)); meters.append(r);
+      };
+      row('当前 5 小时窗口', s.window);
+      if (s.week.limit) row('本周额度', s.week);
+      countdown = {reset: el('div', 'reset'), at: state.block.resetAt};
       actions.append(btn('离开 B 站', 'primary', () => send({type: 'focus-close-tab'}).catch(() => {})));
-      if (!strict) actions.append(btn(kind === 'time' ? `再看 ${core.SNOOZE_SECONDS / 60} 分钟` : '再看 1 个', 'ghost', () => snooze(kind)));
-      c.append(title, body, stats, actions);
+      if (!strict) actions.append(btn(kind === 'videos' ? '再看 1 个' : `再看 ${core.SNOOZE_SECONDS / 60} 分钟`, 'ghost', () => snooze(kind)));
+      c.append(title, body, countdown.reset, meters, actions);
     }
     if (!c.contains(title)) c.append(title, body, actions);
-    actions.append(btn('调整专注设置', 'link', () => send({type: 'flow-open-options'}).catch(() => {})));
+    actions.append(btn('调整节流阀设置', 'link', () => send({type: 'flow-open-options'}).catch(() => {})));
     return c;
   }
 
@@ -176,7 +195,7 @@ p,.stats{color:#9499a0}.stats b{color:#e3e5e7}
         card.animate([{opacity: 0, transform: 'translateY(12px) scale(.96)'}, {opacity: 1, transform: 'none'}], {duration: 320, easing: EASE});
       }
     }
-    if (kind === 'break') renderCountdown();
+    renderCountdown();
     card.querySelector('button')?.focus({preventScroll: true});
   }
 
@@ -190,7 +209,9 @@ p,.stats{color:#9499a0}.stats b{color:#e3e5e7}
   }
 
   function renderCountdown() {
-    if (!countdown || state?.block?.kind !== 'break') return;
+    if (!countdown || !state?.block) return;
+    if (countdown.reset) { countdown.reset.textContent = `距离重置还有 ${core.fmtLeft(countdown.at - Date.now())}`; return; }
+    if (state.block.kind !== 'break') return;
     const left = state.block.until - Date.now();
     countdown.value.textContent = mmss(left);
     countdown.bar.setAttribute('stroke-dashoffset', String(C * (1 - Math.max(0, left) / countdown.total)));

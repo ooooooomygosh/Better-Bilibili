@@ -1,5 +1,5 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BTR Flow · 增强设置</title><link rel="stylesheet" href="common.css"></head><body>
-<header class="hero"><div style="max-width:940px;margin:auto"><div class="brand">BTR FLOW 1.2.0</div><h1>播放与首页设置</h1><p>保留线程撕裂者的多 CDN / Range 下载内核，增加按视频调整的策略、推荐历史、轻量首页与专注模式。已回移上游 2026.10.4.1 的适用修复；独立维护的 MV3 分支，不是作者发布的官方扩展。</p></div></header>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>哔哩节流阀 · 设置</title><link rel="stylesheet" href="common.css"></head><body>
+<header class="hero"><div style="max-width:940px;margin:auto"><div class="brand">BILITHROTTLE 2.0.0 · 哔哩节流阀</div><h1>油门帮你踩，刹车也帮你踩</h1><p>油门：保留线程撕裂者的多 CDN / Range 下载内核，按视频调整加载策略。刹车：像 Claude Code 一样的 5 小时窗口与每周观看额度，外加番茄钟休息。顺手把首页收拾干净，换一批也能回看。非官方衍生版，不是线程撕裂者作者发布的扩展。</p></div></header>
 <main class="wrap"><form id="settings"><section class="card"><div class="row between"><h2>加载与稳定性</h2><span class="pill">不自动降画质</span></div><p class="muted">自动策略只调整下载和缓冲；清晰度、字幕、弹幕与倍速仍由播放器控制。</p>
 <div class="grid" style="margin-top:20px"><div class="field"><label for="strategy">观看策略</label><select id="strategy"><option value="auto">自动：按时长、码率、倍速和卡顿调整</option><option value="smooth">稳播优先</option><option value="fast">起播优先</option><option value="economy">省流</option></select></div>
 <div class="field"><label for="mode">CDN 路线</label><select id="mode"><option value="auto">自动：保留原始地址，探索大陆 / 海外节点</option><option value="mainland">大陆优先</option><option value="overseas">海外优先</option><option value="custom">自定义（在原版详细设置中配置）</option></select></div>
@@ -14,16 +14,16 @@
 <p class="fine">不自动请求更多推荐，只展开页面已经加载的有效卡片。分区、搜索、动态、收藏和原生悬停预览保留。历史快照只保留可点击卡片，不模拟原生预览或“不感兴趣”按钮。</p>
 <p class="fine">每个标签页最多 25 批 × 36 张卡片，7 天过期，最多 20 组标签页记录。标题、UP 主、封面和链接仅存本地；不保存 Cookie、媒体下载地址或原始 HTML。升级会把旧版自定义深浅主题迁移为原生主题。</p>
 <div class="actions"><button type="button" id="clearHistory" class="danger">清空本扩展全部推荐历史</button></div></section>
-<section class="card" id="focus"><div class="row between"><h2>专注模式：给 B 站定个量</h2><span class="pill">仅本地统计</span></div><p class="muted">只统计主播放器真正在播放的时间；首页悬停预览、小窗预告不计。额度用完或到了休息时间，视频会暂停并弹出提示。</p>
+<section class="card" id="focus"><div class="row between"><h2>节流阀：给 B 站装个用量上限</h2><span class="pill">像 Claude Code 一样计量</span></div><p class="muted">两个额度同时生效：<b>5 小时窗口</b>从你开始看的那一秒起算，5 小时后自动重置；<b>每周额度</b>从本周第一次观看起算，7 天后重置。只统计主播放器真正在播放的时间，首页悬停预览不计。</p>
 <div class="usage" id="focusUsage" aria-live="polite"></div>
-<div class="grid" style="margin-top:20px"><div class="field"><label for="focusDailyMinutes">每日观看时长 / 分钟</label><input id="focusDailyMinutes" type="number" min="0" max="1440" step="5" inputmode="numeric"><span class="hint">0 表示不限时长。</span></div>
-<div class="field"><label for="focusDailyVideos">每日视频个数</label><input id="focusDailyVideos" type="number" min="0" max="500" step="1" inputmode="numeric"><span class="hint">0 表示不限。一个视频播放满 10 秒才算一个；分 P 算同一个，正在看的那个可以看完。</span></div>
-<div class="field"><label for="focusSessionMinutes">番茄钟：连续观看 / 分钟</label><input id="focusSessionMinutes" type="number" min="0" max="240" step="5" inputmode="numeric"><span class="hint">连续看满后强制休息；0 表示关闭休息提醒。暂停超过一个休息时长会自动重新计时。</span></div>
+<div class="grid" style="margin-top:20px"><div class="field"><label for="focusWindowMinutes">每 5 小时可看 / 分钟</label><input id="focusWindowMinutes" type="number" min="0" max="300" step="5" inputmode="numeric"><span class="hint">0 表示不限。用完后视频暂停，到点自动恢复。</span></div>
+<div class="field"><label for="focusWeeklyHours">每周可看 / 小时</label><input id="focusWeeklyHours" type="number" min="0" max="168" step="1" inputmode="numeric"><span class="hint">0 表示不限。周额度用完时，5 小时窗口有余量也会暂停。</span></div>
+<div class="field"><label for="focusWindowVideos">每 5 小时可看视频 / 个</label><input id="focusWindowVideos" type="number" min="0" max="500" step="1" inputmode="numeric"><span class="hint">0 表示不限。播放满 10 秒才算一个，分 P 算同一个，正在看的可以看完。</span></div>
+<div class="field"><label for="focusSessionMinutes">番茄钟：连续观看 / 分钟</label><input id="focusSessionMinutes" type="number" min="0" max="240" step="5" inputmode="numeric"><span class="hint">连续看满后强制休息；0 表示关闭。暂停超过一个休息时长会重新计时。</span></div>
 <div class="field"><label for="focusBreakMinutes">番茄钟：休息 / 分钟</label><input id="focusBreakMinutes" type="number" min="1" max="120" step="1" inputmode="numeric"></div>
-<div class="field"><label for="focusResetHour">每天几点重置额度</label><select id="focusResetHour"><option value="0">0:00 午夜</option><option value="4">4:00（熬夜看的算前一天）</option><option value="6">6:00</option></select></div>
-<div class="stack"><label class="row"><input type="checkbox" id="focusEnabled">启用专注模式</label><label class="row"><input type="checkbox" id="focusStrict">严格模式：不提供“再看 5 分钟 / 跳过休息”</label></div></div>
-<div class="presets"><span class="hint">快速套用：</span><button type="button" data-preset="30,0,25,5">轻度 · 30 分钟</button><button type="button" data-preset="60,5,25,5">适中 · 1 小时 / 5 个</button><button type="button" data-preset="120,0,45,10">宽松 · 2 小时</button></div>
-<p class="fine">提醒模式下可以“再看 5 分钟 / 再看 1 个 / 跳过休息”，次数会显示在统计里。数据只存在本机，按天自动清零。</p></section>
+<div class="stack"><label class="row"><input type="checkbox" id="focusEnabled">启用节流阀</label><label class="row"><input type="checkbox" id="focusStrict">严格模式：不提供“再看 5 分钟 / 再看 1 个 / 跳过休息”</label></div></div>
+<div class="presets"><span class="hint">快速套用：</span><button type="button" data-preset="45,5,0,25,5">自律 · 45 分 / 周 5 时</button><button type="button" data-preset="90,10,0,25,5">适中 · 90 分 / 周 10 时</button><button type="button" data-preset="180,20,0,50,10">放纵 · 3 时 / 周 20 时</button></div>
+<p class="fine">提醒模式下的“再看”次数会显示在用量里。数据只存在本机。修改额度立即生效，不会清零已用量；重置时间由首次观看决定，与 Claude Code / Codex 的用量窗口一致。</p></section>
 <div class="actions"><button type="submit" class="primary">保存设置</button><button type="button" id="restore">恢复增强版默认设置</button></div><p id="saved" class="status" role="status" aria-live="polite"></p></form>
 <section class="card" style="margin-top:22px"><h2>海外访问：接入已有可信代理</h2><p class="muted">默认关闭。不内置、不推荐公共解析站或免费代理；这里也不是代理订阅客户端。</p>
 <div class="notice"><strong>不是“安装即可解锁番剧”。</strong>必须有你自己信任、可连接、出口地区合适的 HTTP / HTTPS / SOCKS5 代理。会员、版权、DRM、登录和平台风控仍可能限制播放；请遵守服务条款。已有 VPN / 系统代理 / 分流软件时，优先直接使用原来的分流，不要重复接管。</div>
@@ -32,4 +32,4 @@
 <div class="actions"><button id="enableProxy" class="primary" type="button">授权并启用分流</button><button id="disableProxy" type="button">关闭本扩展代理</button></div><p id="proxyStatus" class="status" role="status" aria-live="polite"></p>
 <p class="fine">B 站请求不会在代理失败后自动直连。HTTPS 保持浏览器端到端加密；切勿安装陌生代理提供的根证书。代理地址仅存本机。配置不等于线路可用，本包没有附带任何代理服务。</p></section>
 <section class="card"><h2>检查与回退</h2><p>出现黑屏、清晰度切换异常时，先切到兼容模式，再尝试关闭加速。需要原版详细统计或自定义 CDN 时，在 B 站页面点击扩展图标 → 原版详细设置。</p><p class="fine">请禁用旧版扩展和同类油猴脚本，避免同时拦截播放器。本分支不会自动更新。安装说明、审阅报告和测试脚本随压缩包提供。</p></section>
-<p class="fine">BTR Flow 1.2.0 · MIT · 保留 Bilibili-thread-ripper 原作者版权声明。本软件非 Bilibili 官方产品。</p></main><script src="../src/home-core.js"></script><script src="../src/focus-core.js"></script><script src="../src/proxy-core.js"></script><script src="options.js"></script></body></html>
+<p class="fine">哔哩节流阀 BiliThrottle 2.0.0 · MIT · 保留 Bilibili-thread-ripper 原作者版权声明。本软件非 Bilibili 官方产品。</p></main><script src="../src/home-core.js"></script><script src="../src/focus-core.js"></script><script src="../src/proxy-core.js"></script><script src="options.js"></script></body></html>
