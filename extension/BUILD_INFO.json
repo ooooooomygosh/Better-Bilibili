@@ -1,0 +1,43 @@
+{
+  "name": "BTR Flow",
+  "version": "1.2.0",
+  "build_date": "2026-10-08",
+  "distribution": "Unofficial Chrome/Edge MV3 fork; not an upstream extension release",
+  "input": "BTR-Flow-1.0.0(1).zip",
+  "input_sha256": "f211255fce9a3c0f06147da1a401884a90a7293c5e6a34c0336e7a608e0c4ba2",
+  "upstream": {
+    "repository": "MrTangLuyao/Bilibili-thread-ripper",
+    "version": "2026.10.4.1",
+    "commit": "bbf4d3dee502a16e424232ae6a51705f52b0e60d",
+    "original_fork_basis": "0.9.4.2",
+    "integration": "Applicable runtime backports; MV3 native storage retained, userscript-only adapter changes not applicable"
+  },
+  "license": "MIT; original upstream notice preserved",
+  "homepage_defaults": {
+    "enabled": true,
+    "hide_carousel": true,
+    "hide_explicit_ad_badges": true,
+    "hide_seasonal_banner": false,
+    "theme": "native",
+    "history": true,
+    "focus_mode_enabled": false
+  },
+  "proxy_enabled_by_default": false,
+  "automatic_updates": false,
+  "testing": {
+    "node_core_passed": 75,
+    "renderer_home_options_fixture_passed": 30,
+    "renderer_branch_diagnostics_fixture_passed": 9,
+    "real_mse_synthetic_media_passed": "not re-run for 1.2.0 (open-source Chromium lacks H.264); 7 passed on 1.1.0",
+    "total_passed": 114,
+    "real_bilibili_e2e_verified": false,
+    "real_HDR_HiRes_hardware_verified": false,
+    "firefox_safari_verified": false,
+    "performance_improvement_measured": false,
+    "reason_for_install_e2e_gap": "Managed Chromium blocked extension management and live Bilibili pages; not bypassed",
+    "browser": "Chromium 141 (Playwright chromium-1194)",
+    "node": "22.22.0",
+    "installed_extension_focus_e2e_passed": "loaded unpacked in Chromium 141 (Playwright); time limit, play() re-block, snooze, Pomodoro countdown verified on a routed fixture page"
+  },
+  "previous_version": "1.1.0"
+}

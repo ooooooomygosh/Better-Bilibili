@@ -1,0 +1,143 @@
+{
+  "manifest_version": 3,
+  "name": "BTR Flow · 线程撕裂者增强版",
+  "short_name": "BTR Flow",
+  "version": "1.2.0",
+  "description": "保留原生播放器和首页：多 CDN / Range 加速、轮播净化、推荐批次回看、专注模式（每日观看额度与番茄钟休息）与可选纯黑。非官方维护分支。",
+  "minimum_chrome_version": "114",
+  "permissions": [
+    "storage"
+  ],
+  "background": {
+    "service_worker": "src/service-worker.js"
+  },
+  "action": {
+    "default_title": "BTR Flow · 控制台",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    },
+    "default_popup": "ui/popup.html"
+  },
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.bilibili.com/*",
+        "https://m.bilibili.com/*"
+      ],
+      "js": [
+        "src/range-core.js",
+        "src/flow-policy.js",
+        "src/cdn-resolver.js",
+        "src/sidx.js",
+        "src/idm-downloader.js",
+        "src/native-mse-player.js",
+        "src/native-range-transport.js",
+        "src/runtime-notices.js",
+        "src/diagnostics-core.js",
+        "src/settings-panel.js",
+        "src/page-hook.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://live.bilibili.com/*"
+      ],
+      "js": [
+        "src/range-core.js",
+        "src/cdn-resolver.js",
+        "src/live-core.js",
+        "src/runtime-notices.js",
+        "src/diagnostics-core.js",
+        "src/settings-panel.js",
+        "src/live-hook.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://*.bilibili.com/*"
+      ],
+      "exclude_matches": [
+        "https://www.bilibili.com/*",
+        "https://m.bilibili.com/*",
+        "https://live.bilibili.com/*"
+      ],
+      "js": [
+        "src/range-core.js",
+        "src/cdn-resolver.js",
+        "src/diagnostics-core.js",
+        "src/settings-panel.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://*.bilibili.com/*"
+      ],
+      "exclude_matches": [
+        "https://live.bilibili.com/*"
+      ],
+      "js": [
+        "src/notification-view.js",
+        "src/bridge.js"
+      ],
+      "run_at": "document_start",
+      "world": "ISOLATED"
+    },
+    {
+      "matches": [
+        "https://live.bilibili.com/*"
+      ],
+      "js": [
+        "src/notification-view.js",
+        "src/bridge.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true,
+      "world": "ISOLATED"
+    },
+    {
+      "matches": [
+        "https://www.bilibili.com/*"
+      ],
+      "js": [
+        "src/home-core.js",
+        "src/home-enhancer.js"
+      ],
+      "run_at": "document_start",
+      "world": "ISOLATED"
+    },
+    {
+      "matches": [
+        "https://www.bilibili.com/*",
+        "https://m.bilibili.com/*",
+        "https://live.bilibili.com/*"
+      ],
+      "js": [
+        "src/focus-core.js",
+        "src/focus-guard.js"
+      ],
+      "run_at": "document_idle",
+      "world": "ISOLATED"
+    }
+  ],
+  "version_name": "1.2.0 · upstream 2026.10.4.1 backport",
+  "optional_permissions": [
+    "proxy"
+  ],
+  "options_page": "ui/options.html"
+}

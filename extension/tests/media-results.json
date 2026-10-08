@@ -1,0 +1,157 @@
+{
+  "browser": "144.0.7559.96",
+  "environment": "Actual MediaSource decoding with synthetic H264/AAC bytes provided by a local-memory fetch mock; no extension installation, no Bilibili CDN/network, no Bilibili native UI",
+  "tests": [
+    {
+      "test": "Real MediaSource: synthetic H.264 video decodes and playback advances",
+      "passed": true
+    },
+    {
+      "test": "Real MediaSource: both AAC audio and video tracks append progressively",
+      "passed": true
+    },
+    {
+      "test": "Real downloader: init, SIDX and media ranges use no credentials",
+      "passed": true
+    },
+    {
+      "test": "Real MediaSource: seeking outside initial buffer resumes near requested position",
+      "passed": true
+    },
+    {
+      "test": "Real MediaSource: playback continues at 2x rate without a codec switch",
+      "passed": true
+    },
+    {
+      "test": "Real media test: no uncaught errors or reported fatal playback errors",
+      "passed": true
+    },
+    {
+      "test": "Real MediaSource: player teardown completes",
+      "passed": true
+    }
+  ],
+  "wire": {
+    "requests": 40,
+    "bytes": 2033478,
+    "credentials": [
+      "omit"
+    ]
+  },
+  "buffer_before_seek": [
+    [
+      0,
+      13.999999
+    ]
+  ],
+  "debug": {
+    "version": "1.1.0",
+    "architecture": "bilibili-native-ui-progressive-mse-0.8-core",
+    "quality": "1080P",
+    "qualityId": 80,
+    "preferredQuality": 0,
+    "preferredCodec": "",
+    "preferredAudio": 0,
+    "codecFailuresBlocked": 0,
+    "sessionStarts": 1,
+    "codec": "avc",
+    "width": 480,
+    "height": 270,
+    "frameRate": 24,
+    "videoType": "video/mp4; codecs=\"avc1.42c01e\"",
+    "audioType": "audio/mp4; codecs=\"mp4a.40.2\"",
+    "videoBandwidth": 620000,
+    "audioBandwidth": 64000,
+    "currentTime": 22.035723,
+    "mediaSourceState": "ended",
+    "playbackActivated": true,
+    "resumeWanted": true,
+    "sessionStartTime": 0.1,
+    "startupBufferSeconds": 2.5,
+    "startupWaitingEvents": 2,
+    "bufferAheadLimit": 0,
+    "urlDeadline": 0,
+    "nativeLeftoversSuppressed": 0,
+    "lastNativeLeftover": "",
+    "progressiveAppends": 3,
+    "seekReloads": 0,
+    "nativeRestoresUndone": 0,
+    "lastSeekMs": 0,
+    "stallsAfterSeek": 0,
+    "timeline": [
+      {
+        "at": 233,
+        "time": 0,
+        "what": "session",
+        "detail": "1080P avc from 0.1"
+      },
+      {
+        "at": 240,
+        "time": 0,
+        "what": "headers requested",
+        "detail": "video"
+      },
+      {
+        "at": 241,
+        "time": 0,
+        "what": "headers requested",
+        "detail": "audio"
+      },
+      {
+        "at": 261,
+        "time": 0.1,
+        "what": "first segment in",
+        "detail": "audio 16 KiB in 1 pieces"
+      },
+      {
+        "at": 264,
+        "time": 0.1,
+        "what": "first segment in",
+        "detail": "video 191 KiB in 2 pieces"
+      },
+      {
+        "at": 266,
+        "time": 0.1,
+        "what": "ready to play",
+        "detail": "needed 2.5 s buffered"
+      },
+      {
+        "at": 269,
+        "time": 0.1,
+        "what": "waiting",
+        "detail": "after start"
+      },
+      {
+        "at": 298,
+        "time": 0.1,
+        "what": "playing",
+        "detail": ""
+      },
+      {
+        "at": 1254,
+        "time": 21,
+        "what": "waiting",
+        "detail": "after start"
+      },
+      {
+        "at": 1269,
+        "time": 21,
+        "what": "playing",
+        "detail": ""
+      }
+    ],
+    "tracks": [
+      {
+        "kind": "video",
+        "nextIndex": 12,
+        "segments": 12
+      },
+      {
+        "kind": "audio",
+        "nextIndex": 12,
+        "segments": 12
+      }
+    ]
+  },
+  "uncaught_errors": []
+}

@@ -1,0 +1,1673 @@
+--- a/manifest.json
++++ b/manifest.json
+@@ -2,8 +2,8 @@
+   "manifest_version": 3,
+   "name": "BTR Flow · 线程撕裂者增强版",
+   "short_name": "BTR Flow",
+-  "version": "1.0.0",
+-  "description": "多 CDN / Range 加速，自适应观看策略，首页推荐历史与轻量美化。非官方衍生版。",
++  "version": "1.1.0",
++  "description": "保留原生播放器和首页：多 CDN / Range 加速、轮播净化、推荐批次回看与可选纯黑。非官方维护分支。",
+   "minimum_chrome_version": "114",
+   "permissions": [
+     "storage"
+@@ -42,6 +42,7 @@
+         "src/native-mse-player.js",
+         "src/native-range-transport.js",
+         "src/runtime-notices.js",
++        "src/diagnostics-core.js",
+         "src/settings-panel.js",
+         "src/page-hook.js"
+       ],
+@@ -57,6 +58,7 @@
+         "src/cdn-resolver.js",
+         "src/live-core.js",
+         "src/runtime-notices.js",
++        "src/diagnostics-core.js",
+         "src/settings-panel.js",
+         "src/live-hook.js"
+       ],
+@@ -76,6 +78,7 @@
+       "js": [
+         "src/range-core.js",
+         "src/cdn-resolver.js",
++        "src/diagnostics-core.js",
+         "src/settings-panel.js"
+       ],
+       "run_at": "document_start",
+@@ -115,11 +118,11 @@
+         "src/home-core.js",
+         "src/home-enhancer.js"
+       ],
+-      "run_at": "document_idle",
++      "run_at": "document_start",
+       "world": "ISOLATED"
+     }
+   ],
+-  "version_name": "1.0.0 · based on upstream 0.9.4.2",
++  "version_name": "1.1.0 · upstream 2026.10.4.1 backport",
+   "optional_permissions": [
+     "proxy"
+   ],
+--- a/src/bridge.js
++++ b/src/bridge.js
+@@ -2,7 +2,7 @@
+   "use strict";
+ 
+   const CHANNEL = "__BILI_RANGE_ACCELERATOR_V1__";
+-  const VERSION = "1.0.0";
++  const VERSION = "1.1.0";
+   const notices = globalThis.__BTR_NOTIFICATION_VIEW__;
+   const ERROR_NOTICE_ID = "__bilibili_thread_ripper_error_notice__";
+   const ERROR_NOTICE_STYLE_ID = "__bilibili_thread_ripper_error_notice_style__";
+--- a/src/diagnostics-core.js
++++ b/src/diagnostics-core.js
+@@ -0,0 +1,17 @@
++/* Diagnostic output sanitization. No network, storage or clipboard side effects. */
++(function(root){
++  'use strict';
++  function redact(input) {
++    return String(input).slice(0,100000)
++      .replace(/https?:\/\/[^\s"'<>]+/gi, raw => {
++        try {
++          const u=new URL(raw);
++          if (/(?:^|\.)(?:bilivideo\.com|bilivideo\.cn|akamaized\.net|mcdn\.bilivideo\.cn)$/.test(u.hostname)||/\.(?:m4s|mp4|flv|m3u8|ts)(?:$|[?#])/i.test(u.pathname))return '[媒体地址已隐藏]';
++          return u.origin+u.pathname;
++        } catch (_) { return '[地址已隐藏]'; }
++      })
++      .replace(/("(?:cookie|authorization|password|token|access_token|upsig|w_rid)"\s*:\s*)"[^"\n]*"/gi,'$1"[已隐藏]"');
++  }
++  root.__BTR_DIAGNOSTICS_CORE__=Object.freeze({redact});
++  if(typeof module==='object')module.exports=root.__BTR_DIAGNOSTICS_CORE__;
++})(globalThis);
+--- a/src/home-core.js
++++ b/src/home-core.js
+@@ -1,37 +1,61 @@
+-/* No raw HTML, signed media URLs, account data or cookies are stored in snapshots. */
+-(function(root) {
++/* BTR Flow: bounded, inert card data only. No HTML, cookies or signed media URLs. */
++(function (root) {
+   'use strict';
+   const MAX_SNAPSHOTS = 25, MAX_CARDS = 36, TTL = 7 * 86400000;
++  const defaults = Object.freeze({homeEnabled:true, homeHistory:true, homeTheme:'native', homeHideCarousel:true, homeHideBanner:false, homeHideAds:true});
++  function settings(raw = {}) {
++    const out = {...defaults};
++    for (const k of Object.keys(defaults)) {
++      if (typeof defaults[k] === 'boolean') out[k] = raw[k] !== undefined ? raw[k] === true : defaults[k];
++    }
++    // 1.0's light/dark/auto/off all return to Bilibili's own theme, never force a theme on upgrade.
++    out.homeTheme = raw.homeTheme === 'oled' ? 'oled' : 'native';
++    return out;
++  }
++  const text = (s, n) => String(s || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, n);
+   function card(input) {
+     if (!input || typeof input !== 'object') return null;
+     let url, image = '';
+     try {
+       url = new URL(String(input.url), 'https://www.bilibili.com');
+-      if (url.protocol !== 'https:' || url.hostname !== 'www.bilibili.com' || !/^\/video\/(?:BV[\w]+|av\d+)\/?$/i.test(url.pathname)) return null;
+-      url.search = ''; url.hash = '';
+-      const u = new URL(String(input.image || ''));
+-      if (u.protocol === 'https:' && /(?:^|\.)(?:hdslb\.com|bilibili\.com)$/.test(u.hostname)) image = u.href.slice(0, 1000);
+-    } catch (_) { if (!url) return null; }
+-    const text = (s, max) => String(s || '').replace(/[\u0000-\u001f]/g, ' ').trim().slice(0, max);
++      if (url.protocol !== 'https:' || url.host !== 'www.bilibili.com' || url.username || url.password || !/^\/video\/(?:BV\w{1,80}|av\d+)\/?$/i.test(url.pathname)) return null;
++      url.search = ''; url.hash = ''; url.pathname = url.pathname.replace(/\/$/, '');
++    } catch (_) { return null; }
++    try {
++      const u = new URL(String(input.image || '').replace(/^\/\//, 'https://'));
++      if (u.protocol === 'https:' && !u.username && !u.password && /(?:^|\.)(?:hdslb\.com|bilibili\.com)$/.test(u.hostname) && !u.port) {
++        u.search = ''; u.hash = ''; image = u.href.slice(0, 1000);
++      }
++    } catch (_) {}
+     const title = text(input.title, 180);
+     if (!title) return null;
+-    return {url: url.href, title, image, author: text(input.author,80), duration: text(input.duration,24), stats: text(input.stats,100)};
++    return {url:url.href,title,image,author:text(input.author,80),duration:text(input.duration,24),stats:text(input.stats,100)};
+   }
+   function cards(items) {
+-    const seen = new Set();
+-    return (Array.isArray(items) ? items : []).map(card).filter(c => c && !seen.has(c.url) && seen.add(c.url)).slice(0, MAX_CARDS);
++    const seen = new Set(), result = [];
++    for (const raw of Array.isArray(items) ? items.slice(0, 144) : []) {
++      const c = card(raw);
++      if (c && !seen.has(c.url)) { seen.add(c.url); result.push(c); }
++      if (result.length === MAX_CARDS) break;
++    }
++    return result;
+   }
+-  const key = items => items.slice(0, 12).map(c => c.url).join('|');
++  const key = items => items.slice(0, MAX_CARDS).map(c => c.url).join('|');
+   function history(raw, now = Date.now()) {
+-    return (Array.isArray(raw) ? raw : []).filter(s => Number.isFinite(s?.at) && s.at <= now + 60000 && now - s.at < TTL)
+-      .map(s => ({at:s.at, cards:cards(s.cards)})).filter(s => s.cards.length >= 2).slice(-MAX_SNAPSHOTS);
++    return (Array.isArray(raw) ? raw.slice(-MAX_SNAPSHOTS) : [])
++      .filter(s => Number.isFinite(s?.at) && s.at <= now + 60000 && now - s.at < TTL)
++      .map(s => ({at:s.at,cards:cards(s.cards)})).filter(s => s.cards.length >= 2);
+   }
+   function append(raw, items, now = Date.now()) {
+-    const h = history(raw, now), clean = cards(items);
++    const h = history(raw,now), clean = cards(items);
+     if (clean.length < 2 || key(h.at(-1)?.cards || []) === key(clean)) return h;
+-    return [...h, {at:now, cards:clean}].slice(-MAX_SNAPSHOTS);
++    return [...h,{at:now,cards:clean}].slice(-MAX_SNAPSHOTS);
+   }
+-  const api = Object.freeze({card,cards,key,history,append,MAX_SNAPSHOTS,MAX_CARDS,TTL});
++  // Lazy growth belongs to the current batch, not a new recommendation request.
++  function grows(previous, next) {
++    return previous.length > 0 && next.length >= previous.length && previous.every((c,i) => c.url === next[i]?.url);
++  }
++  const api = Object.freeze({defaults,settings,card,cards,key,history,append,grows,MAX_SNAPSHOTS,MAX_CARDS,TTL});
+   root.__BTR_HOME_CORE__ = api;
+   if (typeof module === 'object') module.exports = api;
+ })(globalThis);
+--- a/src/home-enhancer.js
++++ b/src/home-enhancer.js
+@@ -1,147 +1,416 @@
+-/* Isolated-world UI. Native recommendations stay mounted; history is a separate view. */
+-(function() {
++/* BTR Flow 1.1.0 — isolated world. Native Vue cards stay mounted and retain their handlers.
++ * Native refresh is the only source of fresh recommendations: no private API, prefetch loop,
++ * synthetic scroll, raw-HTML snapshots or automatic document reload.
++ */
++(function () {
+   'use strict';
+   const core = globalThis.__BTR_HOME_CORE__;
+-  const defaults = {homeEnabled:true,homeTheme:'light',homeHistory:true};
+-  let settings = {...defaults}, snapshots = [], index = -1, bar, sheet, shadow, observer;
+-  let busy = false, captureTimer, routeTimer, lastPath = location.pathname, disposed = false;
+-  let telemetry = null, stats = null, storageError = '', saveChain = Promise.resolve();
++  if (!core || globalThis.__BTR_FLOW_HOME_LOADED__) return;
++  globalThis.__BTR_FLOW_HOME_LOADED__ = true;
++  const GRID = '.recommended-container_floor-aside .container, .recommended-container .container';
++  const CARD = '.bili-video-card, .video-card-reco, .feed-card .video-card';
++  const OWN = '[data-btr-flow-owned]';
++  const QUIET_MS = 600, REFRESH_TIMEOUT = 10000;
++  let settings = {...core.defaults}, ready = false, snapshots = [], index = -1, liveReady = false;
++  let grid = null, bar = null, shadow = null, view = null, refs = {}, nativeRefresh = null;
++  let gridObserver = null, mountObserver = null, resizeObserver = null, themeObserver = null;
++  let settleTimer, deadlineTimer, saveTimer, mountTimer, routeTimer, paintTimer;
++  let busy = false, transaction = null, generation = 0, issuingNative = false;
++  let candidateKey = '', status = '', statusError = false, liveScroll = 0;
++  let clearEpoch = 0, saveGeneration = 0, saveChain = Promise.resolve();
++  let telemetry = null, stats = null, lastPath = location.pathname;
+   let tabKey;
+-  try { tabKey = sessionStorage.getItem('btr-flow-tab'); if (!/^[\w-]{8,80}$/.test(tabKey || '')) {tabKey=crypto.randomUUID();sessionStorage.setItem('btr-flow-tab',tabKey);} }
+-  catch (_) {tabKey = crypto.randomUUID();}
++  try {
++    tabKey = sessionStorage.getItem('btr-flow-tab');
++    if (!/^[\w-]{8,80}$/.test(tabKey || '')) {
++      tabKey = crypto.randomUUID(); sessionStorage.setItem('btr-flow-tab',tabKey);
++    }
++  } catch (_) { tabKey = crypto.randomUUID(); }
+   const storageKey = 'flowHistory:' + tabKey;
+-  const home = () => /^\/(?:index\.html)?$/.test(location.pathname);
+-  const owns = node => node && (node.id?.startsWith('btr-flow-') || node.closest?.('[id^="btr-flow-"]'));
+-  function remember() {
+-    const value = {at:Date.now(),snapshots};
+-    saveChain = saveChain.catch(() => {}).then(async () => {await chrome.storage.local.set({[storageKey]:value});await pruneHistory();}).catch(() => {storageError='浏览器未能保存历史';renderBar();});
+-    return saveChain;
+-  }
+-  async function pruneHistory() {
+-    const all=await chrome.storage.local.get(null);
+-    const records=Object.entries(all).filter(([k])=>k.startsWith('flowHistory:')).sort((a,b)=>(b[1]?.at||0)-(a[1]?.at||0));
+-    const expired=records.filter(([k,v],i)=>k!==storageKey&&(i>=20||Date.now()-(v?.at||0)>core.TTL)).map(([k])=>k);
+-    if(expired.length)await chrome.storage.local.remove(expired);
++  const isHome = () => /^\/(?:index\.html)?$/.test(location.pathname);
++  const active = () => ready && isHome() && settings.homeEnabled;
++  const owns = n => !!(n?.nodeType === 1 ? n.closest(OWN) : n?.parentElement?.closest(OWN));
++  const root = () => document.documentElement;
++  function el(tag,text,cls) {
++    const n = document.createElement(tag); if (text != null) n.textContent=text;
++    if (cls) n.className=cls; return n;
++  }
++  function button(text,fn,title) {
++    const b=el('button',text); b.type='button'; if(title)b.title=title;
++    b.addEventListener('click',fn); return b;
++  }
++  const skin = el('style'); skin.id='btr-flow-home-style'; skin.dataset.btrFlowOwned='';
++  skin.textContent = `
++/* Only homepage surfaces are touched. Preserve Bilibili's column count, titles and previews. */
++html[data-btr-home-clean][data-btr-hide-carousel] :is(.recommended-container_floor-aside,.recommended-container) .recommended-swipe{display:none!important}
++html[data-btr-home-clean][data-btr-hide-carousel] :is(.recommended-container_floor-aside,.recommended-container) .container{grid-template-areas:none!important;grid-template-rows:none!important;grid-auto-rows:auto!important;grid-auto-flow:row!important}
++html[data-btr-home-clean][data-btr-hide-carousel] :is(.recommended-container_floor-aside,.recommended-container) .container > :is(.feed-card,.bili-video-card,.video-card-reco,.floor-single-card){margin-top:0!important;grid-area:auto!important;align-self:start}
++html[data-btr-home-clean][data-btr-hide-carousel] [data-btr-grid] > .feed-card[data-btr-ready]{display:block!important}
++html[data-btr-home-clean][data-btr-hide-ads] [data-btr-grid] :is(.feed-card,.bili-video-card,.video-card-reco)[data-btr-ad]{display:none!important}
++html[data-btr-home-clean][data-btr-hide-banner] .bili-header .bili-header__banner{height:64px!important;min-height:64px!important;background:var(--bg1,white)!important}
++html[data-btr-home-clean][data-btr-hide-banner] .bili-header .bili-header__banner > *{visibility:hidden!important}
++html[data-btr-home-clean][data-btr-hide-banner] .bili-header .bili-header__bar{background:var(--bg1,white)!important}
++html[data-btr-home-clean][data-btr-hide-banner] .bili-header .bili-header__bar :is(.entry-title,.download-entry,.default-entry,.loc-entry,.right-entry-icon,.right-entry-text){color:var(--text1,#18191c)!important}
++html[data-btr-home-ui] [data-btr-native-refresh],html[data-btr-home-ui] #__bilibili_thread_ripper_launcher__{display:none!important}
++html[data-btr-history-open] [data-btr-grid]{display:none!important}
++html[data-btr-oled]{--bg1:#000;--bg2:#000;--bg3:#000;--bg1_float:#000;--bg2_float:#000}
++html[data-btr-oled] :is(body,#i_cecream,#app,.bili-header__bar,.bili-header__channel,.header-channel,.channel-link,.channel-link__right,.channel-link__left,.bili-video-card,.bili-video-card__info,.feed-card,.v-popover-content,.search-panel,.nav-search-content,.nav-search-input){background-color:#000!important}
++`;
++  const uiCSS = `
++:host{display:block;box-sizing:border-box;font:13px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--btr-text,#18191c)}
++*{box-sizing:border-box} [hidden]{display:none!important}
++.toolbar{display:flex;justify-content:flex-end;align-items:center;gap:6px;min-height:32px;margin:0 0 12px;flex-wrap:wrap}
++button{font:inherit;border:1px solid transparent;background:transparent;color:inherit;padding:4px 8px;border-radius:6px;cursor:pointer;min-height:30px;white-space:nowrap}
++button:hover{background:var(--btr-hover,rgba(128,128,128,.10));color:var(--brand_blue,#00aeec)}button:focus-visible,a:focus-visible{outline:2px solid #00aeec;outline-offset:2px}
++button:disabled{opacity:.35;cursor:default}.count{font-size:12px;opacity:.64;min-width:38px;text-align:center;font-variant-numeric:tabular-nums}.separator{height:14px;border-left:1px solid currentColor;opacity:.15;margin:0 3px}
++.refresh{border-color:var(--btr-border,rgba(128,128,128,.25))}.status{margin-right:auto;opacity:.72;font-size:12px;max-width:56%;overflow-wrap:anywhere}.status.error{opacity:1}.history-head{display:flex;gap:12px;align-items:center;justify-content:space-between;margin:0 0 14px;opacity:.75}.history-head p{margin:0;font-size:12px}
++.grid{display:grid;grid-template-columns:repeat(var(--btr-columns,5),minmax(0,1fr));column-gap:var(--btr-gap,20px);row-gap:24px;padding-bottom:20px}
++.card{color:inherit;text-decoration:none;display:block;min-width:0}.cover{position:relative;aspect-ratio:16/9;background:var(--btr-placeholder,rgba(128,128,128,.10));border-radius:6px;overflow:hidden}.cover img{width:100%;height:100%;object-fit:cover;display:block}.duration{position:absolute;right:8px;bottom:5px;font-size:12px;color:white;text-shadow:0 1px 3px black;background:#0008;border-radius:3px;padding:0 3px}.title{font-size:15px;line-height:22px;margin-top:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:44px}.card:hover .title{color:var(--brand_blue,#00aeec)}.meta{opacity:.64;font-size:12px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;margin-top:4px}
++@media(max-width:680px){.toolbar{gap:2px}.status{max-width:100%;flex-basis:100%}.history-head{align-items:flex-start}.grid{row-gap:18px}.title{font-size:14px}}
++`;
++  function mountSkin() { if(root()&&!skin.isConnected)root().append(skin); }
++  function toggle(name,wanted) { const r=root(); if(r&&r.hasAttribute(name)!==!!wanted)r.toggleAttribute(name,!!wanted); }
++  function clearMarks() {
++    for(const n of document.querySelectorAll('[data-btr-ready],[data-btr-ad],[data-btr-native-refresh],[data-btr-grid]')) {
++      for(const a of ['data-btr-ready','data-btr-ad','data-btr-native-refresh','data-btr-grid'])n.removeAttribute(a);
++    }
++  }
++  function detectDark() {
++    // Temporarily remove our own OLED override before measuring; avoid latching black after native light is chosen.
++    const had=root().hasAttribute('data-btr-oled'); if(had)root().removeAttribute('data-btr-oled');
++    let dark=false;
++    for(const node of [document.body,root()]) {
++      if(!node)continue;
++      const cs=getComputedStyle(node), rgb=cs.backgroundColor.match(/[\d.]+/g);
++      if(rgb&&rgb.length>=3&&(rgb.length<4||Number(rgb[3])>.1)) {
++        dark=(Number(rgb[0])*.2126+Number(rgb[1])*.7152+Number(rgb[2])*.0722)<110; break;
++      }
++      const marker=node.getAttribute('data-theme')||node.getAttribute('theme');
++      if(marker==='dark'||marker==='light'){dark=marker==='dark';break;}
++    }
++    if(had)root().setAttribute('data-btr-oled','');
++    return dark;
++  }
++  function theme() {
++    if(!document.body)return;
++    const dark=detectDark(); toggle('data-btr-oled',active()&&settings.homeTheme==='oled'&&dark);
++    if(bar) {
++      bar.style.setProperty('--btr-text',dark?'#e3e5e7':'#18191c');
++      bar.style.setProperty('--btr-placeholder',root().hasAttribute('data-btr-oled')?'#000':dark?'#222':'#f1f2f3');
++      bar.style.colorScheme=dark?'dark':'light';
++    }
++  }
++  function applySkin() {
++    mountSkin(); toggle('data-btr-home-clean',active());
++    toggle('data-btr-hide-carousel',active()&&settings.homeHideCarousel);
++    toggle('data-btr-hide-banner',active()&&settings.homeHideBanner);
++    toggle('data-btr-hide-ads',active()&&settings.homeHideAds); theme();
++  }
++  function isAd(node) {
++    // Explicit promotion badges only. Never classify by video title or link keywords.
++    return !!node.querySelector('.bili-video-card__info--ad,.bili-video-card__info--ad-text,.bili-video-card__stats--ad,[data-ad-id]');
++  }
++  function cardFrom(node) {
++    const a=node.querySelector('.bili-video-card__info--tit a,a[href*="/video/"]');
++    const title=node.querySelector('.bili-video-card__info--tit,.title');
++    const image=node.querySelector('.bili-video-card__image img,.bili-video-card__cover img,picture img,img');
++    return core.card({url:a?.href,title:title?.getAttribute('title')||a?.getAttribute('title')||title?.textContent||a?.textContent,
++      image:image?.currentSrc||image?.getAttribute('data-src')||image?.getAttribute('src')||'',
++      author:node.querySelector('.bili-video-card__info--author,.up-name,.up')?.textContent,
++      duration:node.querySelector('.bili-video-card__stats__duration,.duration')?.textContent,
++      stats:[...node.querySelectorAll('.bili-video-card__stats--text')].map(n=>n.textContent).join(' · ')});
+   }
+   function collect() {
+-    const nodes = [...document.querySelectorAll('.bili-video-card, .feed-card .video-card, .video-card-reco')];
+-    return core.cards(nodes.filter(n => !owns(n)).slice(0,72).map(n => {
+-      const a = n.querySelector('.bili-video-card__info--tit a, a[href*="/video/"]');
+-      const title = n.querySelector('.bili-video-card__info--tit, .title');
+-      const img = n.querySelector('img');
+-      let image = img?.currentSrc || img?.getAttribute('data-src') || img?.getAttribute('src') || '';
+-      if (image.startsWith('//')) image='https:'+image;
+-      return {url:a?.href,title:title?.getAttribute('title') || a?.getAttribute('title') || title?.textContent || a?.textContent,
+-        image,author:n.querySelector('.bili-video-card__info--author,.up-name,.up')?.textContent,
+-        duration:n.querySelector('.bili-video-card__stats__duration,.duration')?.textContent,
+-        stats:[...n.querySelectorAll('.bili-video-card__stats--text')].map(e => e.textContent).join(' · ')};
+-    }));
+-  }
+-  function capture() {
+-    if (!home() || !settings.homeHistory || disposed) return;
+-    const previous = snapshots, next = core.append(snapshots,collect());
+-    const changed = core.key(next.at(-1)?.cards || []) !== core.key(previous.at(-1)?.cards || []);
+-    if (changed) {
+-      const wasLatest = index >= snapshots.length-1, selected = snapshots[index];
+-      snapshots=next;
+-      if(wasLatest || index<0) index=next.length-1;
+-      else {
+-        const found = next.findIndex(s => s.at === selected?.at && core.key(s.cards) === core.key(selected?.cards || []));
+-        index = Math.max(0, found);
+-        if(sheet) show(index);
+-      }
+-      remember();renderBar();
+-    }
+-  }
+-  function debounce() { clearTimeout(captureTimer); captureTimer=setTimeout(capture,650); }
+-  function element(tag,text,cls) {const e=document.createElement(tag);if(text!=null)e.textContent=text;if(cls)e.className=cls;return e;}
+-  function button(text,fn,title) {const b=element('button',text);b.type='button';if(title)b.title=title;b.addEventListener('click',fn);return b;}
+-  const style = `:host{font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#253046;color-scheme:light}*{box-sizing:border-box}button{font:inherit;cursor:pointer;border:1px solid #dfe4ed;background:#fff;color:#26314a;border-radius:10px;padding:9px 13px}button:hover{border-color:#fb7299;background:#fff3f7}button:disabled{opacity:.38;cursor:not-allowed}.toolbar{display:flex;gap:8px;align-items:center;padding:10px 14px;background:#fff;box-shadow:0 8px 36px #20314a26;border:1px solid #e4e8f0;border-radius:18px;max-width:calc(100vw - 24px)}.brand{font-weight:800;letter-spacing:.08em;font-size:12px;color:#d84e7a;margin-right:8px}.count{font-size:12px;color:#67748d;min-width:65px;text-align:center}.fresh{background:#fb7299;border-color:#fb7299;color:white}.view{background:#f5f7fb;min-height:100%;padding:30px max(24px,calc((100vw - 1440px)/2)) 110px}.head{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:24px}.head h1{font-size:26px;margin:0 0 6px}.head p{color:#67748d;margin:0}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:24px}.card{display:block;border-radius:16px;background:white;overflow:hidden;color:inherit;text-decoration:none;border:1px solid #e7ebf3}.card:hover{box-shadow:0 8px 24px #1b2f4c16}.cover{aspect-ratio:16/9;background:#e8edf5;position:relative}.cover img{width:100%;height:100%;object-fit:cover}.duration{position:absolute;right:10px;bottom:8px;color:white;background:#101727c9;border-radius:5px;padding:1px 5px;font-size:12px}.info{padding:14px}.title{font-size:15px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:45px}.meta{color:#738098;font-size:12px;margin-top:9px}.dark{background:#10151f;color:#e4e9f5}.dark .card{background:#1b2433;border-color:#2c374a}.dark .head p,.dark .meta{color:#aab5c8}@media(max-width:680px){.brand{display:none}button{padding:8px}.toolbar{gap:5px}.count{min-width:40px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.view{padding:20px 12px 100px}.head h1{font-size:20px}.info{padding:10px}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}`;
++    if(!grid?.isConnected)return [];
++    const nodes=[...grid.querySelectorAll(CARD)].filter(n=>!owns(n)&&!n.closest('.recommended-swipe'));
++    const result=[];
++    for(const n of nodes.slice(0,144)) {
++      const holder=n.closest('.feed-card')||n, ad=isAd(n), c=cardFrom(n);
++      if(ad!==holder.hasAttribute('data-btr-ad'))holder.toggleAttribute('data-btr-ad',ad);
++      if(!!c!==holder.hasAttribute('data-btr-ready'))holder.toggleAttribute('data-btr-ready',!!c);
++      if(c&&!(ad&&settings.homeHideAds))result.push(c);
++    }
++    return core.cards(result);
++  }
++  function scheduleSave() {
++    clearTimeout(saveTimer);
++    if(!settings.homeHistory)return;
++    const token=saveGeneration, epoch=clearEpoch;
++    // Debounce data writes; prune only at startup, not on every mutation or click.
++    saveTimer=setTimeout(()=>{
++      const value={at:Date.now(),epoch,snapshots:core.history(snapshots)};
++      saveChain=saveChain.catch(()=>{}).then(async()=>{
++        if(token!==saveGeneration||!settings.homeHistory||epoch!==clearEpoch)return;
++        await chrome.storage.local.set({[storageKey]:value});
++      }).catch(()=>notify('历史暂未写入浏览器；当前标签页仍可回看。',true));
++    },250);
++  }
++  function clearHistory(epoch) {
++    clearEpoch=Number(epoch)||0; saveGeneration++; clearTimeout(saveTimer);
++    snapshots=[]; index=-1; liveReady=true; candidateKey=''; // Current native page still exists; do not re-save it as the next refresh baseline.
++    clearTimeout(settleTimer); finishTransaction(); closeHistory(); render();
++    // Do not immediately recapture the page after the user explicitly clears history.
++  }
++  function notify(text,error=false) {status=text;statusError=error;render();}
++  function render() {
++    if(!bar)return;
++    refs.back.hidden=refs.next.hidden=refs.count.hidden=!settings.homeHistory;
++    refs.back.disabled=busy||index<=0;
++    refs.next.disabled=busy||index<0||index>=snapshots.length-1;
++    refs.count.textContent=snapshots.length?`${index+1} / ${snapshots.length}`:'—';
++    refs.count.title='本标签页保存的推荐批次；不是分页请求';
++    refs.refresh.textContent=busy?'更新中…':'换一批';refs.refresh.disabled=busy;
++    refs.status.textContent=status;refs.status.classList.toggle('error',statusError);
++    refs.nav.setAttribute('aria-busy',String(busy));
++  }
++  function columnCount() {
++    if(!grid||!bar)return;
++    // While browsing history the native grid is hidden, so keep the last known count.
++    if(root().hasAttribute('data-btr-history-open'))return;
++    const cs=getComputedStyle(grid), parts=cs.gridTemplateColumns.split(/\s+/).filter(Boolean);
++    const count=parts[0]==='none'?Math.max(1,Math.floor(grid.clientWidth/250)):parts.length;
++    bar.style.setProperty('--btr-columns',String(Math.max(1,Math.min(10,count))));
++    bar.style.setProperty('--btr-gap',cs.columnGap==='normal'?'20px':cs.columnGap);
++  }
+   function ensureBar() {
+-    if (bar || !home() || !settings.homeHistory) return;
+-    bar=element('div');bar.id='btr-flow-toolbar';Object.assign(bar.style,{position:'fixed',bottom:'22px',left:'50%',transform:'translateX(-50%)',zIndex:'100002'});
+-    shadow=bar.attachShadow({mode:'open'});shadow.append(element('style',style));document.body.append(bar);renderBar();
+-  }
+-  function renderBar() {
+-    if(!shadow)return;shadow.querySelector('.toolbar')?.remove();
+-    const t=element('nav',null,'toolbar');t.setAttribute('aria-label','BTR 推荐历史');t.append(element('span','BTR FLOW','brand'));
+-    const back=button('← 上一批',()=>show(index-1),'返回之前刷到的推荐');back.disabled=index<=0;
+-    const next=button('下一批 →',()=>show(index+1),'前进到已保存的下一批，不请求新推荐');next.disabled=index>=snapshots.length-1;
+-    const label=element('span',snapshots.length?`${index+1} / ${snapshots.length}`:'等待推荐','count');
+-    const refresh=button(busy?'更新中…':'刷一批新的',refreshBatch,'调用首页原生换一换；没有此按钮时刷新首页');refresh.className='fresh';refresh.disabled=busy;
+-    t.append(back,next,label,refresh,button('设置',()=>chrome.runtime.sendMessage({type:'flow-open-options'})));
+-    if(storageError) label.title=storageError;
+-    shadow.append(t);
+-  }
+-  function closeSheet(){sheet?.remove();sheet=null;}
+-  function show(wanted){
+-    if(wanted<0||wanted>=snapshots.length)return;index=wanted;closeSheet();renderBar();
+-    if(index===snapshots.length-1)return;
+-    sheet=element('section');sheet.id='btr-flow-history';Object.assign(sheet.style,{position:'fixed',inset:'64px 0 0',zIndex:'100001',overflow:'auto'});
+-    const s=sheet.attachShadow({mode:'open'});s.append(element('style',style));
+-    const dark=settings.homeTheme==='dark'||settings.homeTheme==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches;
+-    const view=element('div',null,'view'+(dark?' dark':'')),h=element('header',null,'head'),intro=element('div');
+-    intro.append(element('h1','刚才刷到的，还在这里。'),element('p',`${new Date(snapshots[index].at).toLocaleString()} · 第 ${index+1} 批 · 这是已保存的卡片快照，不是重新推荐`));
+-    h.append(intro,button('回到当前首页',()=>show(snapshots.length-1)));view.append(h);
+-    const grid=element('div',null,'grid');
+-    for(const c of snapshots[index].cards){
+-      const a=element('a',null,'card');a.href=c.url;a.target='_blank';a.rel='noopener noreferrer';
+-      const cover=element('div',null,'cover');if(c.image){const img=element('img');img.src=c.image;img.alt='';img.loading='lazy';img.decoding='async';cover.append(img);}if(c.duration)cover.append(element('span',c.duration,'duration'));
+-      const info=element('div',null,'info');info.append(element('div',c.title,'title'),element('div',[c.author,c.stats].filter(Boolean).join(' · '),'meta'));a.append(cover,info);grid.append(a);
+-    }
+-    view.append(grid);s.append(view);document.body.append(sheet);
+-  }
+-  async function refreshBatch(){
+-    if(busy)return;capture();await remember();index=snapshots.length-1;closeSheet();busy=true;renderBar();
+-    const candidates=[...document.querySelectorAll('.recommended-container_floor-aside button,.recommended-container button,.roll-btn,.primary-btn,[class*="refresh"] button')];
+-    const target=candidates.find(e=>!owns(e)&&e.getClientRects().length&&/换一换|换一批/.test(e.textContent)&&!e.disabled);
+-    if(target){target.click();setTimeout(()=>{capture();busy=false;renderBar();},2400);}else{location.reload();}
+-  }
+-  let skin;
+-  function applySkin(){
+-    skin?.remove();skin=null;delete document.documentElement.dataset.btrHome;
+-    if(!home()||!settings.homeEnabled||settings.homeTheme==='off')return;
+-    const dark=settings.homeTheme==='dark'||settings.homeTheme==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches;
+-    document.documentElement.dataset.btrHome=dark?'dark':'light';skin=element('style');skin.id='btr-flow-home-skin';
+-    skin.textContent=`html[data-btr-home] body{background:${dark?'#111722':'#f5f7fb'}!important}html[data-btr-home] .bili-video-card{border-radius:14px;background:${dark?'#1c2534':'#fff'};overflow:hidden}html[data-btr-home] .bili-video-card__info{padding:12px}html[data-btr-home] .bili-video-card__cover{border-radius:12px}html[data-btr-home] .bili-video-card__info--tit{font-weight:550;line-height:1.55;color:${dark?'#e4ebf8':'#222c3f'}!important}html[data-btr-home] .bili-video-card__info--bottom{color:${dark?'#aab6cc':'#738096'}!important}html[data-btr-home] .bili-header .bili-header__bar{box-shadow:0 1px 16px #1d2c4110}html[data-btr-home="dark"] .bili-header .bili-header__bar{background:#1c2534!important}html[data-btr-home="dark"] .header-channel{background:#111722;color:#e4ebf8}html[data-btr-home="dark"] .channel-link{color:#dce4f4!important;background:#263248!important}`;
+-    document.head.append(skin);
+-  }
+-  function syncRoute(){
+-    applySkin();if(!home()||!settings.homeHistory){bar?.remove();bar=shadow=null;closeSheet();observer?.disconnect();observer=null;return;}
+-    ensureBar();if(!observer){observer=new MutationObserver(records=>{if(records.some(r=>!owns(r.target)))debounce();});observer.observe(document.body,{childList:true,subtree:true});}debounce();
+-  }
++    if(!grid?.parentElement)return;
++    if(!bar) {
++      bar=el('div');bar.id='btr-flow-toolbar';bar.dataset.btrFlowOwned='';
++      shadow=bar.attachShadow({mode:'open'});shadow.append(el('style',uiCSS));
++      refs.nav=el('nav',null,'toolbar');refs.nav.setAttribute('aria-label','推荐批次');
++      refs.status=el('span','', 'status');refs.status.setAttribute('role','status');refs.status.setAttribute('aria-live','polite');
++      refs.back=button('← 上一批',()=>show(index-1),'只回看本地快照，不重新请求推荐');
++      refs.next=button('下一批 →',()=>show(index+1),'前进到已保存的下一批');
++      refs.count=el('span','—','count');
++      refs.refresh=button('换一批',refresh,'使用 B 站原生换一换，不刷新整个页面');refs.refresh.className='refresh';
++      refs.settings=button('设置',()=>chrome.runtime.sendMessage({type:'flow-open-options'}).catch(()=>notify('请从扩展图标打开增强设置。',true)),'BTR Flow 设置');
++      refs.nav.append(refs.status,refs.back,refs.count,refs.next,el('span',null,'separator'),refs.refresh,refs.settings);
++      shadow.append(refs.nav);
++    }
++    if(bar.parentNode!==grid.parentNode||bar.nextElementSibling!==grid)grid.before(bar);
++    toggle('data-btr-home-ui',true); columnCount();render();theme();
++  }
++  function closeHistory() {view?.remove();view=null;toggle('data-btr-history-open',false);}
++  function show(wanted) {
++    if(busy||wanted<0||wanted>=snapshots.length||!bar)return;
++    const wasHistory=!!view; if(!wasHistory)liveScroll=window.scrollY;
++    index=wanted;closeHistory();render();
++    if(wanted===snapshots.length-1&&liveReady) {
++      if(wasHistory)window.scrollTo({top:liveScroll,behavior:'instant'});
++      return;
++    }
++    view=el('section');view.id='btr-flow-history';view.setAttribute('aria-label','已保存的推荐');
++    const head=el('header',null,'history-head');
++    head.append(el('p',`${new Date(snapshots[index].at).toLocaleString()} · 已保存快照（无悬停预览）`),button('返回当前推荐',()=>show(snapshots.length-1)));
++    view.append(head);const cards=el('div',null,'grid');
++    for(const c of snapshots[index].cards) {
++      const a=el('a',null,'card');a.href=c.url;a.target='_blank';a.rel='noopener noreferrer';
++      const cover=el('div',null,'cover');
++      if(c.image){const img=el('img');img.src=c.image;img.alt='';img.loading='lazy';img.decoding='async';cover.append(img);}
++      if(c.duration)cover.append(el('span',c.duration,'duration'));
++      a.append(cover,el('div',c.title,'title'),el('div',[c.author,c.stats].filter(Boolean).join(' · '),'meta'));cards.append(a);
++    }
++    view.append(cards);shadow.append(view);toggle('data-btr-history-open',true);
++    // History lives in normal flow, never covers the search, navigation or bottom video row.
++    if(bar.getBoundingClientRect().top<64)bar.scrollIntoView({block:'start',behavior:'instant'});
++  }
++  function accept(items,replaceLatest=false) {
++    if(items.length<2)return;
++    if(settings.homeHistory) {
++      const atLatest=index>=snapshots.length-1, old=snapshots[index];
++      if(replaceLatest&&snapshots.length)snapshots=[...snapshots.slice(0,-1),{...snapshots.at(-1),cards:items}];
++      else snapshots=core.append(snapshots,items);
++      if(atLatest||index<0)index=snapshots.length-1;
++      else index=Math.max(0,snapshots.indexOf(old));
++      scheduleSave();
++    }
++    liveReady=true; render();
++  }
++  function finishTransaction() {
++    clearTimeout(deadlineTimer);transaction=null;busy=false;render();
++  }
++  function settle() {
++    clearTimeout(settleTimer);
++    if(!active()||!grid?.isConnected)return;
++    const items=collect(), key=core.key(items);
++    if(items.length<2)return;
++    if(candidateKey!==key){candidateKey=key;settleTimer=setTimeout(settle,QUIET_MS);return;}
++    if(transaction) {
++      if(key===transaction.beforeKey)return;
++      const minimum=Math.max(2,Math.min(transaction.count,6));
++      if(items.length<minimum)return;
++      const fromHistory=!!view;
++      finishTransaction();index=snapshots.length-1;closeHistory();accept(items,false);index=snapshots.length-1;
++      notify('');if(fromHistory)window.scrollTo({top:liveScroll,behavior:'instant'});
++      return;
++    }
++    if(!liveReady){accept(items);return;}
++    const last=snapshots.at(-1)?.cards||[];
++    if(!settings.homeHistory)return;
++    if(core.key(last)===key) {
++      // Update lazy-loaded cover/author data without adding a batch or continuous storage churn.
++      if(JSON.stringify(last)!==JSON.stringify(items))accept(items,true);
++    } else if(core.grows(last,items))accept(items,true);
++    else {
++      // Native refresh can also be invoked by the site's keyboard/UI or an updated selector.
++      accept(items,false);
++    }
++  }
++  function scheduleSettle(records) {
++    if(records&&!records.some(r=>!owns(r.target)&&
++      (r.type!=='attributes'||['href','src','data-src'].includes(r.attributeName))))return;
++    candidateKey='';clearTimeout(settleTimer);settleTimer=setTimeout(settle,QUIET_MS);
++  }
++  function findRefresh() {
++    const scope=grid?.closest('.recommended-container_floor-aside,.recommended-container');
++    if(!scope)return null;
++    const candidates=scope.querySelectorAll('.roll-btn,.refresh-btn,.feed-roll-btn,button,[role="button"]');
++    return [...candidates].find(n=>!owns(n)&&!/BTR/.test(n.textContent)&&/^(?:\s*换\s*[一1]\s*[换批]\s*)$/.test(n.textContent||'')&&
++      !n.disabled&&n.getAttribute('aria-disabled')!=='true'&&(n.hasAttribute('data-btr-native-refresh')||n.getClientRects().length));
++  }
++  function tagRefresh() {
++    const next=findRefresh();
++    if(nativeRefresh&&nativeRefresh!==next)nativeRefresh.removeAttribute('data-btr-native-refresh');
++    nativeRefresh=next;if(next&&bar)next.setAttribute('data-btr-native-refresh','');
++  }
++  function begin() {
++    if(busy||!active()||!grid)return false;
++    const items=collect();
++    // Lock synchronously, before storage promises or native handlers run.
++    busy=true;transaction={id:++generation,beforeKey:core.key(items),count:items.length};
++    if(!liveReady)accept(items);else if(settings.homeHistory&&items.length>=2&&core.grows(snapshots.at(-1)?.cards||[],items))accept(items,true);
++    index=snapshots.length-1;closeHistory();notify('');candidateKey='';render();
++    const id=transaction.id;
++    deadlineTimer=setTimeout(()=>{
++      if(transaction?.id!==id)return;
++      finishTransaction();notify('这次未检测到完整的新推荐；保留历史，可稍后重试。',true);
++    },REFRESH_TIMEOUT);
++    return true;
++  }
++  function refresh() {
++    if(busy)return;
++    tagRefresh();
++    if(!nativeRefresh){notify('未找到原生换一换；没有刷新页面，请使用 B 站原生按钮或手动刷新。',true);return;}
++    if(!begin())return;
++    try {issuingNative=true;nativeRefresh.click();scheduleSettle();}
++    catch(_){finishTransaction();notify('原生换一换未能执行，请稍后重试。',true);}
++    finally {issuingNative=false;}
++  }
++  function nativeClick(event) {
++    if(!active()||owns(event.target))return;
++    const hit=event.target?.closest?.('.roll-btn,.refresh-btn,.feed-roll-btn,button,[role="button"]');
++    if(!hit || (hit!==nativeRefresh&&hit!==findRefresh()))return;
++    if(issuingNative)return;
++    if(busy){event.preventDefault();event.stopImmediatePropagation();return;}
++    begin();scheduleSettle();
++  }
++  function chooseGrid() {
++    return [...document.querySelectorAll(GRID)].find(n=>!owns(n)) ||
++      [...document.querySelectorAll('.recommended-container')].find(n=>!owns(n)&&n.querySelector(CARD)) || null;
++  }
++  function connectGrid(next) {
++    gridObserver?.disconnect();resizeObserver?.disconnect();grid?.removeAttribute('data-btr-grid');
++    if(transaction){finishTransaction();notify('推荐区域已重建，正在读取当前内容。');}
++    grid=next;candidateKey='';
++    if(!grid){bar?.remove();toggle('data-btr-home-ui',false);return;}
++    grid.setAttribute('data-btr-grid','');ensureBar();tagRefresh();collect();
++    gridObserver=new MutationObserver(scheduleSettle);
++    gridObserver.observe(grid,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['href','src','data-src']});
++    resizeObserver=new ResizeObserver(()=>{clearTimeout(paintTimer);paintTimer=setTimeout(columnCount,80);});resizeObserver.observe(grid);
++    scheduleSettle();
++  }
++  function scanMount() {
++    clearTimeout(mountTimer);
++    if(!active())return;
++    const next=chooseGrid();
++    if(next!==grid)connectGrid(next);
++    else if(grid){ensureBar();tagRefresh();}
++  }
++  function stopHome() {
++    clearTimeout(settleTimer);clearTimeout(mountTimer);clearTimeout(paintTimer);finishTransaction();
++    gridObserver?.disconnect();mountObserver?.disconnect();resizeObserver?.disconnect();
++    gridObserver=mountObserver=resizeObserver=null;closeHistory();bar?.remove();bar=shadow=null;refs={};grid=null;
++    nativeRefresh?.removeAttribute('data-btr-native-refresh');nativeRefresh=null;clearMarks();
++    toggle('data-btr-home-ui',false);toggle('data-btr-oled',false);
++  }
++  function syncRoute() {
++    applySkin();
++    if(!active()||!document.body){stopHome();return;}
++    if(!mountObserver) {
++      // Mount discovery sees child-list changes only; the hot-path observer is limited to the recommendation grid.
++      mountObserver=new MutationObserver(records=>{
++        if(records.some(r=>!owns(r.target)&&!grid?.contains(r.target))) {
++          clearTimeout(mountTimer);mountTimer=setTimeout(scanMount,180);
++        }
++      });mountObserver.observe(document.body,{childList:true,subtree:true});
++    }
++    scanMount();
++  }
++  // Display-only telemetry: page messages never grant permissions or change proxy configuration.
+   window.addEventListener('message',e=>{
+     if(e.source!==window||e.origin!==location.origin||!e.data)return;
+-    // Display-only data. Never forward page-origin messages into proxy or permissions APIs.
+-    if(e.data.channel==='__BTR_FLOW_V1__'&&e.data.type==='telemetry'){
+-      const p=e.data.payload||{},n=v=>Math.max(0,Math.min(1e15,Number(v)||0));
++    const p=e.data.payload||{},n=v=>Math.max(0,Math.min(1e15,Number(v)||0));
++    if(e.data.channel==='__BTR_FLOW_V1__'&&e.data.type==='telemetry')
+       telemetry={policy:{name:String(p.policy?.name||'').slice(0,60),cap:n(p.policy?.cap),ahead:n(p.policy?.ahead),decodeWarning:p.policy?.decodeWarning===true},ahead:n(p.ahead),stalls:n(p.stalls),bitrate:n(p.bitrate),received:n(p.received),errors:n(p.errors),droppedRatio:n(p.droppedRatio)};
+-    }
+-    if(e.data.channel==='__BILI_RANGE_ACCELERATOR_V1__'&&e.data.type==='stats'){
+-      const p=e.data.payload||{};stats={activeThreads:Number(p.activeThreads)||0,totalSpeedBps:Number(p.totalSpeedBps)||0,bufferedAhead:Number(p.bufferedAhead)||0,quality:String(p.quality||'').slice(0,30),playerState:String(p.playerState||'').slice(0,30),lastError:String(p.lastError||'').slice(0,180)};
+-    }
++    if(e.data.channel==='__BILI_RANGE_ACCELERATOR_V1__'&&e.data.type==='stats')
++      stats={activeThreads:n(p.activeThreads),totalSpeedBps:n(p.totalSpeedBps),bufferedAhead:n(p.bufferedAhead),quality:String(p.quality||'').slice(0,30),playerState:String(p.playerState||'').slice(0,30)};
+   });
+   chrome.runtime.onMessage.addListener((m,sender,reply)=>{
+     if(sender.id!==chrome.runtime.id)return false;
+-    if(m?.type==='flow-get-state'){reply({telemetry,stats,historyCount:snapshots.length,home:home()});return false;}
+-    if(m?.type==='flow-clear-history'){snapshots=[];index=-1;closeSheet();renderBar();reply({ok:true});}
++    if(m?.type==='flow-get-state'){reply({telemetry,stats,historyCount:snapshots.length,home:isHome()});return false;}
++    if(m?.type==='flow-clear-history'){clearHistory(Date.now());reply({ok:true});}
+     return false;
+   });
+   chrome.storage.onChanged.addListener((changes,area)=>{
+-    if(area==='sync'){for(const k of Object.keys(defaults))if(changes[k])settings[k]=changes[k].newValue??defaults[k];syncRoute();}
+-    if(area==='local'&&changes[storageKey]&&!changes[storageKey].newValue){snapshots=[];index=-1;closeSheet();renderBar();}
++    if(area==='sync'&&Object.keys(core.defaults).some(k=>changes[k])) {
++      const priorHistory=settings.homeHistory;
++      settings=core.settings({...settings,...Object.fromEntries(Object.keys(core.defaults).filter(k=>changes[k]).map(k=>[k,changes[k].newValue]))});
++      if(!settings.homeHistory){saveGeneration++;clearTimeout(saveTimer);closeHistory();}
++      if(!priorHistory&&settings.homeHistory)liveReady=false;
++      syncRoute();scheduleSettle();
++    }
++    if(area==='local') {
++      if(changes.flowHistoryClearedAt){clearHistory(changes.flowHistoryClearedAt.newValue);}
++      const record=changes[storageKey];
++      if(record?.newValue&&(Number(record.newValue.epoch)||0)!==clearEpoch)
++        chrome.storage.local.remove(storageKey).catch(()=>{}); // Reject an in-flight write from before Clear.
++      else if(record&&!record.newValue&&!changes.flowHistoryClearedAt)clearHistory(clearEpoch);
++    }
+   });
+-  chrome.storage.sync.get(defaults).then(s=>{settings=s;return chrome.storage.local.get(storageKey);}).then(data=>{
+-    snapshots=core.history(data[storageKey]?.snapshots);index=snapshots.length-1;syncRoute();
+-    // Cleanup is bounded to this extension's own records; unrelated storage is untouched.
+-    return chrome.storage.local.get(null);
+-  }).then(all=>{
+-    const records=Object.entries(all).filter(([k])=>k.startsWith('flowHistory:')).sort((a,b)=>(b[1]?.at||0)-(a[1]?.at||0));
+-    const expired=records.filter(([k,v],i)=>k!==storageKey&&(i>=20||Date.now()-(v?.at||0)>core.TTL)).map(([k])=>k);
+-    if(expired.length)chrome.storage.local.remove(expired);
+-  }).catch(()=>{storageError='历史读取失败';syncRoute();});
+-  routeTimer=setInterval(()=>{if(location.pathname!==lastPath){lastPath=location.pathname;syncRoute();}},1000);
+-  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&sheet)show(snapshots.length-1);});
+-  window.addEventListener('pagehide',()=>{if(!home())return;capture();});
+-  matchMedia('(prefers-color-scheme: dark)').addEventListener('change',applySkin);
++  async function start() {
++    try {
++      const s=await chrome.storage.sync.get(core.defaults);settings=core.settings(s);
++      const data=await chrome.storage.local.get([storageKey,'flowHistoryClearedAt']);clearEpoch=Number(data.flowHistoryClearedAt)||0;
++      if((Number(data[storageKey]?.epoch)||0)===clearEpoch)snapshots=core.history(data[storageKey]?.snapshots);
++      index=snapshots.length-1;
++    } catch(_){status='设置或历史暂时无法读取，使用原生主题。';statusError=true;}
++    ready=true;syncRoute();
++    // Bounded maintenance, once per page, never on each UI mutation.
++    chrome.storage.local.get(null).then(all=>{
++      const records=Object.entries(all).filter(([k])=>k.startsWith('flowHistory:')).sort((a,b)=>(b[1]?.at||0)-(a[1]?.at||0));
++      const expired=records.filter(([k,v],i)=>k!==storageKey&&(i>=20||Date.now()-(v?.at||0)>core.TTL)).map(([k])=>k);
++      if(expired.length)return chrome.storage.local.remove(expired);
++    }).catch(()=>{});
++  }
++  function domReady() {
++    mountSkin();
++    themeObserver=new MutationObserver(theme);
++    for(const n of [root(),document.body])if(n)themeObserver.observe(n,{attributes:true,attributeFilter:['class','style','data-theme','theme','data-dark']});
++    syncRoute();
++  }
++  mountSkin();start();
++  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',domReady,{once:true});else domReady();
++  document.addEventListener('click',nativeClick,true);
++  document.addEventListener('keydown',e=>{
++    if(e.key==='Escape'&&view){show(snapshots.length-1);refs.back?.focus();}
++  });
++  window.addEventListener('popstate',()=>{lastPath=location.pathname;syncRoute();});
++  // A low-frequency path comparison avoids patching the site's History API in an isolated world.
++  routeTimer=setInterval(()=>{if(lastPath!==location.pathname){lastPath=location.pathname;liveReady=false;syncRoute();}},1000);
++  window.addEventListener('pagehide',()=>{
++    clearTimeout(saveTimer);
++    if(settings.homeHistory&&snapshots.length){const value={at:Date.now(),epoch:clearEpoch,snapshots:core.history(snapshots)};chrome.storage.local.set({[storageKey]:value}).catch(()=>{});}
++  });
++  window.addEventListener('pageshow',e=>{if(e.persisted)syncRoute();});
++  matchMedia('(prefers-color-scheme: dark)').addEventListener('change',theme);
+ })();
+--- a/src/idm-downloader.js
++++ b/src/idm-downloader.js
+@@ -131,6 +131,9 @@
+   // steps it back too, and nothing climbs past a refused level until it has rested. The
+   // level is kept across videos on the same page; a new page starts at 8 again.
+   const AUTO_LADDER = Object.freeze([8, 12, 16, 24, 32]);
++  const AUTO_STARTUP_LEVEL = 2;
++  const AUTO_STARTUP_COMFORT_SECONDS = 15;
++  const AUTO_STARTUP_MAX_MS = 30000;
+   const AUTO_STEP_COOLDOWN_MS = 2500;
+   const AUTO_TRIAL_MS = 10000;
+   const AUTO_WINDOW_MS = 5000;
+@@ -150,7 +153,7 @@
+       buckets: [], lastActivityAt: -Infinity,
+       // Time the connections spent saturated: intervals of { from, to } within the window.
+       saturated: false, saturatedSince: 0, saturatedSpans: [],
+-      aheadSamples: [], pressureSince: 0
++      aheadSamples: [], pressureSince: 0, startup: null
+     };
+     const threads = () => AUTO_LADDER[state.level];
+ 
+@@ -214,7 +217,15 @@
+       }
+       if (next >= AUTO_LADDER.length) return false;
+       setLevel(next, reason, { from: state.level, level: next, at, baseline: throughput(at), stalled: false });
++      state.startup = null;
+       return true;
++    }
++
++    function startupLevel(at) {
++      if (resting(state.level, at)?.hard) return state.level;
++      let level = state.level;
++      while (level < AUTO_STARTUP_LEVEL && !resting(level + 1, at)?.hard) level += 1;
++      return level;
+     }
+ 
+     function stepDown(target, restLevel, reason, restMs, hard) {
+@@ -273,6 +284,12 @@
+       buffer(ahead, playing, at = now()) {
+         state.aheadSamples.push({ at, ahead });
+         while (state.aheadSamples.length && at - state.aheadSamples[0].at > AUTO_PRESSURE_MS + AUTO_BUCKET_MS) state.aheadSamples.shift();
++        const start = state.startup;
++        if (start && at >= start.until) state.startup = null;
++        else if (start && ahead >= AUTO_STARTUP_COMFORT_SECONDS && at - state.changedAt >= AUTO_STEP_COOLDOWN_MS) {
++          if (state.level > start.base) setLevel(state.level - 1, `开头已经跟上，线程数降到 ${AUTO_LADDER[state.level - 1]}`, null);
++          if (state.level <= start.base) state.startup = null;
++        }
+         const earlier = state.aheadSamples.find((item) => at - item.at >= AUTO_PRESSURE_MS);
+         const downloading = at - state.lastActivityAt < AUTO_ACTIVITY_MS;
+         const pressed = playing && downloading && ahead < AUTO_LOW_BUFFER_SECONDS && earlier && ahead <= earlier.ahead + 0.05;
+@@ -293,12 +310,17 @@
+       },
+       // A new playback session: what the buffer did before means nothing now.
+       newSession() {
++        const at = now();
+         state.aheadSamples.length = 0;
+         state.pressureSince = 0;
+         state.trial = null;
+         state.buckets.length = 0;
+         state.saturatedSpans.length = 0;
+-        if (state.saturated) state.saturatedSince = now();
++        if (state.saturated) state.saturatedSince = at;
++        const base = state.startup ? state.startup.base : state.level;
++        const target = startupLevel(at);
++        if (target > state.level) setLevel(target, `开头先用 ${AUTO_LADDER[target]} 线程`, null);
++        state.startup = state.level > base ? { base, until: at + AUTO_STARTUP_MAX_MS } : null;
+       },
+       status() {
+         const at = now();
+@@ -307,14 +329,15 @@
+           throughputBps: Math.round(throughput(at)), saturation: Math.round(saturation(at) * 100) / 100,
+           buckets: state.buckets.length, activityAgeMs: Math.round(at - state.lastActivityAt),
+           resting: [...state.resting.entries()].filter(([, rest]) => rest.until > at).map(([level, rest]) => ({ threads: AUTO_LADDER[level], hard: rest.hard, forMs: Math.round(rest.until - at) })),
+-          trial: state.trial ? { from: AUTO_LADDER[state.trial.from], level: AUTO_LADDER[state.trial.level], ageMs: Math.round(at - state.trial.at), baselineBps: Math.round(state.trial.baseline), stalled: state.trial.stalled } : null
++          trial: state.trial ? { from: AUTO_LADDER[state.trial.from], level: AUTO_LADDER[state.trial.level], ageMs: Math.round(at - state.trial.at), baselineBps: Math.round(state.trial.baseline), stalled: state.trial.stalled } : null,
++          startup: state.startup ? { base: AUTO_LADDER[state.startup.base], forMs: Math.round(state.startup.until - at) } : null
+         };
+       },
+       reset() {
+         state.level = 0; state.changedAt = 0; state.reason = "起步"; state.steps = 0; state.trial = null;
+         state.resting.clear(); state.buckets.length = 0; state.lastActivityAt = -Infinity;
+         state.saturated = false; state.saturatedSince = 0; state.saturatedSpans.length = 0;
+-        state.aheadSamples.length = 0; state.pressureSince = 0;
++        state.aheadSamples.length = 0; state.pressureSince = 0; state.startup = null;
+       }
+     });
+   }
+--- a/src/live-hook.js
++++ b/src/live-hook.js
+@@ -48,7 +48,7 @@
+ 
+   // ---- stats for the extension badge and the settings panel ----
+   const stats = {
+-    version: "1.0.0",
++    version: "1.1.0",
+     architecture: "live-segment-ripper",
+     mode: "live",
+     playerState: "waiting",
+@@ -512,7 +512,7 @@
+         hosts: context.pool.status()
+       },
+       getStats: () => ({ ...stats }),
+-      version: "1.0.0"
++      version: "1.1.0"
+     })
+   });
+   publish();
+--- a/src/native-mse-player.js
++++ b/src/native-mse-player.js
+@@ -76,6 +76,12 @@
+ 
+   // "默认" in the player's 播放策略 menu keeps AV1 > HEVC > AVC. A codec picked there comes
+   // first; a quality that does not have it falls back to that order.
++  // Upstream #29: native audio preference (newA: 0 ordinary, 1 Dolby, 2 Hi-Res).
++  function normalizeAudio(value) {
++    const audio = Math.trunc(Number(value)) || 0;
++    return audio === 1 || audio === 2 ? audio : 0;
++  }
++
+   function codecPriority(representation, preferredCodec = "") {
+     const family = codecFamily(representation);
+     if (preferredCodec && family === preferredCodec) return 4;
+@@ -104,7 +110,7 @@
+   // preferredQuality is the quality chosen in the native menu; 0 is "auto" and keeps the
+   // quality the playinfo itself asks for. preferredCodec is the codec chosen there, "" for
+   // "默认".
+-  function selectRepresentations(playinfo, preferredQuality = 0, preferredCodec = "") {
++  function selectRepresentations(playinfo, preferredQuality = 0, preferredCodec = "", preferredAudio = 0) {
+     const body = dashBody(playinfo);
+     const dash = body?.dash;
+     if (!dash) throw new Error("页面没有 DASH 播放清单");
+@@ -126,7 +132,8 @@
+     // Ordinary tracks stay preferred, like the native player's default.
+     const audioOf = (list) => [].concat(list || []).filter((item) => supported(item, "audio"))
+       .sort((a, b) => (Number(b.bandwidth) || 0) - (Number(a.bandwidth) || 0))[0];
+-    const audio = audioOf(dash.audio) || audioOf(dash.flac?.audio) || audioOf(dash.dolby?.audio);
++    const picked = { 1: dash.dolby?.audio, 2: dash.flac?.audio }[normalizeAudio(preferredAudio)];
++    const audio = audioOf(picked) || audioOf(dash.audio) || audioOf(dash.flac?.audio) || audioOf(dash.dolby?.audio);
+     if (!videos.length || !audio) throw new Error("浏览器不支持清单中的视频或音频编码");
+     const requestedQuality = Number(body?.quality || body?.qn) || 0;
+     const preferred = [Number(preferredQuality) || 0, requestedQuality]
+@@ -273,6 +280,79 @@
+     }, true);
+   }
+ 
++  // Upstream #29: do not close the native MediaSource while its buffers are being created.
++  const pageMediaSources = new Map();
++  const ownMediaSources = new WeakSet();
++  const NATIVE_SOURCE_WAIT_MS = 1000;
++  let mediaSourceWatchInstalled = false;
++  function isMediaSource(object) {
++    return typeof root.MediaSource === "function" && object instanceof root.MediaSource;
++  }
++  function installMediaSourceWatch() {
++    if (mediaSourceWatchInstalled || typeof root.URL?.createObjectURL !== "function") return;
++    mediaSourceWatchInstalled = true;
++    const createObjectURL = root.URL.createObjectURL;
++    root.URL.createObjectURL = function (object) {
++      const url = createObjectURL.apply(this, arguments);
++      if (isMediaSource(object)) {
++        pageMediaSources.set(url, object);
++        if (pageMediaSources.size > 16) pageMediaSources.delete(pageMediaSources.keys().next().value);
++      }
++      return url;
++    };
++  }
++  function nativeSourceSettled(video) {
++    const source = (isMediaSource(video.srcObject) ? video.srcObject : null)
++      || pageMediaSources.get(video.src) || pageMediaSources.get(video.currentSrc);
++    if (!source || ownMediaSources.has(source) || source.readyState !== "open" || source.sourceBuffers.length >= 2) return null;
++    return new Promise((resolve) => {
++      let grace = null, finished = false;
++      const done = () => {
++        if (finished) return;
++        finished = true;
++        clearTimeout(limit); clearTimeout(grace);
++        source.sourceBuffers.removeEventListener("addsourcebuffer", added);
++        source.removeEventListener("sourceclose", done);
++        source.removeEventListener("sourceended", done);
++        resolve();
++      };
++      const added = () => {
++        if (source.sourceBuffers.length >= 2) done();
++        else if (!grace) grace = setTimeout(done, 150);
++      };
++      const limit = setTimeout(done, NATIVE_SOURCE_WAIT_MS);
++      source.sourceBuffers.addEventListener("addsourcebuffer", added);
++      source.addEventListener("sourceclose", done);
++      source.addEventListener("sourceended", done);
++    });
++  }
++  // A takeover failure is not evidence that the browser lacks this codec.
++  const CODEC_FAILURE_KEYS = new Set(["enableHEVCError", "enableAV1Error", "decodeHEVCError", "decodeAV1Error", "bilibili_decode_error_obj"]);
++  const codecFailures = { blocked: 0, last: "" };
++  let codecFailureGuardInstalled = false;
++  function installCodecFailureGuard() {
++    const storage = root.Storage?.prototype;
++    if (codecFailureGuardInstalled || typeof storage?.setItem !== "function") return;
++    codecFailureGuardInstalled = true;
++    const setItem = storage.setItem;
++    storage.setItem = function (key, value) {
++      if (CODEC_FAILURE_KEYS.has(String(key)) && document.querySelector('[data-btr-mse-active="true"]')) {
++        codecFailures.blocked += 1;
++        codecFailures.last = String(key);
++        return;
++      }
++      return setItem.apply(this, arguments);
++    };
++    try {
++      if (root.localStorage.getItem("BTR.codecFailuresCleared") !== "1") {
++        for (const key of CODEC_FAILURE_KEYS) {
++          root.localStorage.removeItem(key); root.sessionStorage.removeItem(key);
++        }
++        setItem.call(root.localStorage, "BTR.codecFailuresCleared", "1");
++      }
++    } catch (_error) {}
++  }
++
+   function createNativePlayer(options) {
+     const getSettings = options.getSettings;
+     const video = options.container.querySelector("video");
+@@ -280,13 +360,15 @@
+     let currentPlayinfo = options.playinfo;
+     let preferredQuality = Math.max(0, Math.trunc(Number(options.preferredQuality)) || 0);
+     let preferredCodec = normalizeCodec(options.preferredCodec);
+-    let selection = selectRepresentations(currentPlayinfo, preferredQuality, preferredCodec);
++    const preferredAudio = normalizeAudio(options.preferredAudio);
++    let selection = selectRepresentations(currentPlayinfo, preferredQuality, preferredCodec, preferredAudio);
+     let selectedVideo = selection.preferred;
+     // The two representation objects the running session downloads from. Its resolvers keep
+     // reading them, so fresh addresses always go into these two and never into a newer
+     // selection's copies.
+     let selectedAudio = selection.audio;
+     let sessionStarts = 0;
++    let sessionRequests = 0;
+     let session = null;
+     let destroyed = false;
+     let generationSequence = 0;
+@@ -806,6 +888,14 @@
+ 
+       downloaderFactory.autoConcurrency?.newSession();
+       if (destroyed) return;
++      const request = ++sessionRequests;
++      const settling = nativeSourceSettled(video);
++      if (settling) {
++        const waitedFrom = performance.now();
++        await settling;
++        note("waited for Bilibili's source buffers", `${Math.round(performance.now() - waitedFrom)} ms`);
++        if (destroyed || request !== sessionRequests) return;
++      }
+       options.onLog?.("正在准备播放器", `使用 ${qualityLabel(representation)} 清晰度，从 ${Number(playbackState.time || 0).toFixed(2)} 秒开始。`, "info", "takeover");
+       const previous = session;
+       // Read once: selection can be replaced by a new playinfo while this session starts.
+@@ -815,6 +905,7 @@
+       sessionStarts += 1;
+       note("session", `${qualityLabel(representation)} ${codecFamily(representation)} from ${Number(playbackState.time || 0).toFixed(1)}`);
+       const mediaSource = new MediaSource();
++      ownMediaSources.add(mediaSource);
+       const objectUrl = URL.createObjectURL(mediaSource);
+       const candidate = {
+         disposed: false, fatal: false, externalSourceDetected: false, generation: 0,
+@@ -1094,7 +1185,7 @@
+ 
+     async function updatePlayinfo(playinfo) {
+       if (destroyed) return;
+-      const next = selectRepresentations(playinfo, preferredQuality, preferredCodec);
++      const next = selectRepresentations(playinfo, preferredQuality, preferredCodec, preferredAudio);
+       // Bilibili's page and the timed refresh both bring playinfos, and the one that arrives
+       // last is not always the newer one. An older one is dropped whole: kept as the current
+       // playinfo it would hand its addresses to the next session, after a seek or a quality
+@@ -1199,12 +1290,14 @@
+       urlDeadlineSeconds,
+       video,
+       getDebug: () => ({
+-        version: "1.0.0",
++        version: "1.1.0",
+         architecture: "bilibili-native-ui-progressive-mse-0.8-core",
+         quality: qualityLabel(selectedVideo),
+         qualityId: Number(selectedVideo?.id) || 0,
+         preferredQuality,
+         preferredCodec,
++        preferredAudio,
++        codecFailuresBlocked: codecFailures.blocked,
+         sessionStarts,
+         codec: codecFamily(selectedVideo),
+         width: Number(selectedVideo?.width) || 0,
+@@ -1239,5 +1332,7 @@
+ 
+   installBufferedShim();
+   installNativeErrorGuard();
++  installMediaSourceWatch();
++  installCodecFailureGuard();
+   root.__BILI_NATIVE_MSE_PLAYER_FACTORY__ = Object.freeze({ createNativePlayer, playbackDeadlineAt, qualityLabel, selectRepresentations });
+ })(globalThis);
+--- a/src/page-hook.js
++++ b/src/page-hook.js
+@@ -76,7 +76,7 @@
+   });
+ 
+   const stats = {
+-    version: "1.0.0",
++    version: "1.1.0",
+     architecture: "bilibili-native-ui-progressive-mse-0.8-core",
+     mode: settings.mode,
+     playerState: "waiting",
+@@ -359,7 +359,30 @@
+       ? 1
+       : Math.max(1, Number(new URLSearchParams(location.search).get("p")) || 1);
+     const videoKey = bvid ? bvid.toLowerCase() : `av${aid}`;
+-    return { aid, bvid, part, key: `${videoKey}:p${part}`, videoKey };
++    const node = interactiveNode(videoKey, part);
++    return { aid, bvid, part, key: nodeRouteKey(videoKey, part, node), videoKey, cid: node };
++  }
++
++  // Upstream #34: branch CIDs are separate playback routes even when the URL stays put.
++  function interactiveFirstCid(videoKey, part) {
++    try {
++      const state = root.__INITIAL_STATE__;
++      if (stateIdentity(state)?.videoKey !== videoKey || Number(state.videoData?.rights?.is_stein_gate) !== 1) return 0;
++      return Number(state.videoData.pages?.[part - 1]?.cid || state.videoData.cid) || 0;
++    } catch (_error) { return 0; }
++  }
++  function interactiveNode(videoKey, part) {
++    const first = interactiveFirstCid(videoKey, part);
++    if (!first) return 0;
++    try {
++      const manifest = root.player?.getManifest?.();
++      if (String(manifest?.bvid || "").toLowerCase() !== videoKey && `av${Number(manifest?.aid) || 0}` !== videoKey) return 0;
++      const cid = Number(manifest.cid) || 0;
++      return cid && cid !== first ? cid : 0;
++    } catch (_error) { return 0; }
++  }
++  function nodeRouteKey(videoKey, part, node) {
++    return node ? `${videoKey}:p${part}:n${node}` : `${videoKey}:p${part}`;
+   }
+ 
+   function stateIdentity(state) {
+@@ -405,7 +428,7 @@
+     routePlayinfo.delete(identity.key);
+     routePlayinfo.set(identity.key, playinfo);
+     if (Number(cid) > 0) routeCids.set(identity.key, Number(cid));
+-    while (routePlayinfo.size > 8) {
++    while (routePlayinfo.size > 16) {
+       const oldest = routePlayinfo.keys().next().value;
+       routePlayinfo.delete(oldest);
+       routeCids.delete(oldest);
+@@ -460,14 +483,21 @@
+     const videoKey = requestedVideoKey(url);
+     const cid = requestedCid(url);
+     if (!identity || !videoKey || videoKey !== identity.videoKey || !cid) return null;
+-    return { routeKey: identity.key, videoKey, cid };
++    const first = interactiveFirstCid(identity.videoKey, identity.part);
++    const routeKey = first ? nodeRouteKey(identity.videoKey, identity.part, cid === first ? 0 : cid) : identity.key;
++    return { routeKey, videoKey, cid };
+   }
+ 
+   function observePlayinfo(url, payload, requestContext = null) {
+     if (!/\/x\/player\/(?:wbi\/)?playurl/i.test(String(url)) || !isDashPlayinfo(payload)) return;
+     const context = requestContext || capturePlayinfoRequest(url);
+     const identity = routeIdentity();
+-    if (!context || !identity || context.routeKey !== identity.key || context.videoKey !== identity.videoKey) return;
++    if (!context || !identity || context.videoKey !== identity.videoKey) return;
++    if (context.routeKey !== identity.key && interactiveFirstCid(identity.videoKey, identity.part)) {
++      cachePlayinfo({ key: context.routeKey }, payload, context.cid);
++      return;
++    }
++    if (context.routeKey !== identity.key) return;
+     const cid = Number(context.cid) || 0;
+     const expectedCid = routeCids.get(identity.key) || 0;
+     // The same BVID can contain many parts. A late response from the previous
+@@ -589,7 +619,7 @@
+   // refresh: new addresses for the video that is already playing. Its CID is known by then,
+   // so the video information is not asked for again, and the takeover notices stay quiet.
+   async function fetchRoutePlayinfo(identity, signal, refresh = false) {
+-    let cid = refresh ? Number(routeCids.get(identity.key)) || 0 : 0;
++    let cid = Number(identity.cid) || (refresh ? Number(routeCids.get(identity.key)) || 0 : 0);
+     let canonicalBvid = String(identity.bvid || "");
+     let canonicalAid = Number(identity.aid) || 0;
+     if (!cid) {
+@@ -982,6 +1012,13 @@
+     catch (_error) { return ""; }
+   }
+ 
++  function nativeAudio() {
++    try {
++      const audio = Math.trunc(Number(root.player?.getQuality?.()?.newA)) || 0;
++      return audio === 1 || audio === 2 ? audio : 0;
++    } catch (_error) { return 0; }
++  }
++
+   function syncNativeCodec() {
+     if (player?.nativeTransport) return;
+     const wanted = nativeCodec();
+@@ -1195,6 +1232,7 @@
+     }
+     const preferredQuality = nativeQuality();
+     const preferredCodec = nativeCodec();
++    const preferredAudio = nativeAudio();
+     const resumeAfterStop = takeResumeHint(autoRetakeRoute === route && autoRetakeCount > 0);
+     for (const meter of Object.values(speedMeters)) meter.shown = 0;
+     try {
+@@ -1207,6 +1245,7 @@
+         identity,
+         preferredQuality,
+         preferredCodec,
++        preferredAudio,
+         // A collection item is a different video. Its native <video> element
+         // can still expose the previous item's currentTime until new metadata
+         // arrives, so carrying that value across would clamp short videos to
+@@ -1426,11 +1465,11 @@
+         const { timeline = [], ...rest } = debug;
+         // Node names and states only: no download address or account data.
+         return JSON.stringify({
+-          version: stats.version, at: Math.round(performance.now()), settings: { takeover: settings.takeover, mode: settings.mode, customHosts: settings.customHosts.slice(), concurrency: settings.concurrency, codec: nativeCodec() || "default" },
++          version: stats.version, upstreamVersion: "2026.10.4.1", distribution: "BTR Flow MV3", at: Math.round(performance.now()), settings: { takeover: settings.takeover, mode: settings.mode, customHosts: settings.customHosts.slice(), concurrency: settings.concurrency, codec: nativeCodec() || "default" },
+           state: stats.playerState, lastError: stats.lastError, player: rest, nodes: stats.cdnHosts.map((item) => ({ ...item })), bannedNodes: cdnBans?.hosts?.() || [], page: pageEvents.slice(), timeline
+         }, null, 1);
+       },
+-      version: "1.0.0"
++      version: "1.1.0"
+     })
+   });
+   publish();
+--- a/src/service-worker.js
++++ b/src/service-worker.js
+@@ -15,6 +15,11 @@
+ async function prepareExtension() {
+   const s = await chrome.storage.sync.get(null);
+   const defaults = {mode:"auto", smartPolicy:true, strategy:"auto", memoryBudgetMB:64, maxAutoThreads:32};
++  // One-time schema migration: preserve playback and proxy settings, remove the old forced theme.
++  if (s.flowHomeSchema !== 2) {
++    await chrome.storage.sync.set({flowHomeSchema:2,homeTheme:["native","oled"].includes(s.homeTheme)?s.homeTheme:"native",
++      homeHideCarousel:s.homeHideCarousel !== false,homeHideBanner:s.homeHideBanner === true,homeHideAds:s.homeHideAds !== false});
++  }
+   const missing = Object.fromEntries(Object.entries(defaults).filter(([k]) => !(k in s)));
+   if (Object.keys(missing).length) await chrome.storage.sync.set(missing);
+ }
+--- a/src/settings-panel.js
++++ b/src/settings-panel.js
+@@ -23,7 +23,7 @@
+     <main>
+       <header>
+         <div class="logo" aria-hidden="true">B</div>
+-        <h1>线程撕裂者</h1>
++        <div class="title"><h1>线程撕裂者</h1><a id="github-link" href="https://github.com/MrTangLuyao/Bilibili-thread-ripper" target="_blank" rel="noopener noreferrer" title="上游项目（本包为 Flow 分支）" aria-label="上游 GitHub 项目"><svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg></a></div>
+         <label class="switch" title="启用或停用">
+           <input id="enabled" type="checkbox">
+           <span></span>
+@@ -93,6 +93,9 @@
+             <label><input type="checkbox" data-debug-category="settings">设置变化</label>
+             <label><input type="checkbox" data-debug-category="other">其他日志</label>
+           </div>
++          <div class="debug-copy"><button id="debug-copy" type="button">复制诊断信息</button><span id="debug-copy-status" role="status"></span></div>
++          <p class="custom-note">包含版本、状态和近期日志；不读取 Cookie，媒体地址与 URL 参数会隐藏。粘贴前仍请检查内容。</p>
++          <textarea id="debug-copy-text" readonly hidden aria-label="诊断信息"></textarea>
+         </fieldset>
+       </section>
+ 
+@@ -104,6 +107,14 @@
+ 
+   const PANEL_CSS = `
+     * { box-sizing: border-box; }
++    .title { display:flex; align-items:center; gap:8px; }
++    #github-link { color:#949baa; padding:4px; display:flex; border-radius:4px; }
++    #github-link:hover { color:#fff; }
++    .debug-copy { display:flex; align-items:center; gap:8px; margin-top:12px; }
++    .debug-copy button { padding:6px 10px; border:1px solid #777; border-radius:5px; background:#000; color:#fff; cursor:pointer; }
++    #debug-copy-status { font-size:12px; }
++    #debug-copy-text { width:100%; height:150px; margin-top:8px; background:#000; color:#ddd; }
++    #debug-copy-text[hidden] { display:none; }
+     .btr-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, .35); }
+     .btr-popup { position: fixed; top: 72px; right: 24px; width: 320px; max-width: calc(100vw - 32px); max-height: calc(100vh - 96px); overflow: auto; border: 1px solid #30343d; border-radius: 12px; box-shadow: 0 12px 40px rgba(0, 0, 0, .45); color-scheme: dark; font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; background: #17191f; color: #f5f7fb; font-size: 14px; line-height: normal; text-align: left; }
+     main { padding: 18px 16px; }
+@@ -188,7 +199,7 @@
+   `;
+ 
+   const LAUNCHER_CSS = `
+-    .btr-launcher { position: fixed; right: 76px; bottom: 116px; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: #fb7299; color: #fff; font: 700 13px/1 Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; letter-spacing: .3px; cursor: grab; opacity: .35; touch-action: none; box-shadow: 0 4px 14px rgba(0, 0, 0, .25); transition: opacity 160ms ease, transform 160ms ease, left 180ms ease, right 180ms ease; }
++    .btr-launcher { position: fixed; right: 76px; bottom: 116px; display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: #fb7299; color: #fff; font: 700 13px/1 Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; letter-spacing: .3px; cursor: grab; opacity: .6; touch-action: none; box-shadow: 0 4px 14px rgba(0, 0, 0, .25); transition: opacity 160ms ease, transform 160ms ease, left 180ms ease, right 180ms ease; }
+     .btr-launcher:hover, .btr-launcher:focus-visible { opacity: 1; transform: scale(1.06); }
+     .btr-launcher:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+     .btr-launcher.dragging { cursor: grabbing; opacity: 1; transform: scale(1.1); transition: opacity 160ms ease, transform 160ms ease; }
+@@ -198,6 +209,21 @@
+   let current = null;
+   // bridge.js sends the stored settings when they load or change, and the page its stats.
+   let latestSettings = null;
++  const noticeHistory = [];
++  function diagnostics() {
++    const safely = (f) => { try { return f(); } catch (_) { return "不可读取"; } };
++    const parse = (s) => { try { return JSON.parse(s); } catch (_) { return String(s); } };
++    const sections = [
++      ["环境", {BTR:"1.1.0",upstream:"2026.10.4.1",package:"BTR Flow / MV3 extension",browser:navigator.userAgent,page:location.origin+location.pathname,at:new Date().toISOString()}],
++      ["设置",latestSettings || "未加载"]
++    ];
++    if (root.__biliThreadRipperDebug?.report) sections.push(["视频接管",safely(()=>parse(root.__biliThreadRipperDebug.report()))]);
++    if (root.__BILI_IDM_DOWNLOADER_FACTORY__?.autoConcurrency) sections.push(["自动线程数",safely(()=>root.__BILI_IDM_DOWNLOADER_FACTORY__.autoConcurrency.status())]);
++    const frames = [root,...[...document.querySelectorAll("iframe")].slice(0,12).map(f=>safely(()=>f.contentWindow))];
++    frames.forEach((win,i)=>{ const api=safely(()=>win?.__biliThreadRipperLiveDebug); if(api?.getStats)sections.push(["直播模块 "+i,safely(()=>({stats:api.getStats(),context:api.getContext?.()}))]); });
++    sections.push(["最近的 Debug 提示",noticeHistory.slice()]);
++    return root.__BTR_DIAGNOSTICS_CORE__.redact(sections.map(([title,v])=>`## ${title}\n${JSON.stringify(v,null,1)}`).join("\n\n"));
++  }
+   let latestStats = null;
+   const post = (type, payload) => root.postMessage({ channel: CHANNEL, type, payload }, "*");
+ 
+@@ -386,6 +412,17 @@
+     $("debug-select-all").addEventListener("click", () => { for (const input of debugCategoryInputs) input.checked = true; saveDebugCategories(); });
+     $("debug-select-none").addEventListener("click", () => { for (const input of debugCategoryInputs) input.checked = false; saveDebugCategories(); });
+ 
++    $("debug-copy").addEventListener("click", async () => {
++      const text = diagnostics(), output = $("debug-copy-text");
++      let copied = false;
++      try { await navigator.clipboard.writeText(text); copied = true; } catch (_) {}
++      if (!copied) {
++        output.hidden = false; output.value = text; output.focus(); output.select();
++        try { copied = document.execCommand("copy"); } catch (_) {}
++      }
++      $("debug-copy-status").textContent = copied ? "已复制" : "请手动复制下方内容";
++    });
++
+     // Keys typed into the panel belong to it. The shadow root hides the input from the page,
+     // so the player's shortcuts (space, F, arrows) would otherwise react to them.
+     const keepKeys = (event) => { if (event.key !== "Escape") event.stopPropagation(); };
+@@ -614,6 +651,12 @@
+       current?.render(latestSettings);
+     } else if (event.data.type === "stats") {
+       latestStats = event.data.payload;
++    } else if (event.data.type === "debug-notices") {
++      for (const item of [].concat(event.data.payload || []).slice(-50)) {
++        if (!latestSettings?.debugNotices) break;
++        noticeHistory.push({at:Number(item?.at)||Date.now(),level:String(item?.level||"info").slice(0,20),category:String(item?.category||"other").slice(0,30),title:String(item?.title||"").slice(0,200),detail:String(item?.detail||"").slice(0,1200)});
++        if (noticeHistory.length > 100) noticeHistory.shift();
++      }
+     } else if (event.data.type === "open-settings" && root.top === root) {
+       // The toolbar icon toggles the panel; "自定义" in the gear menu only opens it.
+       if (event.data.payload?.toggle) toggle();
+--- a/tests/browser-dom.py
++++ b/tests/browser-dom.py
+@@ -1,48 +1,156 @@
+-"""Renderer-only DOM tests with an explicit Chrome API mock.
+-No extension is installed; these results do not validate Chrome permissions/injection.
+-Requires playwright and a Chromium binary. No external page is opened.
++"""Local Chromium DOM regression with explicitly mocked Chrome APIs.
++Not an installed-extension or logged-in Bilibili E2E test. The renderer uses set_content
++and an explicit fixture location/Chrome API shim; image requests are fulfilled locally.
+ """
+-import json, pathlib, os
++import json,pathlib,os,re
+ from playwright.sync_api import sync_playwright
+ ROOT=pathlib.Path(__file__).resolve().parents[1]
+-SHIM=r'''(()=>{
+-const all={sync:{},local:{}},listeners=[],messages=[];let permissions=false,proxyValue={mode:'system'},level='controllable_by_this_extension';
+-const area=name=>({get:async function(keys,callback){let out;if(keys===null)out={...all[name]};else if(typeof keys==='string')out={[keys]:all[name][keys]};else if(Array.isArray(keys))out=Object.fromEntries(keys.map(k=>[k,all[name][k]]));else out={...keys,...Object.fromEntries(Object.keys(keys||{}).filter(k=>k in all[name]).map(k=>[k,all[name][k]]))};if(callback)callback(out);return out;},set:async obj=>{const changes={};for(const[k,v]of Object.entries(obj)){changes[k]={oldValue:all[name][k],newValue:v};all[name][k]=v;}listeners.forEach(f=>f(changes,name));},remove:async keys=>{const changes={};for(const k of [].concat(keys)){changes[k]={oldValue:all[name][k]};delete all[name][k];}listeners.forEach(f=>f(changes,name));}});
+-window.chromeMock={storage:{sync:area('sync'),local:area('local'),onChanged:{addListener:f=>listeners.push(f)}},runtime:{id:'test-renderer-only',lastError:null,onMessage:{addListener:f=>messages.push(f)},sendMessage:async()=>{},openOptionsPage:async()=>{}},permissions:{contains:async()=>permissions,request:async()=>{window.permissionRequests++;permissions=true;return true;},remove:async()=>{permissions=false;return true;}},proxy:{settings:{get:(_d,cb)=>cb({value:proxyValue,levelOfControl:level}),set:(d,cb)=>{proxyValue=d.value;level='controlled_by_this_extension';window.proxyCalls.push(d);cb();},clear:(_d,cb)=>{proxyValue={mode:'system'};level='controllable_by_this_extension';cb();}}}};
+-window.permissionRequests=0;window.proxyCalls=[];window.fixtureLocation={pathname:'/',origin:'https://www.bilibili.com',href:'https://www.bilibili.com/',reload:()=>{window.reloadRequested=true;}};
+-})();'''
+-HOME='''<!doctype html><html><head><meta charset="utf-8"><base href="https://www.bilibili.com/"></head><body><div class="recommended-container"><button class="roll-btn">换一换</button><div id="feed"></div></div><script>window.batch=1;window.renderBatch=()=>{const f=document.getElementById('feed');f.replaceChildren();for(let i=0;i<8;i++){const n=document.createElement('article');n.className='bili-video-card';const h=document.createElement('h3');h.className='bili-video-card__info--tit';const a=document.createElement('a');a.href='/video/BV'+window.batch+'demo'+i;a.textContent='本地测试视频 · 第'+window.batch+'批 / '+i;h.append(a);n.append(h);f.append(n);}};renderBatch();document.querySelector('.roll-btn').onclick=()=>{window.batch++;renderBatch();};</script></body></html>'''
+ results=[]
+-def ok(name):results.append({'test':name,'passed':True});print('PASS',name,flush=True)
++def ok(name):
++ results.append({'test':name,'passed':True});print('PASS',name,flush=True)
++def script(page,name):page.add_script_tag(content=(ROOT/name).read_text())
++def fill(route):
++ n=int(re.search(r'fixture-(\d+)',route.request.url).group(1));colors=['#4e6e80','#6c8155','#77647f','#756249','#476d69']
++ svg=f'<svg xmlns="http://www.w3.org/2000/svg" width="480" height="270"><rect width="480" height="270" fill="{colors[n%5]}"/><text x="30" y="175" fill="#fff" font-family="sans-serif" font-size="94" opacity=".65">{n+1:02d}</text></svg>'
++ route.fulfill(status=200,content_type='image/svg+xml',body=svg)
+ with sync_playwright() as p:
+  browser=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH','/usr/lib/chromium/chromium'),headless=True,args=['--no-sandbox'])
+- ctx=browser.new_context(viewport={'width':1360,'height':1000})
+- page=ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)));page.set_content(HOME);page.add_script_tag(content=SHIM)
+- page.add_script_tag(content=(ROOT/'src/home-core.js').read_text())
+- page.evaluate("code=>new Function('location','chrome','crypto',code)(window.fixtureLocation,window.chromeMock,{randomUUID:()=> 'fixture-tab-1234567890'})",(ROOT/'src/home-enhancer.js').read_text())
+- page.wait_for_function("document.querySelector('#btr-flow-toolbar')?.shadowRoot.textContent.includes('1 / 1')")
+- ok('DOM harness: homepage cards captured and history toolbar mounted')
+- page.locator('#btr-flow-toolbar').get_by_role('button',name='刷一批新的').click();page.wait_for_function("document.querySelector('#btr-flow-toolbar').shadowRoot.textContent.includes('2 / 2')")
+- ok('DOM harness: refresh invokes existing native control and records next batch')
+- page.locator('#btr-flow-toolbar').get_by_role('button',name='← 上一批').click();page.wait_for_selector('#btr-flow-history');assert page.locator('#btr-flow-history .card').count()==8
+- assert '第1批' in page.locator('#btr-flow-history .title').first.inner_text();ok('DOM harness: previous batch restores original safe card links and titles')
+- page.locator('#btr-flow-toolbar').get_by_role('button',name='下一批 →').click();assert page.locator('#btr-flow-history').count()==0;assert page.evaluate('window.batch')==2
+- ok('DOM harness: next saved batch returns to current page without fetching')
+- page.evaluate("chromeMock.storage.sync.set({homeTheme:'dark'})");page.wait_for_function("document.documentElement.dataset.btrHome==='dark'");ok('DOM harness: theme responds to storage events')
+- page.evaluate("chromeMock.storage.sync.set({homeEnabled:false})");page.wait_for_function("!document.documentElement.dataset.btrHome");ok('DOM harness: disabling theme removes skin')
+- page.evaluate("document.querySelector('.roll-btn').remove()");page.wait_for_timeout(2500);page.locator('#btr-flow-toolbar').get_by_role('button',name='刷一批新的').click();page.wait_for_function('window.reloadRequested===true');ok('DOM harness: missing native refresh button falls back to reload after save')
+- stored=page.evaluate("chromeMock.storage.local.get(null)");assert len(list(stored.values())[0]['snapshots'])==2;ok('DOM harness: snapshots serialized to bounded local storage')
+- option=ctx.new_page();option.on('pageerror',lambda e:errors.append(str(e)));markup=(ROOT/'ui/options.html').read_text();import re
+- markup=re.sub(r'<script[^>]*>.*?</script>','',markup,flags=re.S);markup=re.sub(r'<link[^>]*>','',markup)
+- option.set_content(markup);option.add_style_tag(content=(ROOT/'ui/common.css').read_text());option.add_script_tag(content=SHIM);option.add_script_tag(content=(ROOT/'src/proxy-core.js').read_text());option.evaluate("code=>new Function('chrome',code)(window.chromeMock)",(ROOT/'ui/options.js').read_text())
+- option.select_option('#strategy','economy');option.get_by_role('button',name='保存设置',exact=True).click();option.wait_for_function("document.getElementById('saved').textContent.includes('已保存')");assert option.evaluate("chromeMock.storage.sync.get('strategy')")['strategy']=='economy';ok('DOM harness: settings save selected strategy')
+- assert option.evaluate("chromeMock.permissions.contains({permissions:['proxy']})")==False;ok('DOM harness: no automatic proxy request')
+- option.locator('#enableProxy').click();assert '勾选' in option.locator('#proxyStatus').inner_text();ok('DOM harness: proxy requires explicit consent')
+- option.locator('#proxyConsent').check();option.locator('#proxyUrl').fill('https://user:pass@example.com/');option.locator('#enableProxy').click();assert '账号密码' in option.locator('#proxyStatus').inner_text();assert option.evaluate('permissionRequests')==0;ok('DOM harness: credential URL rejected before mock permission request')
+- option.locator('#proxyUrl').fill('http://127.0.0.1:7890');option.locator('#enableProxy').click();option.wait_for_function('proxyCalls.length===1');assert option.evaluate('proxyCalls[0].scope')=='regular_only';ok('DOM harness: opt-in calls mocked PAC configuration, not real proxy API')
+- option.locator('#disableProxy').click();option.wait_for_function("document.getElementById('proxyStatus').textContent.includes('已清除')");assert option.evaluate("chromeMock.permissions.contains({permissions:['proxy']})")==False;ok('DOM harness: disabling clears mock proxy and revokes mock permission')
+- # Self-contained screenshot of the actual settings markup/CSS, not a Bilibili screenshot.
+- option.locator('#proxyUrl').fill('');option.locator('#proxyConsent').uncheck();option.evaluate('window.scrollTo(0,0)');option.screenshot(path=str(ROOT/'docs/options-preview.png'),full_page=True)
+- assert not errors,errors;ok('DOM harness: no uncaught script errors')
+- (ROOT/'tests/browser-dom-results.json').write_text(json.dumps({'browser':browser.version,'environment':'Renderer-only DOM harness with mocked Chrome APIs; no extension installed, no real Bilibili traffic or proxy activation','tests':results,'uncaught_errors':errors},ensure_ascii=False,indent=2))
+- print('TOTAL',len(results));browser.close()
++ ctx=browser.new_context(viewport={'width':1704,'height':864},device_scale_factor=1)
++ ctx.route('https://www.bilibili.com/**',lambda r:r.fulfill(status=200,content_type='text/html',body=(ROOT/'tests/home-fixture.html').read_text()))
++ ctx.route('https://i0.hdslb.com/**',fill)
++ page=ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)));page.set_content((ROOT/'tests/home-fixture.html').read_text())
++ script(page,'tests/browser-shim.js');script(page,'src/home-core.js')
++ page.evaluate("window.fixtureLocation={pathname:'/',origin:'https://www.bilibili.com',href:'https://www.bilibili.com/',reload:()=>{throw Error('unexpected reload')}}")
++ page.evaluate("document.querySelectorAll('img').forEach((img,i)=>{img.src='data:image/svg+xml;base64,'+btoa('<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"480\" height=\"270\"><rect width=\"480\" height=\"270\" fill=\"#4e6e80\"/></svg>')})")
++ # Simulate 1.0 settings. The new page must use native theme without waiting for a service worker migration.
++ page.evaluate("chromeMock.storage.sync.set({homeTheme:'dark'})")
++ page.evaluate("code=>new Function('chrome','location','crypto',code)(window.chromeMock,window.fixtureLocation,{randomUUID:()=> 'fixture-tab-1234567890'})",(ROOT/'src/home-enhancer.js').read_text())
++ bar=page.locator('#btr-flow-toolbar')
++ def label(text):page.wait_for_function("t=>document.querySelector('#btr-flow-toolbar')?.shadowRoot.querySelector('.count')?.textContent===t",arg=text,timeout=12000)
++ def snapshots():return page.evaluate("Object.values(fixtureStorage.all.local).find(v=>v?.snapshots)?.snapshots || []")
++ label('1 / 1');page.wait_for_timeout(350);assert len(snapshots())==1
++ ok('initial stable batch is saved once')
++ assert page.locator('.feed-card:visible').count()==10
++ assert not page.locator('.recommended-swipe').is_visible()
++ rects=page.locator('.feed-card').evaluate_all('(items)=>items.map(n=>({x:n.getBoundingClientRect().x,y:n.getBoundingClientRect().y}))')
++ assert len(set(r['y'] for r in rects[:5]))==1 and len(set(r['y'] for r in rects[5:]))==1
++ assert abs(rects[0]['x']-rects[5]['x'])<1
++ ok('carousel footprint and legacy nth-child margins removed; ten populated cards fill two native rows')
++ assert page.evaluate("getComputedStyle(document.body).backgroundColor")=='rgb(24, 24, 27)'
++ assert not page.evaluate("document.documentElement.hasAttribute('data-btr-oled')")
++ ok('old forced dark setting migrates to native; native dark colors are not overwritten')
++ assert page.evaluate("getComputedStyle(document.querySelector('#btr-flow-toolbar')).position")=='static'
++ bb=bar.bounding_box();feed=page.locator('.container').bounding_box();assert bb['y']+bb['height']<=feed['y']+1
++ assert page.locator('.bili-header__banner').bounding_box()['height']==154
++ ok('toolbar is inline, not a bottom overlay; seasonal banner and navigation remain')
++ page.locator('.bili-video-card').first.hover();page.locator('.watch-later').first.click();assert page.evaluate('nativeClicks')==1
++ ok('native hover control retains its original event listener')
++ page.evaluate("const b=document.querySelector('#btr-flow-toolbar').shadowRoot.querySelector('.refresh');b.click();b.click();b.click();")
++ assert page.evaluate('refreshCalls')==1;assert bar.get_by_role('button',name='← 上一批').is_disabled();label('2 / 2')
++ ok('three synchronous refresh clicks invoke the native action exactly once')
++ page.evaluate('window.savedNativeCard=document.querySelector(".bili-video-card")')
++ bar.get_by_role('button',name='← 上一批').click()
++ assert page.locator('#btr-flow-history .card').count()==10
++ assert '第 1 批' in page.locator('#btr-flow-history .title').first.inner_text()
++ assert page.locator('.container').count()==1 and not page.locator('.container').is_visible()
++ assert page.locator('.bili-header__bar').is_visible()
++ ok('previous batch uses safe card data in an inline view; native Vue tree remains mounted')
++ bar.get_by_role('button',name='下一批 →').click()
++ assert page.locator('#btr-flow-history').count()==0
++ assert page.evaluate('savedNativeCard===document.querySelector(".bili-video-card")')
++ assert page.evaluate('refreshCalls')==1
++ ok('next saved batch restores the same native elements without fetching')
++ page.evaluate("document.querySelector('.container').append(makeCard(batch,10),makeCard(batch,11))")
++ page.wait_for_timeout(1800);label('2 / 2');assert len(snapshots()[-1]['cards'])==12
++ ok('lazy growth updates the current batch instead of creating spurious history')
++ before=page.evaluate('fixtureStorage.writes')
++ page.evaluate("for(let i=0;i<30;i++){const e=document.createElement('span');e.textContent=i;document.querySelector('.bili-header__bar').append(e);e.remove();}")
++ page.wait_for_timeout(1600);assert page.evaluate('fixtureStorage.writes')==before
++ ok('unrelated header mutations do not write history or prune storage')
++ page.evaluate("refreshMode='partial'");bar.get_by_role('button',name='换一批',exact=True).click();page.wait_for_timeout(1350)
++ assert len(snapshots())==2;label('3 / 3');assert page.locator('.feed-card:visible').count()==10
++ ok('partial three-card render is not committed; full stable batch is recorded')
++ page.evaluate("chromeMock.storage.sync.set({homeTheme:'oled'})")
++ page.wait_for_function("getComputedStyle(document.body).backgroundColor==='rgb(0, 0, 0)'")
++ assert page.evaluate("getComputedStyle(document.querySelector('.bili-video-card')).backgroundColor")=='rgb(0, 0, 0)'
++ assert page.evaluate("getComputedStyle(document.querySelector('img')).filter")=='none'
++ ok('OLED makes native dark surfaces exactly #000000 without an image/video filter')
++ page.screenshot(path=str(ROOT/'docs/home-oled-fixture.png'),full_page=False)
++ page.evaluate("document.documentElement.classList.remove('dark')")
++ page.wait_for_function("!document.documentElement.hasAttribute('data-btr-oled')")
++ assert page.evaluate("getComputedStyle(document.body).backgroundColor")=='rgb(255, 255, 255)'
++ ok('native dark-to-light change exits OLED; no self-latching black theme')
++ page.evaluate("document.documentElement.classList.add('dark');chromeMock.storage.sync.set({homeTheme:'native',homeHideBanner:true})")
++ page.wait_for_function("document.querySelector('.bili-header__banner').getBoundingClientRect().height===64")
++ assert page.locator('.search').is_visible()
++ ok('optional seasonal banner collapse keeps search and top navigation')
++ for width,columns in [(1704,5),(1280,4),(900,3),(600,2)]:
++  page.set_viewport_size({'width':width,'height':864});page.wait_for_timeout(250)
++  assert page.locator('.container').evaluate("n=>getComputedStyle(n).gridTemplateColumns.split(' ').length")==columns
++  assert page.evaluate('document.documentElement.scrollWidth<=innerWidth+1')
++ ok('responsive layout preserves native 5/4/3/2-column breakpoints without horizontal overflow')
++ page.set_viewport_size({'width':1704,'height':864})
++ page.evaluate("const n=makeCard(batch,99);n.querySelector('.bili-video-card__info').append(Object.assign(document.createElement('span'),{className:'bili-video-card__info--ad',textContent:'广告'}));document.querySelector('.container').append(n)")
++ page.wait_for_timeout(1400);assert page.locator('[data-btr-ad]').count()==1 and not page.locator('[data-btr-ad]').is_visible()
++ assert page.locator('.feed-card:visible').count()==10
++ ok('only explicit advertising badge is filtered; no title keyword or uploader blocking')
++ page.evaluate("chromeMock.storage.sync.set({homeEnabled:false})")
++ page.wait_for_function("!document.querySelector('#btr-flow-toolbar')")
++ assert page.locator('.recommended-swipe').is_visible() and page.locator('.roll-btn').is_visible()
++ assert page.locator('[data-btr-ready],[data-btr-grid],[data-btr-ad]').count()==0
++ ok('master off restores native layout and controls and removes extension DOM markers')
++ page.evaluate("chromeMock.storage.sync.set({homeEnabled:true,homeHideBanner:false})");page.wait_for_selector('#btr-flow-toolbar');page.wait_for_timeout(1600)
++ page.evaluate("fixtureLocation.pathname='/video/BV1fixtureRoute'")
++ page.wait_for_function("!document.querySelector('#btr-flow-toolbar')")
++ assert not page.evaluate("document.documentElement.hasAttribute('data-btr-home-clean')")
++ page.evaluate("fixtureLocation.pathname='/'");page.wait_for_selector('#btr-flow-toolbar');page.wait_for_timeout(1600)
++ ok('SPA navigation removes homepage styling outside the homepage and remounts once on return')
++ page.evaluate("refreshMode='none'");old=len(snapshots());bar.get_by_role('button',name='换一批',exact=True).click()
++ page.wait_for_function("document.querySelector('#btr-flow-toolbar').shadowRoot.querySelector('.status').textContent.includes('未检测到')",timeout=12000)
++ assert len(snapshots())==old and bar.get_by_role('button',name='换一批',exact=True).is_enabled()
++ ok('no-change/failed refresh times out, unlocks the UI and keeps previous batches')
++ page.evaluate("document.querySelector('.roll-btn').remove()")
++ page.wait_for_timeout(350);bar.get_by_role('button',name='换一批',exact=True).click()
++ assert '未找到原生' in bar.locator('.status').inner_text();assert page.evaluate('typeof chromeMock')=='object'
++ ok('missing native refresh control produces a message, never reloads the document')
++ # Rebuild the native grid and button to exercise remount discovery.
++ page.evaluate("const c=document.querySelector('.container');c.replaceWith(c.cloneNode(true));const b=document.createElement('button');b.className='roll-btn';b.textContent='换一换';b.onclick=invokeRefresh;document.querySelector('.recommended-container_floor-aside').prepend(b);refreshMode='normal'")
++ page.wait_for_timeout(1700);assert page.locator('#btr-flow-toolbar').count()==1
++ bar.get_by_role('button',name='换一批',exact=True).click();page.wait_for_timeout(1900)
++ assert page.evaluate('batch')==4
++ ok('native grid replacement is detected without duplicate toolbar or lost refresh control')
++ # Pending local writes must not resurrect snapshots after Clear.
++ page.evaluate("fixtureStorage.delay=1000;document.querySelector('.container').append(makeCard(batch,10))")
++ page.wait_for_timeout(1600)
++ page.evaluate("(async()=>{fixtureStorage.delay=0;await chromeMock.storage.local.set({flowHistoryClearedAt:Date.now()});await chromeMock.storage.local.remove(Object.keys(fixtureStorage.all.local).filter(k=>k.startsWith('flowHistory:')));})()")
++ page.wait_for_timeout(1800);assert snapshots()==[];label('—')
++ ok('clear-history epoch rejects an in-flight pre-clear write; old records do not reappear')
++ page.evaluate("fixtureStorage.fail=true")
++ bar.get_by_role('button',name='换一批',exact=True).click();label('1 / 1')
++ page.wait_for_function("document.querySelector('#btr-flow-toolbar').shadowRoot.textContent.includes('暂未写入')")
++ assert page.locator('.feed-card:visible').count()==10
++ ok('local storage failure is reported without breaking refresh or the live page')
++ page.evaluate("fixtureStorage.fail=false;chromeMock.storage.sync.set({homeHistory:false})")
++ page.wait_for_timeout(300);assert bar.get_by_role('button',name='← 上一批').is_hidden()
++ assert bar.get_by_role('button',name='换一批',exact=True).is_visible()
++ ok('history can be disabled independently while keeping clean layout and native refresh')
++ # Actual options markup and JS with mock browser APIs; never activates a real proxy.
++ option=ctx.new_page();option.on('pageerror',lambda e:errors.append(str(e)))
++ markup=(ROOT/'ui/options.html').read_text();markup=re.sub(r'<script[^>]*>.*?</script>','',markup,flags=re.S);markup=re.sub(r'<link[^>]*>','',markup)
++ option.set_content(markup);option.add_style_tag(content=(ROOT/'ui/common.css').read_text());script(option,'tests/browser-shim.js');script(option,'src/home-core.js');script(option,'src/proxy-core.js')
++ option.evaluate("code=>new Function('chrome',code)(window.chromeMock)",(ROOT/'ui/options.js').read_text())
++ option.select_option('#homeTheme','oled');option.locator('#homeHideBanner').check();option.get_by_role('button',name='保存设置',exact=True).click()
++ assert option.evaluate('fixtureStorage.all.sync.homeTheme')=='oled' and option.evaluate('fixtureStorage.all.sync.homeHideBanner')
++ ok('options save all new homepage switches and theme selection')
++ assert option.evaluate('permissionRequests')==0;option.locator('#enableProxy').click();assert '勾选' in option.locator('#proxyStatus').inner_text()
++ option.locator('#proxyConsent').check();option.locator('#proxyUrl').fill('https://user:pass@example.com/');option.locator('#enableProxy').click();assert '账号密码' in option.locator('#proxyStatus').inner_text();assert option.evaluate('permissionRequests')==0
++ ok('proxy stays opt-in; consent and credential rejection precede mock permission requests')
++ option.locator('#proxyUrl').fill('http://127.0.0.1:7890');option.locator('#enableProxy').click();option.wait_for_function('proxyCalls.length===1');option.locator('#disableProxy').click()
++ assert not option.evaluate("chromeMock.permissions.contains({permissions:['proxy']})")
++ ok('legacy proxy controls set and revoke only mocked proxy state')
++ option.locator('#restore').click();assert option.locator('#homeTheme').input_value()=='native' and not option.locator('#homeHideBanner').is_checked()
++ ok('restore defaults returns native theme without modifying proxy configuration')
++ option.locator('#proxyConsent').uncheck();option.locator('#proxyUrl').fill('');option.evaluate('scrollTo(0,0)');option.screenshot(path=str(ROOT/'docs/options-preview.png'),full_page=True)
++ assert not errors,errors;ok('no uncaught errors across homepage and options regression scenarios')
++ (ROOT/'tests/browser-dom-results.json').write_text(json.dumps({'browser':browser.version,'environment':'Local fixture DOM only, mocked Chrome APIs; NOT installed extension or live Bilibili; proxy never enabled','tests':results,'uncaught_errors':errors},ensure_ascii=False,indent=2))
++ print('TOTAL',len(results),flush=True);browser.close()
+--- a/tests/browser-shim.js
++++ b/tests/browser-shim.js
+@@ -0,0 +1,25 @@
++/* TEST ONLY. Browser APIs are mocked; this file is never loaded by the extension manifest. */
++(()=>{
++ const all={sync:{},local:{}},listeners=[],messages=[];
++ window.fixtureStorage={all,reads:0,writes:0,fail:false,delay:0};
++ const copy=x=>structuredClone(x);
++ const area=name=>({
++  async get(keys,callback){fixtureStorage.reads++;let out;
++   if(keys===null)out=copy(all[name]);
++   else if(typeof keys==='string')out={[keys]:copy(all[name][keys])};
++   else if(Array.isArray(keys))out=Object.fromEntries(keys.map(k=>[k,copy(all[name][k])]));
++   else out={...copy(keys),...Object.fromEntries(Object.keys(keys||{}).filter(k=>k in all[name]).map(k=>[k,copy(all[name][k])]))};
++   if(callback)callback(out);return out;
++  },
++  async set(obj){if(name==='local'&&fixtureStorage.delay)await new Promise(r=>setTimeout(r,fixtureStorage.delay));if(name==='local'&&fixtureStorage.fail)throw Error('Synthetic storage quota failure');fixtureStorage.writes++;
++   const changes={};for(const[k,v]of Object.entries(obj)){changes[k]={oldValue:copy(all[name][k]),newValue:copy(v)};all[name][k]=copy(v);}queueMicrotask(()=>listeners.forEach(f=>f(changes,name)));
++  },
++  async remove(keys){const changes={};for(const k of [].concat(keys)){changes[k]={oldValue:copy(all[name][k])};delete all[name][k];}queueMicrotask(()=>listeners.forEach(f=>f(changes,name)));}
++ });
++ let permissions=false,proxyValue={mode:'system'},level='controllable_by_this_extension';window.permissionRequests=0;window.proxyCalls=[];window.optionCalls=0;
++ window.chromeMock={storage:{sync:area('sync'),local:area('local'),onChanged:{addListener:f=>listeners.push(f)}},
++  runtime:{id:'fixture-not-real-extension',lastError:null,onMessage:{addListener:f=>messages.push(f)},sendMessage:async()=>{window.optionCalls++;},openOptionsPage:async()=>{window.optionCalls++;}},
++  permissions:{contains:async()=>permissions,request:async()=>{permissionRequests++;permissions=true;return true;},remove:async()=>{permissions=false;return true;}},
++  proxy:{settings:{get:(_d,cb)=>cb({value:proxyValue,levelOfControl:level}),set:(d,cb)=>{proxyValue=d.value;level='controlled_by_this_extension';proxyCalls.push(d);cb();},clear:(_d,cb)=>{proxyValue={mode:'system'};level='controllable_by_this_extension';cb();}}}
++ };
++})();
+--- a/tests/engine-browser.py
++++ b/tests/engine-browser.py
+@@ -0,0 +1,63 @@
++"""Interactive CID routing + diagnostic UI, using a stub native player and fetch.
++Based on upstream issue34 regression scenarios. No external navigation or network.
++"""
++import pathlib,json,os
++from playwright.sync_api import sync_playwright
++ROOT=pathlib.Path(__file__).resolve().parents[1]
++results=[]
++def ok(name):results.append({'test':name,'passed':True});print('PASS',name,flush=True)
++def script(page,name):page.add_script_tag(content=(ROOT/'src'/name).read_text())
++with sync_playwright() as p:
++ b=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH','/usr/lib/chromium/chromium'),headless=True,args=['--no-sandbox'])
++ page=b.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
++ page.set_content('<div id="bilibili-player" style="width:640px;height:360px"><video width="640" height="360"></video></div>')
++ script(page,'range-core.js')
++ page.evaluate(r'''()=>{
++ window.fixtureLocation={hostname:'www.bilibili.com',pathname:'/video/BV1steinGate1/',search:'',href:'https://www.bilibili.com/video/BV1steinGate1/',origin:'https://www.bilibili.com'};
++ window.fixtureHistory={pushState(){},replaceState(){}};
++ window.branch=101;window.calls=[];window.apiRequests=[];
++ window.__INITIAL_STATE__={videoData:{bvid:'BV1steinGate1',aid:7,cid:101,pages:[{cid:101}],rights:{is_stein_gate:1}}};
++ window.__playinfo__={data:{dash:{duration:6,video:[],audio:[]},marker:'n101'}};
++ window.player={getManifest:()=>({bvid:'BV1steinGate1',aid:7,cid:branch,p:1}),getQuality:()=>({newQ:80,newA:2})};
++ window.__BILI_NATIVE_MSE_PLAYER_FACTORY__={createNativePlayer(options){const record={route:options.identity.key,marker:options.playinfo?.data?.marker,options,updates:[]};calls.push(record);return{video:document.querySelector('video'),applySettings(){},updatePlayinfo(p){record.updates.push(p.data?.marker);},destroy(){record.destroyed=true;}};}};
++ window.fetch=async input=>{const url=new URL(String(input),fixtureLocation.href);apiRequests.push(url.href);await new Promise(r=>setTimeout(r,5));if(url.pathname==='/x/web-interface/view')return new Response(JSON.stringify({code:0,data:{aid:7,bvid:'BV1steinGate1',cid:101,pages:[{cid:101}]}}));if(url.pathname.includes('playurl'))return new Response(JSON.stringify({code:0,data:{dash:{duration:6,video:[],audio:[]},marker:'n'+url.searchParams.get('cid')}}));throw Error('unexpected fixture request');};
++ }''')
++ page.evaluate("code=>new Function('location','history',code)(window.fixtureLocation,window.fixtureHistory)",(ROOT/'src/page-hook.js').read_text())
++ page.evaluate("postMessage({channel:'__BILI_RANGE_ACCELERATOR_V1__',type:'settings',payload:{enabled:true,mode:'mainland',concurrency:32}},'*')")
++ page.wait_for_function("calls.length===1&&calls[0].marker==='n101'",timeout=6000)
++ assert page.evaluate('calls[0].route')=='bv1steingate1:p1'
++ ok('interactive first branch comes from embedded playinfo')
++ assert page.evaluate('calls[0].options.preferredAudio')==2
++ ok('native newA audio preference reaches the takeover factory')
++ page.evaluate("(async()=>{await fetch('https://api.bilibili.com/x/player/wbi/playurl?bvid=BV1steinGate1&cid=202');await fetch('https://api.bilibili.com/x/player/wbi/playurl?bvid=BV1steinGate1&cid=303');})()")
++ page.wait_for_timeout(150);assert page.evaluate('calls.length')==1;assert page.evaluate('calls[0].updates.length')==0
++ ok('prefetched interactive branches do not interrupt the current branch')
++ page.evaluate('branch=202;calls.at(-1).options.onNativeSourceChange()')
++ page.wait_for_function("calls.at(-1).route==='bv1steingate1:p1:n202'&&calls.at(-1).marker==='n202'",timeout=6000)
++ assert page.evaluate("apiRequests.filter(u=>new URL(u).searchParams.get('cid')==='202').length")==1
++ ok('switching to a prefetched branch reuses that branch without duplicate playurl fetch')
++ page.evaluate('branch=404;calls.at(-1).options.onNativeSourceChange()')
++ page.wait_for_function("calls.at(-1).route==='bv1steingate1:p1:n404'&&calls.at(-1).marker==='n404'",timeout=6000)
++ assert page.evaluate("apiRequests.filter(u=>new URL(u).searchParams.get('cid')==='404').length")==1
++ assert not page.evaluate("apiRequests.some(u=>u.includes('/x/web-interface/view'))")
++ ok('uncached branch is requested by its own CID, not the first branch CID')
++ page.evaluate('branch=101;calls.at(-1).options.onNativeSourceChange()')
++ page.wait_for_function("calls.at(-1).route==='bv1steingate1:p1'&&calls.at(-1).marker==='n101'",timeout=6000)
++ ok('returning to the first branch restores the first branch identity')
++ # Settings panel with a controlled diagnostic report; no actual clipboard or account access.
++ panel=b.new_page();panel.on('pageerror',lambda e:errors.append(str(e)));panel.set_content('<html><body>Local settings fixture</body></html>')
++ for n in ['range-core.js','cdn-resolver.js','diagnostics-core.js','settings-panel.js']:script(panel,n)
++ panel.evaluate("Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.copied=text;}}});window.__biliThreadRipperDebug={report:()=>JSON.stringify({version:'1.1.0',test:'https://a.bilivideo.com/x.m4s?upsig=private',page:'https://www.bilibili.com/video/BV1example?token=private'})};")
++ panel.evaluate("postMessage({channel:'__BILI_RANGE_ACCELERATOR_V1__',type:'settings',payload:{debugNotices:true}},'*')")
++ panel.wait_for_timeout(100);panel.evaluate('__BTR_SETTINGS_PANEL__.open()')
++ panel.locator('#debug-copy').click();panel.wait_for_function("typeof copied==='string'")
++ copied=panel.evaluate('copied');assert '1.1.0' in copied and '2026.10.4.1' in copied and 'MV3' in copied
++ assert 'upsig' not in copied and 'private' not in copied and 'x.m4s' not in copied
++ assert panel.locator('#github-link').get_attribute('target')=='_blank'
++ ok('diagnostic copy includes fork/upstream versions and redacts signed media addresses')
++ panel.evaluate("Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw Error('fixture denied')}}});document.execCommand=()=>false")
++ panel.locator('#debug-copy').click();assert panel.locator('#debug-copy-text').is_visible();assert panel.locator('#debug-copy-text').get_attribute('readonly') is not None
++ ok('clipboard denial offers selected read-only diagnostic text instead of failing silently')
++ assert not errors,errors;ok('no uncaught exceptions in branch routing or diagnostic UI scenarios')
++ (ROOT/'tests/engine-browser-results.json').write_text(json.dumps({'browser':b.version,'environment':'Renderer fixture, stub native player/fetch/clipboard; not live Bilibili or HDR hardware validation','tests':results,'uncaught_errors':errors},ensure_ascii=False,indent=2))
++ print('TOTAL',len(results));b.close()
+--- a/tests/home-fixture.html
++++ b/tests/home-fixture.html
+@@ -0,0 +1,13 @@
++<!doctype html><html lang="zh-CN" class="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BTR Flow · 本地首页回归页面（非真实站点）</title>
++<style>
++*{box-sizing:border-box}body{margin:0;font:14px/1.5 Arial,"Noto Sans CJK SC",sans-serif;color:#18191c;background:white}html{--bg1:#fff;--text1:#18191c;--brand_blue:#00aeec}.dark{--bg1:#18181b;--text1:#e3e5e7}.dark body{background:#18181b;color:#e3e5e7}a{color:inherit;text-decoration:none}button{cursor:pointer;color:inherit}.bili-header{position:relative;margin-bottom:20px}.bili-header__bar{position:absolute;inset:0 0 auto;height:64px;background:#fafafa;display:flex;align-items:center;justify-content:space-between;padding:0 3%;gap:24px}.dark .bili-header__bar{background:#232632}.bili-header__banner{height:154px;background:linear-gradient(110deg,#336a44,#375968)}.banner-art{padding:85px 8% 0;font-size:24px;color:white;letter-spacing:8px}.search{border:1px solid #7775;background:#8881;color:inherit;border-radius:6px;width:32%;padding:8px 14px} .header-channel{margin:auto;width:85%;padding:18px 0;display:flex;justify-content:space-between;gap:12px}.channel-link{border:0;background:#ddd2;border-radius:5px;padding:4px 16px;white-space:nowrap}.recommended-container_floor-aside{position:relative;width:85%;margin:auto}.container{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:20px;grid-auto-flow:row}.recommended-swipe{grid-column:span 2;grid-row:span 2;aspect-ratio:1.42;display:flex;align-items:center;justify-content:center;text-align:center;background:linear-gradient(150deg,#9498db,#f1c3de);border-radius:8px;color:#fff;font-size:26px}.feed-card:nth-of-type(n+8){display:none}.feed-card:nth-of-type(n+5){margin-top:20px}.bili-video-card{min-width:0;border-radius:6px;background:#fff}.dark .bili-video-card{background:#232632}.bili-video-card__image{aspect-ratio:16/9;position:relative;overflow:hidden;border-radius:6px}.bili-video-card__image img{width:100%;height:100%;object-fit:cover;display:block}.bili-video-card__info{padding:0 6px 8px}.bili-video-card__info--tit{font-size:15px;line-height:22px;margin:8px 0 6px;height:44px;overflow:hidden;font-weight:500}.bili-video-card__info--author{font-size:12px;opacity:.65}.bili-video-card__stats__duration{position:absolute;bottom:4px;right:7px;color:#fff;text-shadow:0 1px 3px #000;font-size:12px}.roll-btn{position:absolute;top:0;right:-46px;width:36px;background:#7772;border:1px solid #7774;border-radius:6px;writing-mode:vertical-lr;padding:8px 7px}.watch-later{display:none;position:absolute;right:5px;top:5px;border:0;border-radius:3px;background:#000b;color:white}.bili-video-card:hover .watch-later{display:block}.foot{width:85%;margin:30px auto;opacity:.55;font-size:12px}.spacer{height:600px}@media(max-width:1399px){.container{grid-template-columns:repeat(4,minmax(0,1fr))}.header-channel{overflow:auto}}@media(max-width:1000px){.container{grid-template-columns:repeat(3,minmax(0,1fr))}.channel-link{padding:4px 8px}}@media(max-width:700px){.container{grid-template-columns:repeat(2,minmax(0,1fr))}.bili-header__bar{font-size:11px;gap:6px}.search{width:30%}.recommended-container_floor-aside,.header-channel{width:90%}.roll-btn{right:0}.bili-video-card__info--tit{font-size:13px}}
++</style></head><body>
++<div id="i_cecream"><div class="bili-header"><div class="bili-header__banner"><div class="banner-art">季节横幅 · 默认保留</div></div><div class="bili-header__bar"><span>首页　番剧　直播　漫画</span><input class="search" placeholder="搜索视频"><span>动态　收藏　历史　创作中心</span></div><div class="header-channel"><button class="channel-link">热门</button><button class="channel-link">科技</button><button class="channel-link">知识</button><button class="channel-link">音乐</button><button class="channel-link">影视</button><button class="channel-link">美食</button><button class="channel-link">汽车</button><button class="channel-link">更多</button></div></div>
++<main><section class="recommended-container_floor-aside"><button class="roll-btn">换一换</button><div class="container"></div></section></main><p class="foot">本地合成回归页面，仅用于测试布局与交互。不是登录 B 站后的截图。</p><div class="spacer"></div></div>
++<script>
++window.batch=1;window.refreshCalls=0;window.nativeClicks=0;window.refreshMode='normal';
++window.makeCard=(batch,i)=>{const holder=document.createElement('article');holder.className='feed-card';holder.innerHTML=`<div class="bili-video-card"><div class="bili-video-card__image"><a href="/video/BV${batch}fixture${i}"><img alt="" src="https://i0.hdslb.com/bfs/archive/fixture-${i}.jpg"></a><span class="bili-video-card__stats__duration">12:34</span><button class="watch-later" aria-label="稍后再看">稍后再看</button></div><div class="bili-video-card__info"><h3 class="bili-video-card__info--tit"><a href="/video/BV${batch}fixture${i}">第 ${batch} 批 · 测试视频 ${i+1}：原生标题、封面与交互仍然保留</a></h3><span class="bili-video-card__info--author">测试 UP 主 ${i+1}</span></div></div>`;holder.querySelector('.watch-later').onclick=()=>nativeClicks++;return holder;};
++window.renderBatch=(number,count=10)=>{const grid=document.querySelector('.container');grid.replaceChildren();const swipe=document.createElement('div');swipe.className='recommended-swipe';swipe.textContent='大图活动轮播\n占用两列两行';grid.append(swipe);for(let i=0;i<count;i++)grid.append(makeCard(number,i));};
++window.invokeRefresh=()=>{refreshCalls++;if(refreshMode==='none')return;const n=++batch;if(refreshMode==='partial'){renderBatch(n,3);setTimeout(()=>renderBatch(n,10),1800);}else setTimeout(()=>renderBatch(n,10),150);};
++renderBatch(1);document.querySelector('.roll-btn').onclick=invokeRefresh;
++</script></body></html>
+--- a/tests/update.test.cjs
++++ b/tests/update.test.cjs
+@@ -0,0 +1,47 @@
++'use strict';
++const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
++const home=require('../src/home-core.js'),diagnostics=require('../src/diagnostics-core.js');
++const root=path.join(__dirname,'..');
++function auto(){
++ let time=5000;
++ const c=vm.createContext({console,URL,Headers,Response,Request,AbortController,DOMException,Uint8Array,ArrayBuffer,performance,setTimeout,clearTimeout,WeakRef});
++ for(const f of ['range-core.js','flow-policy.js','cdn-resolver.js','idm-downloader.js'])vm.runInContext(fs.readFileSync(path.join(root,'src',f),'utf8'),c,{filename:f});
++ const a=c.__BILI_IDM_DOWNLOADER_FACTORY__.createAutoConcurrency({now:()=>time});
++ return {a,c,advance:ms=>{time+=ms;},feed:(ahead,ms)=>{for(let t=0;t<ms;t+=250){time+=250;a.activity();a.buffer(ahead,true);}}};
++}
++test('upstream startup starts at16 then returns16->12->8 after15s ahead with cooldown',()=>{const x=auto();x.a.newSession();assert.equal(x.a.threads(),16);assert.equal(x.a.status().startup.base,8);x.feed(9,4000);assert.equal(x.a.threads(),16);x.feed(16,250);assert.equal(x.a.threads(),12);x.feed(16,1000);assert.equal(x.a.threads(),12);x.feed(16,2000);assert.equal(x.a.threads(),8);assert.equal(x.a.status().startup,null);});
++test('startup never climbs past a429-refused level',()=>{const x=auto();x.a.stall();assert.equal(x.a.threads(),12);x.a.pushback(429);assert.equal(x.a.threads(),8);x.a.newSession();assert.equal(x.a.threads(),8);assert.equal(x.a.status().startup,null);});
++test('startup pressure climbs to24 and cancels startup reduction',()=>{const x=auto();x.a.newSession();assert.equal(x.a.stall(),false);x.advance(2600);assert.equal(x.a.stall(),true);assert.equal(x.a.threads(),24);assert.equal(x.a.status().startup,null);x.feed(20,5000);assert.equal(x.a.threads(),24);});
++test('startup expires after30 seconds without being mistaken for successful buffering',()=>{const x=auto();x.a.newSession();for(let i=0;i<125;i++){x.advance(250);x.a.activity();x.a.buffer(6+i*.02,true);}assert.equal(x.a.threads(),16);assert.equal(x.a.status().startup,null);});
++test('seek during startup retains original base level',()=>{const x=auto();x.a.newSession();x.advance(1000);x.a.newSession();assert.equal(x.a.status().startup.base,8);x.feed(20,6000);assert.equal(x.a.threads(),8);});
++test('auto reset clears startup state',()=>{const x=auto();x.a.newSession();x.a.reset();assert.equal(x.a.threads(),8);assert.equal(x.a.status().startup,null);});
++test('Flow economy cap still wins over upstream startup controller',()=>{const x=auto(),factory=x.c.__BILI_IDM_DOWNLOADER_FACTORY__;factory.autoConcurrency.newSession();const d=factory.createDownloader({nativeFetch:()=>{},getSettings:()=>({autoConcurrency:true,strategy:'economy'})});assert.equal(d.getConcurrency(),4);});
++test('home defaults preserve native theme and seasonal banner; remove carousel',()=>{assert.equal(home.defaults.homeTheme,'native');assert.equal(home.defaults.homeHideBanner,false);assert.equal(home.defaults.homeHideCarousel,true);});
++test('all1.0 custom themes migrate to native without changing explicit master/history off',()=>{for(const old of ['light','dark','auto','off',null]){const s=home.settings({homeTheme:old,homeEnabled:false,homeHistory:false});assert.equal(s.homeTheme,'native');assert.equal(s.homeEnabled,false);assert.equal(s.homeHistory,false);}assert.equal(home.settings({homeTheme:'oled'}).homeTheme,'oled');});
++test('history rejects URL credentials, nonstandard port, javascript and foreign hosts',()=>{for(const url of ['https://u:p@www.bilibili.com/video/BV1foo','https://www.bilibili.com:444/video/BV1foo','javascript:alert(1)','https://evil.test/video/BV1foo'])assert.equal(home.card({url,title:'x'}),null);});
++test('history canonicalizes trailing slash and strips cover query tokens',()=>{const a=home.card({url:'/video/BV1foo/?spm=secret',title:'x',image:'https://i0.hdslb.com/bfs/x.jpg?token=secret#x'});assert.equal(a.url,'https://www.bilibili.com/video/BV1foo');assert.equal(a.image,'https://i0.hdslb.com/bfs/x.jpg');});
++test('batch identity includes cards beyond first12, fixing old snapshot collision',()=>{const a=Array.from({length:15},(_,i)=>({url:`/video/BV1foo${i}`,title:'x'}));let h=home.append([],a);const b=a.slice();b[14]={url:'/video/BV1different',title:'x'};h=home.append(h,b);assert.equal(h.length,2);});
++test('lazy growth is distinct from replacement or reorder',()=>{const a=home.cards([{url:'/video/BV1a',title:'a'},{url:'/video/BV1b',title:'b'}]);const b=home.cards([...a,{url:'/video/BV1c',title:'c'}]);assert(home.grows(a,b));assert(!home.grows(a,b.slice().reverse()));assert(!home.grows(a,b.slice(1)));});
++test('future-dated and expired batches are discarded and card budget enforced',()=>{const a=Array.from({length:80},(_,i)=>({url:`/video/BV1f${i}`,title:'x'}));const now=Date.now();assert.equal(home.cards(a).length,36);assert.equal(home.history([{at:now+120000,cards:a},{at:now-home.TTL,cards:a}],now).length,0);});
++test('diagnostics redact media URLs, ordinary query strings, fragments and JSON credentials',()=>{const s=diagnostics.redact('{"cookie":"session-secret","url":"https://upos.example.bilivideo.com/a.m4s?upsig=secret", "page":"https://www.bilibili.com/video/BV1test?token=secret#ref", "token":"abc"}');assert(!s.includes('session-secret'));assert(!s.includes('upsig'));assert(!s.includes('a.m4s'));assert(!s.includes('?'));assert(!s.includes('#ref'));assert(s.includes('https://www.bilibili.com/video/BV1test'));assert(!s.includes('abc'));});
++test('all runtime version identifiers use the fork release version',()=>{const s=fs.readFileSync(path.join(root,'src/page-hook.js'),'utf8');assert(s.includes('version: "1.1.0"'));assert(!s.includes('version: "1.0.0"'));});
++test('MV3 bundles one copy of every runtime dependency, has no remotely hosted executable code',()=>{const m=JSON.parse(fs.readFileSync(path.join(root,'manifest.json'),'utf8'));assert.equal(m.version,'1.1.0');assert(!m.update_url);for(const entry of m.content_scripts){assert.equal(new Set(entry.js).size,entry.js.length);if(entry.js.includes('src/settings-panel.js'))assert(entry.js.indexOf('src/diagnostics-core.js')<entry.js.indexOf('src/settings-panel.js'));if(entry.js.includes('src/home-enhancer.js'))assert.equal(entry.run_at,'document_start');}assert(!fs.readFileSync(path.join(root,'src/home-enhancer.js'),'utf8').includes('location.reload('));});
++function nativeHarness(){
++ let active=false,seq=0;
++ class MemoryStorage{constructor(){this.data=new Map();}getItem(k){return this.data.get(String(k))??null;}setItem(k,v){this.data.set(String(k),String(v));}removeItem(k){this.data.delete(String(k));}}
++ class Source extends EventTarget{constructor(){super();this.readyState='open';this.sourceBuffers=new EventTarget();this.sourceBuffers.length=0;}static isTypeSupported(mime){return !mime.includes('unsupported');}}
++ class LocalURL extends URL{static createObjectURL(){return 'blob:fixture/'+(++seq);}}
++ const storage=new MemoryStorage();storage.setItem('enableHEVCError','old-false-negative');storage.setItem('my-preference','keep');
++ const c=vm.createContext({console,URL:LocalURL,MediaSource:Source,Storage:MemoryStorage,localStorage:storage,sessionStorage:new MemoryStorage(),document:{querySelector:()=>active?{}:null},setTimeout,clearTimeout,performance,DOMException,
++ __BILI_RANGE_CORE__:{},__BILI_SIDX__:{},__BILI_CDN_RESOLVER_FACTORY__:{},__BILI_IDM_DOWNLOADER_FACTORY__:{}});
++ let source=fs.readFileSync(path.join(root,'src/native-mse-player.js'),'utf8');
++ // Test-only access to private state; shipped source is not modified.
++ source=source.replace('  root.__BILI_NATIVE_MSE_PLAYER_FACTORY__ =','  root.__fixture = {nativeSourceSettled,pageMediaSources,codecFailures};\n  root.__BILI_NATIVE_MSE_PLAYER_FACTORY__ =');
++ vm.runInContext(source,c);return {c,Source,storage,active:v=>{active=v;}};
++}
++test('codec cleanup removes only five known flags and runs once per origin',()=>{const x=nativeHarness();assert.equal(x.storage.getItem('enableHEVCError'),null);assert.equal(x.storage.getItem('my-preference'),'keep');assert.equal(x.storage.getItem('BTR.codecFailuresCleared'),'1');});
++test('codec flag guard applies only while BTR takeover is active; unrelated writes remain valid',()=>{const x=nativeHarness();x.storage.setItem('decodeAV1Error','real');assert.equal(x.storage.getItem('decodeAV1Error'),'real');x.active(true);x.storage.setItem('decodeAV1Error','takeover-race');assert.equal(x.storage.getItem('decodeAV1Error'),'real');x.storage.setItem('ordinary-setting','saved');assert.equal(x.storage.getItem('ordinary-setting'),'saved');assert.equal(x.c.__fixture.codecFailures.blocked,1);x.active(false);x.storage.setItem('decodeAV1Error','native');assert.equal(x.storage.getItem('decodeAV1Error'),'native');});
++test('native source wait observes source-buffer creation before takeover',async()=>{const x=nativeHarness(),source=new x.Source(),url=x.c.URL.createObjectURL(source);let done=false;const waiting=x.c.__fixture.nativeSourceSettled({src:url}).then(()=>{done=true;});source.sourceBuffers.length=1;source.sourceBuffers.dispatchEvent(new Event('addsourcebuffer'));await new Promise(r=>setTimeout(r,30));assert.equal(done,false);source.sourceBuffers.length=2;source.sourceBuffers.dispatchEvent(new Event('addsourcebuffer'));await waiting;assert(done);});
++test('native source wait has a one-second upper bound when no buffers arrive',async()=>{const x=nativeHarness(),s=new x.Source(),url=x.c.URL.createObjectURL(s),start=performance.now();await x.c.__fixture.nativeSourceSettled({src:url});const elapsed=performance.now()-start;assert(elapsed>=900&&elapsed<2500,elapsed);});
++test('native media source registry stays bounded and settled/closed sources do not wait',()=>{const x=nativeHarness();for(let i=0;i<24;i++)x.c.URL.createObjectURL(new x.Source());assert.equal(x.c.__fixture.pageMediaSources.size,16);const s=new x.Source(),url=x.c.URL.createObjectURL(s);s.sourceBuffers.length=2;assert.equal(x.c.__fixture.nativeSourceSettled({src:url}),null);s.sourceBuffers.length=0;s.readyState='closed';assert.equal(x.c.__fixture.nativeSourceSettled({src:url}),null);});
++test('native HiRes and Dolby preferences are honored only when codec support is reported',()=>{const x=nativeHarness(),select=x.c.__BILI_NATIVE_MSE_PLAYER_FACTORY__.selectRepresentations;const p={data:{quality:80,dash:{video:[{id:80,height:1080,codecs:'avc1.64001f'}],audio:[{id:1,codecs:'mp4a.40.2'}],flac:{audio:{id:2,codecs:'fLaC'}},dolby:{audio:[{id:3,codecs:'ec-3'}]}}}};assert.equal(select(p,80,'',0).audio.id,1);assert.equal(select(p,80,'',2).audio.id,2);assert.equal(select(p,80,'',1).audio.id,3);p.data.dash.flac.audio.codecs='unsupported';assert.equal(select(p,80,'',2).audio.id,1);});
+--- a/ui/options.html
++++ b/ui/options.html
+@@ -1,14 +1,18 @@
+ <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BTR Flow · 增强设置</title><link rel="stylesheet" href="common.css"></head><body>
+-<header class="hero"><div style="max-width:940px;margin:auto"><div class="brand">BTR FLOW / VIEWING, WITHOUT THE WAIT</div><h1>更顺畅，也更从容。</h1><p>保留线程撕裂者的多 CDN / Range 下载内核，增加按视频调整的策略、推荐历史与轻量首页。基于上游 0.9.4.2 的独立实验分支。</p></div></header>
++<header class="hero"><div style="max-width:940px;margin:auto"><div class="brand">BTR FLOW 1.1.0</div><h1>播放与首页设置</h1><p>保留线程撕裂者的多 CDN / Range 下载内核，增加按视频调整的策略、推荐历史与轻量首页。已回移上游 2026.10.4.1 的适用修复；独立维护的 MV3 分支，不是作者发布的官方扩展。</p></div></header>
+ <main class="wrap"><form id="settings"><section class="card"><div class="row between"><h2>加载与稳定性</h2><span class="pill">不自动降画质</span></div><p class="muted">自动策略只调整下载和缓冲；清晰度、字幕、弹幕与倍速仍由播放器控制。</p>
+ <div class="grid" style="margin-top:20px"><div class="field"><label for="strategy">观看策略</label><select id="strategy"><option value="auto">自动：按时长、码率、倍速和卡顿调整</option><option value="smooth">稳播优先</option><option value="fast">起播优先</option><option value="economy">省流</option></select></div>
+ <div class="field"><label for="mode">CDN 路线</label><select id="mode"><option value="auto">自动：保留原始地址，探索大陆 / 海外节点</option><option value="mainland">大陆优先</option><option value="overseas">海外优先</option><option value="custom">自定义（在原版详细设置中配置）</option></select></div>
+ <div class="field"><label for="maxAutoThreads">自动并发硬上限</label><select id="maxAutoThreads"><option>4</option><option>8</option><option>16</option><option selected>32</option></select><span class="hint">这是上限，不会为了凑数增加请求；手动线程模式不受此项控制。</span></div>
+ <div class="field"><label for="memoryBudgetMB">媒体预缓冲预算参考 / MiB</label><select id="memoryBudgetMB"><option>32</option><option selected>64</option><option>96</option><option>128</option></select><span class="hint">按码率估算目标时长，不是浏览器总内存限制；音频、解码器和在途数据另占内存。</span></div>
+-<div class="field"><label for="takeover">播放内核</label><select id="takeover"><option value="full">全接管：插件管理媒体缓冲</option><option value="compat">兼容：保留原生内核，只加速 Range</option></select><span class="hint">兼容模式下，缓冲目标和起播门槛由 B 站决定，增强版不强行改写。</span></div>
++<div class="field"><label for="takeover">播放内核</label><select id="takeover"><option value="full">全接管：插件管理媒体缓冲（已回移音轨 / HDR / 互动视频修复）</option><option value="compat">兼容：保留原生内核，只加速 Range</option></select><span class="hint">兼容模式下，缓冲目标和起播门槛由 B 站决定，增强版不强行改写。</span></div>
+ <div class="stack"><label class="row"><input type="checkbox" id="enabled">启用视频加速</label><label class="row"><input type="checkbox" id="autoConcurrency">自动线程数</label><label class="row"><input type="checkbox" id="smartPolicy">启用视频分类与状态策略</label><label class="row"><input type="checkbox" id="liveEnabled">保留原版直播加速</label></div></div>
+ <div class="notice">快速起播不等于总吞吐更高。若画面掉帧但缓冲很多，瓶颈可能是解码；请在 B 站播放器中调整编码策略，而不是不断增加线程。</div></section>
+-<section class="card"><h2>首页，简洁一点</h2><p class="muted">不改推荐排序，不屏蔽 UP 主，不伪造推荐 API。关闭后恢复原首页样式。</p><div class="grid" style="margin-top:20px"><div class="field"><label for="homeTheme">首页卡片主题</label><select id="homeTheme"><option value="light">浅色 · 留白与圆角</option><option value="dark">深色 · 卡片与基础背景</option><option value="auto">跟随系统</option><option value="off">保持 B 站原样</option></select></div><div class="stack"><label class="row"><input type="checkbox" id="homeEnabled">启用首页美化</label><label class="row"><input type="checkbox" id="homeHistory">保存推荐批次，显示上一批 / 下一批</label></div></div><p class="fine">每个标签页最多 25 批，每批最多 36 张卡片，保留 7 天；最多保留 20 个标签页记录。仅存标题、UP 主、封面和视频链接，不保存 Cookie、播放签名或媒体文件。历史不经账号同步上传。</p>
++<section class="card"><h2>首页：保留原生，只减干扰</h2><p class="muted">不接管推荐接口，不重排视频，不改原生卡片。历史操作在推荐区上方，不再悬浮遮挡。</p>
++<div class="grid" style="margin-top:20px"><div class="field"><label for="homeTheme">首页背景</label><select id="homeTheme"><option value="native">原生：沿用 B 站的浅色 / 深色</option><option value="oled">纯黑：原生深色时将首页背景改为 #000000</option></select><span class="hint">不修改图片或视频，不使用反色滤镜。切回原生浅色会退出纯黑。</span></div>
++<div class="stack"><label class="row"><input type="checkbox" id="homeEnabled">启用首页净化与操作栏</label><label class="row"><input type="checkbox" id="homeHistory">本地保存推荐批次，允许上一批 / 下一批</label><label class="row"><input type="checkbox" id="homeHideCarousel">移除大图轮播，释放推荐网格空间</label><label class="row"><input type="checkbox" id="homeHideAds">隐藏带明确广告标记的推荐卡片</label><label class="row"><input type="checkbox" id="homeHideBanner">同时收起顶部季节横幅（默认保留）</label></div></div>
++<p class="fine">不自动请求更多推荐，只展开页面已经加载的有效卡片。分区、搜索、动态、收藏和原生悬停预览保留。历史快照只保留可点击卡片，不模拟原生预览或“不感兴趣”按钮。</p>
++<p class="fine">每个标签页最多 25 批 × 36 张卡片，7 天过期，最多 20 组标签页记录。标题、UP 主、封面和链接仅存本地；不保存 Cookie、媒体下载地址或原始 HTML。升级会把旧版自定义深浅主题迁移为原生主题。</p>
+ <div class="actions"><button type="button" id="clearHistory" class="danger">清空本扩展全部推荐历史</button></div></section>
+ <div class="actions"><button type="submit" class="primary">保存设置</button><button type="button" id="restore">恢复增强版默认设置</button></div><p id="saved" class="status" role="status" aria-live="polite"></p></form>
+ <section class="card" style="margin-top:22px"><h2>海外访问：接入已有可信代理</h2><p class="muted">默认关闭。不内置、不推荐公共解析站或免费代理；这里也不是代理订阅客户端。</p>
+@@ -18,4 +22,4 @@
+ <div class="actions"><button id="enableProxy" class="primary" type="button">授权并启用分流</button><button id="disableProxy" type="button">关闭本扩展代理</button></div><p id="proxyStatus" class="status" role="status" aria-live="polite"></p>
+ <p class="fine">B 站请求不会在代理失败后自动直连。HTTPS 保持浏览器端到端加密；切勿安装陌生代理提供的根证书。代理地址仅存本机。配置不等于线路可用，本包没有附带任何代理服务。</p></section>
+ <section class="card"><h2>检查与回退</h2><p>出现黑屏、清晰度切换异常时，先切到兼容模式，再尝试关闭加速。需要原版详细统计或自定义 CDN 时，在 B 站页面点击扩展图标 → 原版详细设置。</p><p class="fine">请禁用旧版扩展和同类油猴脚本，避免同时拦截播放器。本分支不会自动更新。安装说明、审阅报告和测试脚本随压缩包提供。</p></section>
+-<p class="fine">BTR Flow 1.0.0 · MIT · 保留 Bilibili-thread-ripper 原作者版权声明。本软件非 Bilibili 官方产品。</p></main><script src="../src/proxy-core.js"></script><script src="options.js"></script></body></html>
++<p class="fine">BTR Flow 1.1.0 · MIT · 保留 Bilibili-thread-ripper 原作者版权声明。本软件非 Bilibili 官方产品。</p></main><script src="../src/home-core.js"></script><script src="../src/proxy-core.js"></script><script src="options.js"></script></body></html>
+--- a/ui/options.js
++++ b/ui/options.js
+@@ -1,11 +1,11 @@
+ 'use strict';
+ const $=id=>document.getElementById(id);
+-const defaults={enabled:true,liveEnabled:true,autoConcurrency:true,smartPolicy:true,strategy:'auto',mode:'auto',maxAutoThreads:32,memoryBudgetMB:64,takeover:'full',homeEnabled:true,homeHistory:true,homeTheme:'light'};
++const defaults={enabled:true,liveEnabled:true,autoConcurrency:true,smartPolicy:true,strategy:'auto',mode:'auto',maxAutoThreads:32,memoryBudgetMB:64,takeover:'full',...globalThis.__BTR_HOME_CORE__.defaults};
+ function populate(s){for(const[k,v]of Object.entries(defaults))if(typeof v==='boolean')$(k).checked=s[k];else $(k).value=String(s[k]);}
+-chrome.storage.sync.get(defaults).then(populate).catch(e=>$('saved').textContent=e.message);
++chrome.storage.sync.get(defaults).then(s=>populate({...s,...globalThis.__BTR_HOME_CORE__.settings(s)})).catch(e=>$('saved').textContent=e.message);
+ $('settings').onsubmit=async e=>{e.preventDefault();try{const out={};for(const[k,v]of Object.entries(defaults))out[k]=typeof v==='boolean'?$(k).checked:typeof v==='number'?Number($(k).value):$(k).value;await chrome.storage.sync.set(out);$('saved').textContent='已保存。下载策略在后续请求中生效；若更换播放内核，请刷新视频页。';}catch(err){$('saved').textContent=err.message;}};
+ $('restore').onclick=async()=>{try{await chrome.storage.sync.set(defaults);populate(defaults);$('saved').textContent='已恢复默认设置；没有改动代理或清除历史。';}catch(e){$('saved').textContent=e.message;}};
+-$('clearHistory').onclick=async()=>{try{const all=await chrome.storage.local.get(null);const keys=Object.keys(all).filter(k=>k.startsWith('flowHistory:'));await chrome.storage.local.remove(keys);$('saved').textContent=`已清空 ${keys.length} 组推荐历史；之后刷到的推荐仍会记录，关闭“保存推荐批次”可停止。`;}catch(e){$('saved').textContent=e.message;}};
++$('clearHistory').onclick=async()=>{try{await chrome.storage.local.set({flowHistoryClearedAt:Date.now()});const all=await chrome.storage.local.get(null);const keys=Object.keys(all).filter(k=>k.startsWith('flowHistory:'));await chrome.storage.local.remove(keys);$('saved').textContent=`已清空 ${keys.length} 组推荐历史；之后刷到的推荐仍会记录，关闭“保存推荐批次”可停止。`;}catch(e){$('saved').textContent=e.message;}};
+ const proxyCall=(method,details)=>new Promise((resolve,reject)=>{chrome.proxy.settings[method](details,result=>{const e=chrome.runtime.lastError;if(e)reject(new Error(e.message));else resolve(result);});});
+ async function proxyState(){
+  const data=await chrome.storage.local.get('flowProxy');if(data.flowProxy?.url)$('proxyUrl').value=data.flowProxy.url;
+--- a/ui/popup.html
++++ b/ui/popup.html
+@@ -5,4 +5,4 @@
+ <div class="stack"><div class="field"><label for="strategy">观看策略</label><select id="strategy"><option value="auto">自动 · 按视频和播放状态调整</option><option value="smooth">稳播优先 · 更充分地预缓冲</option><option value="fast">起播优先 · 减少初始等待</option><option value="economy">省流 · 限制预取和自动并发</option></select></div>
+ <div class="field"><label for="mode">CDN 路线</label><select id="mode"><option value="auto">自动 · 原始地址 + 大陆 + 海外</option><option value="mainland">大陆优先</option><option value="overseas">海外优先</option><option value="custom">自定义 · 在原版设置里选节点</option></select></div></div>
+ <p id="warning" class="fine"></p><div class="actions"><button id="native">原版详细设置</button><button id="options" class="primary">增强版设置</button></div>
+-<p id="message" class="fine" role="status"></p><p class="fine">1.0.0 · 非官方衍生版 · 不自动降低画质</p><script src="popup.js"></script></body></html>
++<p id="message" class="fine" role="status"></p><p class="fine">1.1.0 · 非官方衍生版 · 不自动降低画质</p><script src="popup.js"></script></body></html>
+--- a/ui/popup.js
++++ b/ui/popup.js
+@@ -13,7 +13,7 @@
+ async function update(){
+  try{
+   if(!tab?.id)return;const d=await chrome.tabs.sendMessage(tab.id,{type:'flow-get-state'}),s=d.stats,t=d.telemetry;
+-  if(s){$('speed').textContent=(Math.max(0,s.totalSpeedBps)/1048576).toFixed(2);$('buffer').textContent=Math.max(0,s.bufferedAhead).toFixed(1);$('threads').textContent=String(Math.max(0,s.activeThreads));}
++  if(s){$('speed').textContent=(Math.max(0,Number(s.totalSpeedBps)||0)/1048576).toFixed(2);$('buffer').textContent=Math.max(0,Number(s.bufferedAhead)||0).toFixed(1);$('threads').textContent=String(Math.max(0,Number(s.activeThreads)||0));}
+   $('profile').textContent=t?.policy?.name?`${t.policy.name} · 自动并发上限 ${t.policy.cap} · 缓冲目标 ${t.policy.ahead}s`:(d.home?`首页已保存 ${d.historyCount} 批推荐`:'等待播放器准备');
+   $('warning').textContent=t?.policy?.decodeWarning?'缓冲充足但掉帧偏多：更可能是解码问题。可在播放器播放策略中试 HEVC / AVC。':s?.lastError||'';
+  }catch(_){$('profile').textContent='请在 B 站页面使用；刚安装后需要刷新页面。';}

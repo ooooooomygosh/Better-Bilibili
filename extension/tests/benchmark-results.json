@@ -1,0 +1,119 @@
+{
+  "scope": "Synthetic in-memory transport model only. NOT real Bilibili performance, NOT a speedup of this fork over upstream.",
+  "node": "v22.22.0",
+  "parameters": {
+    "payload_bytes": 524288,
+    "packet_bytes": 16384,
+    "request_header_delay_ms": 40,
+    "per_request_limit_bytes_s": 262144,
+    "shared_link_limit_bytes_s": 1048576,
+    "manual_concurrency": 8,
+    "repeats": 3
+  },
+  "results": [
+    {
+      "model": "per_request_limit",
+      "single": [
+        {
+          "elapsed_ms": 2052,
+          "requests": 1,
+          "wire_bytes": 524288,
+          "pieces": 1,
+          "sha256": "61d1d9c5745bdaa4fab39240651bc242a5186b15393fd475082fcf6e84f400ab"
+        },
+        {
+          "elapsed_ms": 2040,
+          "requests": 1,
+          "wire_bytes": 524288,
+          "pieces": 1,
+          "sha256": "61d1d9c5745bdaa4fab39240651bc242a5186b15393fd475082fcf6e84f400ab"
+        },
+        {
+          "elapsed_ms": 2040,
+          "requests": 1,
+          "wire_bytes": 524288,
+          "pieces": 1,
+          "sha256": "61d1d9c5745bdaa4fab39240651bc242a5186b15393fd475082fcf6e84f400ab"
+        }
+      ],
+      "parallel": [
+        {
+          "elapsed_ms": 331,
+          "requests": 7,
+          "wire_bytes": 524288,
+          "pieces": 7,
+          "sha256": "61d1d9c5745bdaa4fab39240651bc242a5186b15393fd475082fcf6e84f400ab"
+        },
+        {
+          "elapsed_ms": 329,
+          "requests": 7,
+          "wire_bytes": 524288,
+          "pieces": 7,
+          "sha256": "61d1d9c5745bdaa4fab39240651bc242a5186b15393fd475082fcf6e84f400ab"
+        },
+        {
+          "elapsed_ms": 328,
+          "requests": 7,
+          "wire_bytes": 524288,
+          "pieces": 7,
+          "sha256": "61d1d9c5745bdaa4fab39240651bc242a5186b15393fd475082fcf6e84f400ab"
+        }
+      ],
+      "median_single_ms": 2040,
+      "median_parallel_ms": 329,
+      "ratio": 6.201
+    },
+    {
+      "model": "shared_link_limit",
+      "single": [
+        {
+          "elapsed_ms": 544,
+          "requests": 1,
+          "wire_bytes": 524288,
+          "pieces": 1,
+          "sha256": "61d1d9c5745bdaa4fab39240651bc242a5186b15393fd475082fcf6e84f400ab"
+        },
+        {
+          "elapsed_ms": 545,
+          "requests": 1,
+          "wire_bytes": 524288,
+          "pieces": 1,
+          "sha256": "61d1d9c5745bdaa4fab39240651bc242a5186b15393fd475082fcf6e84f400ab"
+        },
+        {
+          "elapsed_ms": 544,
+          "requests": 1,
+          "wire_bytes": 524288,
+          "pieces": 1,
+          "sha256": "61d1d9c5745bdaa4fab39240651bc242a5186b15393fd475082fcf6e84f400ab"
+        }
+      ],
+      "parallel": [
+        {
+          "elapsed_ms": 540,
+          "requests": 7,
+          "wire_bytes": 524288,
+          "pieces": 7,
+          "sha256": "61d1d9c5745bdaa4fab39240651bc242a5186b15393fd475082fcf6e84f400ab"
+        },
+        {
+          "elapsed_ms": 542,
+          "requests": 7,
+          "wire_bytes": 524288,
+          "pieces": 7,
+          "sha256": "61d1d9c5745bdaa4fab39240651bc242a5186b15393fd475082fcf6e84f400ab"
+        },
+        {
+          "elapsed_ms": 541,
+          "requests": 7,
+          "wire_bytes": 524288,
+          "pieces": 7,
+          "sha256": "61d1d9c5745bdaa4fab39240651bc242a5186b15393fd475082fcf6e84f400ab"
+        }
+      ],
+      "median_single_ms": 544,
+      "median_parallel_ms": 541,
+      "ratio": 1.006
+    }
+  ]
+}
