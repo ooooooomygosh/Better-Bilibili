@@ -1,0 +1,123 @@
+{
+  "browser": "144.0.7559.96",
+  "environment": "Local fixture DOM only, mocked Chrome APIs; NOT installed extension or live Bilibili; proxy never enabled",
+  "tests": [
+    {
+      "test": "initial stable batch is saved once",
+      "passed": true
+    },
+    {
+      "test": "carousel footprint and legacy nth-child margins removed; ten populated cards fill two native rows",
+      "passed": true
+    },
+    {
+      "test": "old forced dark setting migrates to native; native dark colors are not overwritten",
+      "passed": true
+    },
+    {
+      "test": "toolbar is inline, not a bottom overlay; seasonal banner and navigation remain",
+      "passed": true
+    },
+    {
+      "test": "native hover control retains its original event listener",
+      "passed": true
+    },
+    {
+      "test": "three synchronous refresh clicks invoke the native action exactly once",
+      "passed": true
+    },
+    {
+      "test": "previous batch uses safe card data in an inline view; native Vue tree remains mounted",
+      "passed": true
+    },
+    {
+      "test": "next saved batch restores the same native elements without fetching",
+      "passed": true
+    },
+    {
+      "test": "lazy growth updates the current batch instead of creating spurious history",
+      "passed": true
+    },
+    {
+      "test": "unrelated header mutations do not write history or prune storage",
+      "passed": true
+    },
+    {
+      "test": "partial three-card render is not committed; full stable batch is recorded",
+      "passed": true
+    },
+    {
+      "test": "OLED makes native dark surfaces exactly #000000 without an image/video filter",
+      "passed": true
+    },
+    {
+      "test": "native dark-to-light change exits OLED; no self-latching black theme",
+      "passed": true
+    },
+    {
+      "test": "optional seasonal banner collapse keeps search and top navigation",
+      "passed": true
+    },
+    {
+      "test": "responsive layout preserves native 5/4/3/2-column breakpoints without horizontal overflow",
+      "passed": true
+    },
+    {
+      "test": "only explicit advertising badge is filtered; no title keyword or uploader blocking",
+      "passed": true
+    },
+    {
+      "test": "master off restores native layout and controls and removes extension DOM markers",
+      "passed": true
+    },
+    {
+      "test": "SPA navigation removes homepage styling outside the homepage and remounts once on return",
+      "passed": true
+    },
+    {
+      "test": "no-change/failed refresh times out, unlocks the UI and keeps previous batches",
+      "passed": true
+    },
+    {
+      "test": "missing native refresh control produces a message, never reloads the document",
+      "passed": true
+    },
+    {
+      "test": "native grid replacement is detected without duplicate toolbar or lost refresh control",
+      "passed": true
+    },
+    {
+      "test": "clear-history epoch rejects an in-flight pre-clear write; old records do not reappear",
+      "passed": true
+    },
+    {
+      "test": "local storage failure is reported without breaking refresh or the live page",
+      "passed": true
+    },
+    {
+      "test": "history can be disabled independently while keeping clean layout and native refresh",
+      "passed": true
+    },
+    {
+      "test": "options save all new homepage switches and theme selection",
+      "passed": true
+    },
+    {
+      "test": "proxy stays opt-in; consent and credential rejection precede mock permission requests",
+      "passed": true
+    },
+    {
+      "test": "legacy proxy controls set and revoke only mocked proxy state",
+      "passed": true
+    },
+    {
+      "test": "restore defaults returns native theme without modifying proxy configuration",
+      "passed": true
+    },
+    {
+      "test": "no uncaught errors across homepage and options regression scenarios",
+      "passed": true
+    }
+  ],
+  "uncaught_errors": []
+}

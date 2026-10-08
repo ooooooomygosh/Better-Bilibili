@@ -1,0 +1,8 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BTR Flow 控制台</title><link rel="stylesheet" href="common.css"></head><body class="popup">
+<div class="row between"><div><div class="brand">BTR FLOW</div><h1>把时间留给视频。</h1></div><label class="row" title="视频加速总开关"><input id="enabled" type="checkbox" aria-label="启用视频加速"></label></div>
+<div class="metrics"><div class="metric"><strong id="speed">—</strong><span>网络下载 MiB/s</span></div><div class="metric"><strong id="buffer">—</strong><span>连续缓冲 / 秒</span></div><div class="metric"><strong id="threads">—</strong><span>在途请求</span></div></div>
+<div id="profile" class="muted">打开 B 站视频后显示状态</div><hr class="divider">
+<div class="stack"><div class="field"><label for="strategy">观看策略</label><select id="strategy"><option value="auto">自动 · 按视频和播放状态调整</option><option value="smooth">稳播优先 · 更充分地预缓冲</option><option value="fast">起播优先 · 减少初始等待</option><option value="economy">省流 · 限制预取和自动并发</option></select></div>
+<div class="field"><label for="mode">CDN 路线</label><select id="mode"><option value="auto">自动 · 原始地址 + 大陆 + 海外</option><option value="mainland">大陆优先</option><option value="overseas">海外优先</option><option value="custom">自定义 · 在原版设置里选节点</option></select></div></div>
+<p id="warning" class="fine"></p><div class="actions"><button id="native">原版详细设置</button><button id="options" class="primary">增强版设置</button></div>
+<p id="message" class="fine" role="status"></p><p class="fine">1.1.0 · 非官方衍生版 · 不自动降低画质</p><script src="popup.js"></script></body></html>

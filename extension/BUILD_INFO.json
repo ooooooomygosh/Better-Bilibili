@@ -1,0 +1,41 @@
+{
+  "name": "BTR Flow",
+  "version": "1.1.0",
+  "build_date": "2026-10-06",
+  "distribution": "Unofficial Chrome/Edge MV3 fork; not an upstream extension release",
+  "input": "BTR-Flow-1.0.0(1).zip",
+  "input_sha256": "f211255fce9a3c0f06147da1a401884a90a7293c5e6a34c0336e7a608e0c4ba2",
+  "upstream": {
+    "repository": "MrTangLuyao/Bilibili-thread-ripper",
+    "version": "2026.10.4.1",
+    "commit": "bbf4d3dee502a16e424232ae6a51705f52b0e60d",
+    "original_fork_basis": "0.9.4.2",
+    "integration": "Applicable runtime backports; MV3 native storage retained, userscript-only adapter changes not applicable"
+  },
+  "license": "MIT; original upstream notice preserved",
+  "homepage_defaults": {
+    "enabled": true,
+    "hide_carousel": true,
+    "hide_explicit_ad_badges": true,
+    "hide_seasonal_banner": false,
+    "theme": "native",
+    "history": true
+  },
+  "proxy_enabled_by_default": false,
+  "automatic_updates": false,
+  "testing": {
+    "node_core_passed": 63,
+    "renderer_home_options_fixture_passed": 29,
+    "renderer_branch_diagnostics_fixture_passed": 9,
+    "real_mse_synthetic_media_passed": 7,
+    "total_passed": 108,
+    "real_extension_install_verified": false,
+    "real_bilibili_e2e_verified": false,
+    "real_HDR_HiRes_hardware_verified": false,
+    "firefox_safari_verified": false,
+    "performance_improvement_measured": false,
+    "reason_for_install_e2e_gap": "Managed Chromium blocked extension management and live Bilibili pages; not bypassed",
+    "browser": "Chromium 144.0.7559.96",
+    "node": "22.16.0"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "browser": "144.0.7559.96",
+  "environment": "Renderer fixture, stub native player/fetch/clipboard; not live Bilibili or HDR hardware validation",
+  "tests": [
+    {
+      "test": "interactive first branch comes from embedded playinfo",
+      "passed": true
+    },
+    {
+      "test": "native newA audio preference reaches the takeover factory",
+      "passed": true
+    },
+    {
+      "test": "prefetched interactive branches do not interrupt the current branch",
+      "passed": true
+    },
+    {
+      "test": "switching to a prefetched branch reuses that branch without duplicate playurl fetch",
+      "passed": true
+    },
+    {
+      "test": "uncached branch is requested by its own CID, not the first branch CID",
+      "passed": true
+    },
+    {
+      "test": "returning to the first branch restores the first branch identity",
+      "passed": true
+    },
+    {
+      "test": "diagnostic copy includes fork/upstream versions and redacts signed media addresses",
+      "passed": true
+    },
+    {
+      "test": "clipboard denial offers selected read-only diagnostic text instead of failing silently",
+      "passed": true
+    },
+    {
+      "test": "no uncaught exceptions in branch routing or diagnostic UI scenarios",
+      "passed": true
+    }
+  ],
+  "uncaught_errors": []
+}
