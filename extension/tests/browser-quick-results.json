@@ -1,0 +1,41 @@
+{
+ "scope": "Mocked chrome.* APIs; real panel markup and CSS in Chromium",
+ "results": [
+  {
+   "test": "floating button mounts, shows the 5-hour usage ring and marks the page so the old launcher hides",
+   "passed": true
+  },
+  {
+   "test": "first-run hint appears once and is remembered when dismissed",
+   "passed": true
+  },
+  {
+   "test": "Alt+T opens the panel on the tab that fits the page (油门 on a video page)",
+   "passed": true
+  },
+  {
+   "test": "油门 tab: switch and segmented control write settings and re-render live",
+   "passed": true
+  },
+  {
+   "test": "首页 tab: turning on 无限下滑 reveals batch size and speed controls",
+   "passed": true
+  },
+  {
+   "test": "刹车 tab: usage meters and presets apply and highlight",
+   "passed": true
+  },
+  {
+   "test": "Esc and outside clicks close the panel; the button reopens it",
+   "passed": true
+  },
+  {
+   "test": "hiding the floating button keeps the panel reachable programmatically (popup / toolbar)",
+   "passed": true
+  },
+  {
+   "test": "no uncaught errors",
+   "passed": true
+  }
+ ]
+}

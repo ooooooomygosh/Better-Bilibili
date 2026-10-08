@@ -12,7 +12,8 @@
     // 1.0's light/dark/auto/off all return to Bilibili's own theme, never force a theme on upgrade.
     out.homeTheme = raw.homeTheme === 'oled' ? 'oled' : 'native';
     const num = (v, lo, hi, d) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d; };
-    out.homeInfiniteSize = num(raw.homeInfiniteSize, 6, 30, defaults.homeInfiniteSize);
+    // Each request returns 12 like B 站's own page; a batch is 1–3 merged requests.
+    out.homeInfiniteSize = Math.round(num(raw.homeInfiniteSize, 12, 36, defaults.homeInfiniteSize) / 12) * 12;
     out.homeInfiniteThreads = num(raw.homeInfiniteThreads, 1, 3, defaults.homeInfiniteThreads);
     return out;
   }

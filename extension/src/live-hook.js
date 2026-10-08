@@ -48,7 +48,7 @@
 
   // ---- stats for the extension badge and the settings panel ----
   const stats = {
-    version: "2.1.0",
+    version: "2.2.0",
     architecture: "live-segment-ripper",
     mode: "live",
     playerState: "waiting",
@@ -512,7 +512,7 @@
         hosts: context.pool.status()
       },
       getStats: () => ({ ...stats }),
-      version: "2.1.0"
+      version: "2.2.0"
     })
   });
   publish();

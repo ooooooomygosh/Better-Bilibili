@@ -1,6 +1,6 @@
 'use strict';
 const $=id=>document.getElementById(id);
-const defaults={enabled:true,liveEnabled:true,autoConcurrency:true,smartPolicy:true,strategy:'auto',mode:'auto',maxAutoThreads:32,memoryBudgetMB:64,takeover:'full',...globalThis.__BTR_HOME_CORE__.defaults,...globalThis.__BTR_FOCUS_CORE__.defaults};
+const defaults={enabled:true,liveEnabled:true,autoConcurrency:true,smartPolicy:true,strategy:'auto',mode:'auto',maxAutoThreads:32,memoryBudgetMB:64,takeover:'full',...globalThis.__BTR_HOME_CORE__.defaults,...globalThis.__BTR_FOCUS_CORE__.defaults,quickFab:true};
 const focusCore=globalThis.__BTR_FOCUS_CORE__;
 function populate(s){for(const[k,v]of Object.entries(defaults))if(typeof v==='boolean')$(k).checked=s[k];else $(k).value=String(s[k]);}
 chrome.storage.sync.get(defaults).then(s=>populate({...s,...globalThis.__BTR_HOME_CORE__.settings(s),...focusCore.settings(s)})).catch(e=>$('saved').textContent=e.message);

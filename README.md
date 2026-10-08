@@ -1,114 +1,193 @@
 <div align="center">
 
-<img src="docs/screenshots/icon.png" width="112" alt="哔哩节流阀图标">
+<img src="docs/screenshots/banner.jpg" alt="哔哩节流阀 BiliThrottle：油门帮你踩，刹车也帮你踩" width="100%">
 
 # 哔哩节流阀 · BiliThrottle
 
-**油门帮你踩，刹车也帮你踩。**
+**B 站的油门和刹车。** 想刷的时候一路刷不到头，想停的时候有人帮你踩刹车。
 
-*Throttle* 既是「油门」也是「节流」：视频加载给你一脚油门；刷 B 站停不下来时，像 Claude Code 的用量额度一样给你一脚刹车。
+[![下载最新版](https://img.shields.io/github/v/release/ooooooomygosh/Better-Bilibili?label=%E2%AC%87%20%E4%B8%8B%E8%BD%BD&style=for-the-badge&color=fb7299)](https://github.com/ooooooomygosh/Better-Bilibili/releases/latest)
 
-[![Release](https://img.shields.io/github/v/release/ooooooomygosh/Better-Bilibili?label=%E4%B8%8B%E8%BD%BD&color=fb7299)](https://github.com/ooooooomygosh/Better-Bilibili/releases/latest)
 [![CI](https://github.com/ooooooomygosh/Better-Bilibili/actions/workflows/ci.yml/badge.svg)](https://github.com/ooooooomygosh/Better-Bilibili/actions/workflows/ci.yml)
-![Manifest V3](https://img.shields.io/badge/Manifest-V3-00aeec)
 ![Chrome / Edge](https://img.shields.io/badge/Chrome%20%2F%20Edge-114%2B-4285f4)
+![Manifest V3](https://img.shields.io/badge/Manifest-V3-00aeec)
+![权限只要 storage](https://img.shields.io/badge/%E6%9D%83%E9%99%90-%E5%8F%AA%E8%A6%81%20storage-43a047)
 [![License: MIT](https://img.shields.io/badge/License-MIT-lightgrey)](LICENSE)
 
-[**⬇ 下载最新版**](https://github.com/ooooooomygosh/Better-Bilibili/releases/latest) · [安装](#安装) · [节流阀额度](#刹车节流阀额度) · [全部功能](#油门与其他功能) · [审计报告](docs/AUDIT-2026-10.zh-CN.md) · [更新日志](extension/CHANGELOG.md)
-
-<img src="docs/screenshots/focus-window.png" width="720" alt="5 小时额度用完时的提示：已用百分比、重置时间和倒计时">
+[♾️ 无限下滑](#infinite) · [🎛️ 快捷面板](#quick) · [⏱️ 观看额度](#limit) · [🧹 首页净化](#home) · [⚡ 加载加速](#speed) · [📦 安装](#install)
 
 </div>
 
 ---
 
-## 刹车：节流阀额度
+<a id="infinite"></a>
 
-用过 Claude Code 或 Codex 的人对这套规则不会陌生：
+## ♾️ 无限下滑：一口气刷到底，一条都不会错过
 
-| 额度 | 怎么计时 | 默认 |
-|---|---|---|
-| **5 小时窗口** | 从你开始看的那一秒起算，5 小时后自动重置 | 每窗口 90 分钟 |
-| **每周额度** | 从本周第一次观看起算，7 天后重置 | 每周 10 小时 |
-| **每窗口视频数**（可选） | 播放满 10 秒算 1 个，分 P 算同一个，正在看的可以看完 | 不限 |
-| **番茄钟**（可选） | 连续看满 N 分钟强制休息 M 分钟，带圆环倒计时 | 25 + 5 分钟 |
+<img align="right" src="docs/screenshots/infinite.gif" width="440" alt="无限下滑：每一批推荐接在下面，右侧显示第几批">
 
-- 额度用完时主播放器暂停、退出全屏，遮罩上显示 **已用 %**、**重置时间**（「今天 15:20 重置」）和 **距离重置的倒计时**；到点后自动解除，不用刷新。
-- **提醒模式**可以「再看 5 分钟 / 再看 1 个 / 跳过休息」，次数会记在用量里，随窗口一起清零；**严格模式**不给这些按钮。
-- 只统计主播放器真实播放的时间，首页悬停预览不算；多个标签页由后台统一计数；数据只存在本机。
-- 默认关闭。到 **扩展图标 → 增强版设置 → 节流阀** 里打开，有「自律 / 适中 / 放纵」三档预设。
+B 站的「换一换」**每次只换两行**，点一下，上一批就没了；刷快了还得盯着转圈等它加载。
+
+打开无限下滑之后，首页会变成一条**刷不到头的推荐流**：
+
+- 🚀 **多线程预加载，不用等**。还没滑到底，下一批已经在路上，几路请求同时发出，滑到哪里内容就已经在哪里。
+- 📚 **每一批都拼在下面，往上翻还在**。新内容只往下接，不会替换掉之前的。手滑刷过去了？往回翻就是。
+- 🔖 **第几批一目了然**。每批有「第 N 批 · 24 个视频 · 12:47」分隔条，右侧悬浮提示你正在看第几批，点一下回到这一批开头。
+- 🧽 **干净**。自动去重，自动去掉广告和直播卡片；B 站留下的空白占位也会隐藏。
+- 🛡️ **懂得收手**。请求方式与 B 站网页完全一致（每次 12 个）。一旦 B 站提示限流，立刻停下，等你点「重试」。
+
+每批 12 / 24 / 36 个视频、加载速度「稳 / 标准 / 快」都能在快捷面板里一键切换。
+
+<br clear="right">
+
+<a id="quick"></a>
+
+## 🎛️ 快捷面板：常用开关，一个按钮全搞定
+
+<img src="docs/screenshots/quick-home.jpg" alt="快捷面板：首页标签" width="100%">
+
+B 站每个页面的右下角，都有一个粉色的油门按钮（按 <kbd>Alt</kbd>+<kbd>T</kbd> 也行），点开就是全部常用开关：
+
+| 标签 | 能做什么 |
+|---|---|
+| **刹车** | 开关观看额度；5 小时 / 每周用量条；自律 · 适中 · 放纵三档预设；严格模式；番茄钟 |
+| **首页** | 无限下滑（每批数量、加载速度）、首页净化、移除轮播、隐藏广告、换一批回看、纯黑背景 |
+| **油门** | 视频加速、CDN 路线、观看策略、直播加速；视频页可进入高级播放设置 |
+
+- 自动打开当前页面用得上的那一页：在首页打开「首页」，在视频页打开「油门」。
+- 开启观看额度后，**按钮外圈就是一个进度环**，不用点开也知道这 5 小时看了多少。
+- 按钮可以上下拖动，挡住内容了就挪开；不想要也能隐藏，改从扩展图标打开。
 
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshots/focus-week.png" alt="本周额度见底"></td>
-<td width="50%"><img src="docs/screenshots/focus-break.png" alt="番茄钟休息倒计时"></td>
-</tr>
-<tr>
-<td><img src="docs/screenshots/options-focus.png" alt="节流阀设置与用量"></td>
-<td align="center"><img src="docs/screenshots/popup.png" width="300" alt="弹窗里的 5 小时与每周用量"></td>
+<td width="50%"><img src="docs/screenshots/quick-brake.jpg" alt="快捷面板：刹车"></td>
+<td width="50%"><img src="docs/screenshots/quick-play.jpg" alt="快捷面板：油门"></td>
 </tr>
 </table>
 
-## 油门与其他功能
+<a id="limit"></a>
 
-| | 功能 | 说明 |
+## ⏱️ 刹车：像 Claude Code 一样的观看额度
+
+<img align="right" src="docs/screenshots/limit.jpg" width="440" alt="5 小时额度用完的提示">
+
+刷 B 站最怕的是「再看一个」。节流阀借用了 Claude Code / Codex 的用量规则：
+
+| 额度 | 怎么计时 | 默认 |
 |---|---|---|
-| ⚡ | **视频加载加速** | 多 CDN / Range 并发下载、自动线程数、按时长 / 码率 / 倍速调整缓冲；播放出问题可切到「兼容模式」，只保留 Range 加速。 |
-| 🧹 | **首页净化** | 移除大图活动轮播和它留下的空位，隐藏带明确广告标记的卡片；季节横幅可以选择收起。不重排、不改动原生卡片。 |
-| ♾️ | **无限下滑**（2.1 新增） | 开启后快到底时自动并发加载 1–3 批推荐（每批 12 / 24 / 30 个），按「第 N 批」接在下面，右侧显示当前第几批；去重、过滤广告，遇到限流自动暂停。默认关闭。 |
-| ↩️ | **换一批可回看** | 推荐区上方的操作行：上一批 · 批次 · 下一批 · 换一批。历史只存在本机，每个标签页最多 25 批。 |
-| 🌑 | **OLED 纯黑** | 仅在 B 站原生深色模式下，把首页主要底色改为 `#000`；不反色，不动封面和视频。 |
-| 🌐 | **可选代理分流** | 默认关闭；明确授权后，只让 B 站域名走你自己的代理。 |
-| 🎛️ | **页内面板** | 视频页右下角的「节流」按钮：CDN 路线、播放内核、线程数、诊断复制。 |
+| **5 小时窗口** | 从开始看的那一秒起算，5 小时后自动重置 | 90 分钟 |
+| **每周额度** | 从本周第一次观看起算，7 天后重置 | 10 小时 |
+| 每窗口视频数 | 播放满 10 秒算 1 个，正在看的可以看完 | 不限 |
+| 番茄钟 | 连续看满 N 分钟，强制休息 M 分钟 | 25 + 5 |
 
-<p align="center"><img src="docs/screenshots/infinite.png" width="760" alt="无限下滑：按批次拼接的推荐和右侧的批次提示"></p>
+- 额度用完时视频暂停，提示里写清楚**已用多少、几点重置、还要等多久**。到点自动解除，不用刷新页面。
+- 提醒模式可以「再看 5 分钟」；严格模式不给这个按钮。
+- 只计算主播放器**真正在播放**的时间，首页悬停预览不算；多个标签页一起计数；用量数据只保存在本机。
+- 默认关闭，在快捷面板「刹车」里一键开启。
 
-## 安装
+<br clear="right">
 
-> 还没上架应用商店，需要用「开发者模式」加载。
+<a id="home"></a>
 
-1. 到 [Releases](https://github.com/ooooooomygosh/Better-Bilibili/releases/latest) 下载 `BiliThrottle-x.y.z.zip` 并解压。
+## 🧹 首页净化 · 换一批可回看
+
+<img src="docs/screenshots/home.jpg" alt="净化后的首页和推荐区上方的操作行" width="100%">
+
+- **去掉大图活动轮播**，连同它占的格子一起收掉；隐藏带明确广告标记的卡片。
+- 推荐区上方加一行 **上一批 · 第几批 · 下一批 · 换一批**。每次「换一批」都会存一份，点快了还能翻回去。
+- 不重排、不改写原生卡片，悬停预览、稍后再看都还在；B 站深色模式下可以一键换成 **OLED 纯黑**。
+
+<a id="speed"></a>
+
+## ⚡ 油门：视频加载加速
+
+继承自 [线程撕裂者](https://github.com/MrTangLuyao/Bilibili-thread-ripper) 的下载内核：多 CDN 节点 + Range 分段并发，按视频时长、码率、倍速和卡顿情况自动调整缓冲与线程数。清晰度、字幕、弹幕仍由 B 站播放器决定，**不会悄悄给你降画质**。播放出问题时，切到「兼容模式」或者关掉加速即可。
+
+## 🆚 装之前 / 装之后
+
+| | B 站原生 | 装了节流阀 |
+|---|---|---|
+| 换一批 | 每次两行，旧的直接消失 | 多线程无限下滑，一批批往下接，往上翻都还在 |
+| 刷过头了 | 找不回来 | 「上一批」或者往上翻 |
+| 首页 | 大轮播 + 广告 + 空白占位 | 只剩推荐 |
+| 停不下来 | 靠自觉 | 5 小时 / 每周额度 + 番茄钟 |
+| 设置 | — | 右下角一个按钮，三个标签页 |
+
+<a id="install"></a>
+
+## 📦 三步装好
+
+> 暂未上架应用商店，需要以「开发者模式」加载，一分钟就够。
+
+1. 到 [**Releases**](https://github.com/ooooooomygosh/Better-Bilibili/releases/latest) 下载 `BiliThrottle-x.y.z.zip` 并解压。
 2. 打开 `chrome://extensions/`（Edge 是 `edge://extensions/`），打开右上角的 **开发者模式**。
-3. 点击 **加载已解压的扩展程序**，选中直接包含 `manifest.json` 的 `BiliThrottle-x.y.z` 文件夹。
-4. 刷新已经打开的 B 站标签页。
+3. 点 **加载已解压的扩展程序**，选择解压出来的 `BiliThrottle-x.y.z` 文件夹。
 
-**从 BTR Flow 1.x 或旧版本升级**：先不要卸载。把新文件夹里的所有文件覆盖到原来加载的目录，在扩展页点「重新加载」，再刷新 B 站标签页。内部存储键没有变，设置和历史都会保留。
+装好后会自动打开一页**使用指南**，可以在那里直接打开无限下滑、选一档观看额度。
 
-> [!IMPORTANT]
-> 不要同时启用另一份线程撕裂者扩展或它的用户脚本，两套播放器拦截会冲突。本扩展不会自动更新，新版本请关注 Releases。
+<details>
+<summary><b>从旧版本升级（BTR Flow 1.x / 节流阀 2.x）</b></summary>
 
-## 出问题怎么办
+先不要卸载。把新文件夹里的所有文件覆盖到原来加载的目录，在扩展页点「重新加载」，再刷新 B 站标签页。设置和历史都会保留。
 
-- **黑屏或画质菜单异常**：增强版设置 → 播放内核切到「兼容模式」后刷新页面；还不行就关闭视频加速。
-- **首页异常**：关闭「启用首页净化与操作栏」，首页就会恢复原生布局。
-- **节流阀误拦**：关闭「启用节流阀」立即解除，并欢迎[提交反馈](https://github.com/ooooooomygosh/Better-Bilibili/issues/new/choose)。
-- **回退**：把旧版本的文件覆盖回原目录，然后重新加载扩展。
+</details>
 
-## 仓库结构
+<p align="center"><img src="docs/screenshots/welcome.jpg" width="720" alt="安装后打开的使用指南"></p>
+
+## ❓ 常见问题
+
+<details><summary><b>视频黑屏，或者画质菜单不对</b></summary>
+
+快捷面板 →「油门」→ 关闭视频加速后刷新；或者在完整设置里把播放内核切到「兼容模式」。
+</details>
+
+<details><summary><b>无限下滑提示被限流</b></summary>
+
+把「加载速度」调到「稳」，过几分钟点「重试」。插件被限流后会自己停下，不会一直请求。底部会显示 B 站返回的错误码，反馈问题时附上它就行。
+</details>
+
+<details><summary><b>首页看起来不对</b></summary>
+
+快捷面板 →「首页」→ 关闭「首页净化与操作栏」，立刻恢复原生首页。
+</details>
+
+<details><summary><b>能和线程撕裂者一起用吗？</b></summary>
+
+不行。不要同时启用另一份线程撕裂者扩展或它的用户脚本，两套播放器拦截会互相冲突。
+</details>
+
+<details><summary><b>会自动更新吗？</b></summary>
+
+不会。新版本发布在 [Releases](https://github.com/ooooooomygosh/Better-Bilibili/releases)，可以点右上角 Watch → Custom → Releases 订阅。
+</details>
+
+## 🔒 隐私
+
+- 必需权限只有 `storage`。推荐历史、观看用量只存在本机，不上传任何数据，也没有统计上报。
+- 开启「无限下滑」后，扩展会以你的登录状态请求 B 站**自己的**首页推荐接口，和 B 站网页加载推荐用的是同一组接口；扩展不读取、不保存 Cookie。
+- 代理功能默认关闭，只在你明确授权后才申请权限。详见[隐私说明](extension/docs/PRIVACY.zh-CN.md)。
+
+## 🛠️ 开发
 
 ```
-extension/          可以直接「加载已解压」的扩展本体（manifest.json 在这里）
-  src/              内容脚本、后台 Service Worker、节流阀核心逻辑（focus-core.js）
-  ui/               弹窗与设置页
-  tests/            Node 单元测试与 Chromium 回归脚本
-  docs/             隐私说明、上游同步、测试报告
+extension/          可直接「加载已解压」的扩展本体（manifest.json 在这里）
+  src/              内容脚本与后台：quick-panel / home-infinite / feed-core / focus-core …
+  ui/               弹窗、设置页、欢迎页
+  tests/            Node 单元测试 + Chromium 回归测试
 docs/               审计报告、发布说明、截图
 scripts/build.sh    打包为 dist/BiliThrottle-<版本>.zip
-.github/workflows/  CI 测试；manifest 版本号变化时自动发布 Release
 ```
-
-### 开发
 
 ```bash
-node --test extension/tests/core.test.cjs extension/tests/update.test.cjs extension/tests/focus.test.cjs extension/tests/feed.test.cjs
-./scripts/build.sh   # 生成 dist/BiliThrottle-<版本>.zip
-# 修改 extension/manifest.json 的 version 并推送到 main，即自动构建并发布对应 Release
+node --test extension/tests/{core,update,focus,feed}.test.cjs            # 单元测试
+CHROMIUM_PATH=/path/to/chrome python3 extension/tests/browser-quick.py   # 任一浏览器回归测试
+./scripts/build.sh                                                       # 打包
 ```
 
-## 隐私
+修改 `extension/manifest.json` 的版本号并推送到 main，GitHub Actions 会自动打包并发布对应的 Release。更新日志见 [CHANGELOG](extension/CHANGELOG.md)，审计记录见 [docs/AUDIT-2026-10.zh-CN.md](docs/AUDIT-2026-10.zh-CN.md)。
 
-必需权限只有 `storage`。推荐历史和节流阀用量都只保存在本机，不上传任何数据；开启「无限下滑」后，扩展会以你的登录状态请求 B 站自己的首页推荐接口；代理权限只在你明确授权后才申请。详见[隐私说明](extension/docs/PRIVACY.zh-CN.md)。
+## 🙏 致谢与许可
 
-## 致谢与许可
+基于 [MrTangLuyao/Bilibili-thread-ripper](https://github.com/MrTangLuyao/Bilibili-thread-ripper)（线程撕裂者）的非官方 MV3 衍生版，原名 BTR Flow。MIT 许可，保留原作者版权声明。
 
-基于 [MrTangLuyao/Bilibili-thread-ripper](https://github.com/MrTangLuyao/Bilibili-thread-ripper)（线程撕裂者）的非官方 MV3 衍生版，原名 BTR Flow，已回移上游 2026.10.4.1 的适用修复。MIT 许可，保留原作者的版权声明。本项目与哔哩哔哩官方无关，与 Anthropic、OpenAI 也无关，只是借用了 Claude Code / Codex 的计量思路。
+本项目与哔哩哔哩官方无关；与 Anthropic、OpenAI 也无关，只是借用了 Claude Code / Codex 的计量思路。

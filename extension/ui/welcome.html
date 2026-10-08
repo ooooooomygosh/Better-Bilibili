@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>欢迎使用哔哩节流阀</title>
+<link rel="stylesheet" href="common.css">
+<link rel="stylesheet" href="welcome.css">
+</head>
+<body class="welcome">
+<header class="w-hero">
+  <div class="w-wrap">
+    <img class="w-icon" src="../icons/icon-128.png" alt="" width="88" height="88">
+    <p class="brand">BILITHROTTLE · 哔哩节流阀</p>
+    <h1>油门帮你踩，<span>刹车也帮你踩。</span></h1>
+    <p class="w-sub">视频加载更快，首页更干净、刷不到头；刷多了，像 Claude Code 的用量额度一样提醒你歇一歇。</p>
+    <div class="w-cta">
+      <a class="w-btn primary" href="https://www.bilibili.com/" target="_blank" rel="noopener">打开 B 站首页试试</a>
+      <a class="w-btn" href="options.html">完整设置</a>
+    </div>
+  </div>
+</header>
+
+<main class="w-wrap">
+  <section class="w-start">
+    <h2>三步上手</h2>
+    <ol class="w-steps">
+      <li><b>找到右下角的油门按钮</b><span>B 站每个页面都有。点开就是常用开关，按 <kbd>Alt</kbd>+<kbd>T</kbd> 也行，按钮可以上下拖动。</span></li>
+      <li><b>首页试试「无限下滑」</b><span>一直往下刷，插件按「第 N 批」接着加载，右侧告诉你看到第几批。</span></li>
+      <li><b>给自己定个量</b><span>选一档观看额度。用完视频会暂停，到点自动恢复。</span></li>
+    </ol>
+  </section>
+
+  <section class="w-setup" aria-label="快速设置">
+    <div class="w-card">
+      <h3>♾️ 无限下滑</h3>
+      <p>快到底时自动加载更多推荐，按批次拼接，去重并过滤广告。</p>
+      <label class="w-toggle"><input type="checkbox" id="homeInfinite"><i></i><span>开启无限下滑</span></label>
+    </div>
+    <div class="w-card">
+      <h3>⏱️ 观看额度</h3>
+      <p>5 小时窗口 + 每周额度，到点重置；可随时在快捷面板里改。</p>
+      <div class="w-presets" id="presets">
+        <button type="button" data-p="0">不限制</button>
+        <button type="button" data-p="1"><b>自律</b>45 分 / 周 5 时</button>
+        <button type="button" data-p="2"><b>适中</b>90 分 / 周 10 时</button>
+        <button type="button" data-p="3"><b>放纵</b>3 时 / 周 20 时</button>
+      </div>
+    </div>
+    <p class="w-saved" id="saved" role="status" aria-live="polite"></p>
+  </section>
+
+  <section>
+    <h2>它能做什么</h2>
+    <div class="w-features">
+      <article class="w-feature">
+        <img src="img/quick-panel.webp" alt="快捷面板" loading="lazy">
+        <div><h3>快捷面板</h3><p>刹车 / 首页 / 油门三个标签页，常用开关一处搞定；按钮外圈实时显示 5 小时额度用了多少。</p></div>
+      </article>
+      <article class="w-feature">
+        <img src="img/infinite.webp" alt="无限下滑" loading="lazy">
+        <div><h3>无限下滑，刷不到头</h3><p>B 站「换一换」每次只换两行。打开后快到底就自动多路请求，按「第 N 批」接在下面。</p></div>
+      </article>
+      <article class="w-feature">
+        <img src="img/limit.webp" alt="观看额度" loading="lazy">
+        <div><h3>像 Claude Code 一样的额度</h3><p>5 小时窗口和每周额度从首次观看起算，显示已用百分比、重置时间和倒计时；还有番茄钟休息。</p></div>
+      </article>
+      <article class="w-feature">
+        <img src="img/home.webp" alt="首页净化" loading="lazy">
+        <div><h3>首页净化 · 换一批可回看</h3><p>去掉大图轮播和广告卡片；每次「换一批」都存一份，手滑了能翻回上一批。</p></div>
+      </article>
+    </div>
+    <ul class="w-more">
+      <li><b>⚡ 视频加载加速</b>多 CDN、Range 并发，按码率与倍速调整缓冲；清晰度仍由 B 站决定。</li>
+      <li><b>🌑 OLED 纯黑</b>B 站深色模式下把首页背景换成真正的纯黑。</li>
+      <li><b>🔒 只存本机</b>必需权限只有 storage；推荐历史、观看用量都不上传。</li>
+    </ul>
+  </section>
+
+  <section class="w-faq">
+    <h2>遇到问题</h2>
+    <details><summary>视频黑屏或画质菜单异常</summary><p>快捷面板 →「油门」→ 关闭视频加速后刷新；或在完整设置里把播放内核切到「兼容模式」。</p></details>
+    <details><summary>首页布局不对</summary><p>快捷面板 →「首页」→ 关闭「首页净化与操作栏」即恢复原生首页。</p></details>
+    <details><summary>无限下滑提示被限流</summary><p>把「加载速度」调到「稳」，过几分钟点「重试」。插件遇到限流会自己停下，不会一直请求。</p></details>
+    <details><summary>能和线程撕裂者一起用吗</summary><p>不要同时启用另一份线程撕裂者扩展或用户脚本，两套播放器拦截会冲突。</p></details>
+  </section>
+</main>
+<footer class="w-wrap w-footer">哔哩节流阀 BiliThrottle · MIT · 基于 Bilibili-thread-ripper 的非官方衍生版 · 与哔哩哔哩官方无关</footer>
+<script src="../src/home-core.js"></script>
+<script src="../src/focus-core.js"></script>
+<script src="welcome.js"></script>
+</body>
+</html>

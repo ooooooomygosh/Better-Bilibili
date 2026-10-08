@@ -27,6 +27,10 @@ async function prepareExtension() {
 }
 
 chrome.runtime.onInstalled.addListener(prepareExtension);
+// New users get a short tour of what the extension does and where its switches live.
+chrome.runtime.onInstalled.addListener(({reason}) => {
+  if (reason === "install") chrome.tabs.create({url: chrome.runtime.getURL("ui/welcome.html")}).catch(() => {});
+});
 chrome.runtime.onStartup.addListener(prepareExtension);
 
 // The settings open inside the bilibili page, the same panel as in the userscript. Other
@@ -47,6 +51,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 
 chrome.runtime.onMessage.addListener((message, sender) => {
   if (sender.id === chrome.runtime.id && message?.type === 'flow-open-options') chrome.runtime.openOptionsPage();
+  if (sender.id === chrome.runtime.id && message?.type === 'flow-open-welcome') chrome.tabs.create({url: chrome.runtime.getURL("ui/welcome.html")}).catch(() => {});
   return false;
 });
 

@@ -1,4 +1,4 @@
-/* BiliThrottle 2.1.0 — isolated world. Native Vue cards stay mounted and retain their handlers.
+/* BiliThrottle 2.2.0 — isolated world. Native Vue cards stay mounted and retain their handlers.
  * Native refresh is the only source of fresh recommendations: no private API, prefetch loop,
  * synthetic scroll, raw-HTML snapshots or automatic document reload.
  */
@@ -46,6 +46,7 @@ html[data-btr-home-clean][data-btr-hide-carousel] :is(.recommended-container_flo
 html[data-btr-home-clean][data-btr-hide-carousel] :is(.recommended-container_floor-aside,.recommended-container) .container{grid-template-areas:none!important;grid-template-rows:none!important;grid-auto-rows:auto!important;grid-auto-flow:row!important}
 html[data-btr-home-clean][data-btr-hide-carousel] :is(.recommended-container_floor-aside,.recommended-container) .container > :is(.feed-card,.bili-video-card,.video-card-reco,.floor-single-card){margin-top:0!important;grid-area:auto!important;align-self:start}
 html[data-btr-home-clean][data-btr-hide-carousel] [data-btr-grid] > .feed-card[data-btr-ready]{display:block!important}
+html[data-btr-home-clean] [data-btr-grid] > [data-btr-empty]{display:none!important}
 html[data-btr-home-clean][data-btr-hide-ads] [data-btr-grid] :is(.feed-card,.bili-video-card,.video-card-reco)[data-btr-ad]{display:none!important}
 html[data-btr-home-clean][data-btr-hide-banner] .bili-header .bili-header__banner{height:64px!important;min-height:64px!important;background:var(--bg1,white)!important}
 html[data-btr-home-clean][data-btr-hide-banner] .bili-header .bili-header__banner > *{visibility:hidden!important}
@@ -79,8 +80,8 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
   function mountSkin() { if(root()&&!skin.isConnected)root().append(skin); }
   function toggle(name,wanted) { const r=root(); if(r&&r.hasAttribute(name)!==!!wanted)r.toggleAttribute(name,!!wanted); }
   function clearMarks() {
-    for(const n of document.querySelectorAll('[data-btr-ready],[data-btr-ad],[data-btr-native-refresh],[data-btr-grid]')) {
-      for(const a of ['data-btr-ready','data-btr-ad','data-btr-native-refresh','data-btr-grid'])n.removeAttribute(a);
+    for(const n of document.querySelectorAll('[data-btr-ready],[data-btr-ad],[data-btr-native-refresh],[data-btr-grid],[data-btr-empty]')) {
+      for(const a of ['data-btr-ready','data-btr-ad','data-btr-native-refresh','data-btr-grid','data-btr-empty'])n.removeAttribute(a);
     }
   }
   function detectDark() {
@@ -140,8 +141,18 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
       duration:node.querySelector('.bili-video-card__stats__duration,.duration')?.textContent,
       stats:[...node.querySelectorAll('.bili-video-card__stats--text')].map(n=>n.textContent).join(' · ')});
   }
+  // B 站 pre-renders skeleton slots for its lazy loader. Slots after the last real card that never
+  // received a link are hidden; while 换一换 turns every card into a skeleton nothing is hidden, so the
+  // grid never collapses mid-refresh.
+  function markEmpty() {
+    const slots=[...grid.children].filter(n=>!owns(n)&&!n.matches('.recommended-swipe,.feed-roll-btn,.flexible-roll-btn')&&!n.closest('.recommended-swipe'));
+    let last=-1;
+    slots.forEach((n,i)=>{if(n.querySelector('a[href]:not([href=""]):not([href^="javascript"])'))last=i;});
+    slots.forEach((n,i)=>{const empty=last>=0&&i>last;if(empty!==n.hasAttribute('data-btr-empty'))n.toggleAttribute('data-btr-empty',empty);});
+  }
   function collect() {
     if(!grid?.isConnected)return [];
+    markEmpty();
     const nodes=[...grid.querySelectorAll(CARD)].filter(n=>!owns(n)&&!n.closest('.recommended-swipe'));
     const result=[];
     for(const n of nodes.slice(0,144)) {
@@ -204,7 +215,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
       refs.next=button('下一批 →',()=>show(index+1),'前进到已保存的下一批');
       refs.count=el('span','—','count');
       refs.refresh=button('换一批',refresh,'使用 B 站原生换一换，不刷新整个页面');refs.refresh.className='refresh';
-      refs.settings=button('设置',()=>chrome.runtime.sendMessage({type:'flow-open-options'}).catch(()=>notify('请从扩展图标打开增强设置。',true)),'哔哩节流阀设置');
+      refs.settings=button('设置',()=>globalThis.__BTR_QUICK__?globalThis.__BTR_QUICK__.open('home'):chrome.runtime.sendMessage({type:'flow-open-options'}).catch(()=>notify('请从扩展图标打开增强设置。',true)),'哔哩节流阀快捷面板');
       refs.nav.append(refs.status,refs.back,refs.count,refs.next,el('span',null,'separator'),refs.refresh,refs.settings);
       shadow.append(refs.nav);
     }
