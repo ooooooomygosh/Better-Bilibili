@@ -446,7 +446,13 @@
       }
     }
     // Placeholders that are still waiting for the user (undo / dismiss).
-    const AUTO_DISMISS = 8000, AFTER_LEAVE = 2500;
+    // No timer ever folds a placeholder that is on screen; it goes on ×, 知道了, or when the user
+    // scrolls it away — and only after it has been on screen for MIN_VISIBLE in total and has
+    // stayed fully out of the viewport for OUT_FOR. Live, a 2.5 s "after the pointer leaves"
+    // timer and an instant IntersectionObserver fold made it vanish after ~2–3 s.
+    const MIN_VISIBLE = 8000, OUT_FOR = 1000, USER_SCROLL_WINDOW = 1200;
+    let lastUserInput = -Infinity;
+    for (const t of ['wheel', 'touchmove', 'keydown', 'pointerdown']) addEventListener(t, () => { lastUserInput = performance.now(); }, {capture: true, passive: true});
     function gone(c, v, kind, viaKey) {
       const outer = v.closest('.feed-card');
       if (!outer || !outer.isConnected) return;
@@ -477,27 +483,42 @@
       if (ui) ui.animate(layer, [{opacity: 0}, {opacity: 1}], {duration: 220});
       if (viaKey) undo.focus({preventScroll: true});
 
-      let done = false, hovered = false, focused = false, seen = false, timer = 0;
-      const since = Date.now();
-      const arm = ms => { clearTimeout(timer); timer = setTimeout(tick, ms); };
-      function tick() {
+      let done = false, focused = false, timer = 0, userScrollAt = -Infinity, outSince = 0;
+      let visibleMs = 0, visibleSince = 0; // Time on screen, summed over every stretch in view.
+      const onScreen = () => { const r = ph.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth && r.height > 0; };
+      const onScroll = () => {
+        const now = performance.now();
+        if (now - lastUserInput >= USER_SCROLL_WINDOW) return; // Layout / script scrolls do not count.
+        userScrollAt = now;
+        if (!done && !visibleSince && !timer) timer = setTimeout(check, OUT_FOR); // Off screen already: re-check once the user moves on.
+      };
+      addEventListener('scroll', onScroll, {passive: true});
+      ph.addEventListener('focusin', () => { focused = true; });
+      ph.addEventListener('focusout', e => { if (!ph.contains(e.relatedTarget)) focused = false; });
+      function check() {
+        timer = 0;
         if (done || !ph.isConnected) return;
-        if (hovered || focused) return; // Re-armed when the pointer / focus leaves.
-        const left = AUTO_DISMISS - (Date.now() - since);
-        if (left > 0) arm(left); else dismiss();
+        if (onScreen()) return; // Layout flicker: it is back (or never left).
+        // The user must have scrolled it away (a scroll of theirs since just before it left), it must
+        // have been on screen long enough, and it must be off screen for OUT_FOR now.
+        if (userScrollAt < outSince - 300 || focused || visibleMs < MIN_VISIBLE) return; // Waits off screen.
+        if (performance.now() - Math.max(outSince, 0) < OUT_FOR) { timer = setTimeout(check, OUT_FOR); return; }
+        dismiss(true);
       }
-      arm(AUTO_DISMISS);
-      ph.addEventListener('pointerenter', () => { hovered = true; clearTimeout(timer); });
-      ph.addEventListener('pointerleave', () => { hovered = false; if (!focused) arm(Math.max(AFTER_LEAVE, AUTO_DISMISS - (Date.now() - since))); });
-      ph.addEventListener('focusin', () => { focused = true; clearTimeout(timer); });
-      ph.addEventListener('focusout', e => { if (ph.contains(e.relatedTarget)) return; focused = false; if (!hovered) arm(Math.max(AFTER_LEAVE, AUTO_DISMISS - (Date.now() - since))); });
-      // Scrolled out of view after being seen: fold away quietly (in place, so nothing jumps).
       const io = typeof IntersectionObserver === 'function' ? new IntersectionObserver(es => {
-        for (const e of es) { if (e.isIntersecting) seen = true; else if (seen) dismiss(true); }
+        for (const e of es) {
+          const now = performance.now();
+          if (e.isIntersecting) { if (!visibleSince) visibleSince = now; clearTimeout(timer); timer = 0; }
+          else {
+            if (visibleSince) { visibleMs += now - visibleSince; visibleSince = 0; }
+            outSince = now;
+            clearTimeout(timer); timer = setTimeout(check, OUT_FOR);
+          }
+        }
       }) : null;
       io?.observe(ph);
 
-      function finish() { done = true; clearTimeout(timer); io?.disconnect(); }
+      function finish() { done = true; clearTimeout(timer); io?.disconnect(); removeEventListener('scroll', onScroll); }
       function dismiss(offscreen) {
         if (done) return; finish();
         const others = kind === 'up' ? [...(list?.querySelectorAll(`.bili-video-card[data-mid="${String(c.mid).replace(/[^0-9]/g, "")}"]`) || [])].map(n => n.closest('.feed-card')).filter(Boolean) : [];

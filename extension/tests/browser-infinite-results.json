@@ -38,11 +38,23 @@
    "passed": true
   },
   {
-   "test": "hovered: stays past 8 s; after the pointer leaves it is dismissed, following cards glide into place (FLIP) and a spare card refills the row",
+   "test": "on screen it never folds by itself: hovered past 8 s, then 4 s after the pointer leaves, still there",
    "passed": true
   },
   {
-   "test": "知道了 dismisses at once; scrolling the placeholder out of view dismisses it too",
+   "test": "知道了 dismisses at once; following cards glide into place (FLIP) and a spare card refills the row",
+   "passed": true
+  },
+  {
+   "test": "scrolled away by the user after only ~1.5 s on screen: it waits (minimum 8 s visible)",
+   "passed": true
+  },
+  {
+   "test": "layout shifts that push it off screen (without user scroll, or for < 1 s) do not fold it",
+   "passed": true
+  },
+  {
+   "test": "after ≥8 s on screen, a user scroll that keeps it out of the viewport for >1 s folds it (and refills the row)",
    "passed": true
   },
   {

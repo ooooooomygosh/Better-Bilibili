@@ -111,25 +111,51 @@ with sync_playwright() as p:
   page.hover(f"#btr-flow-feed .btr-batch .bili-video-card >> nth=0");page.evaluate(f"{c0}.querySelector('.bili-video-card__info--no-interest').click()");page.wait_for_timeout(250)
   mb=page.locator('#btr-flow-feed > .btr-menu button',has_text='不感兴趣').bounding_box();page.mouse.click(mb['x']+mb['width']/2,mb['y']+mb['height']/2);page.wait_for_timeout(300)
   page.evaluate("window.opens.length=0;0")
- # Hovering holds it past 8 s; leaving lets it go a little later, then the row reflows (FLIP) and refills.
+ # On screen, no timer ever folds it: hovered past 8 s, then the pointer leaves, and it is still there.
  page.evaluate(f"window.firstBv={c0}.dataset.bvid;0");hide_first()
  g=page.locator('#btr-flow-feed .btr-gone-card').bounding_box();page.mouse.move(g['x']+20,g['y']+20)
- page.wait_for_timeout(9000);assert page.evaluate(f"!!{ph}"),'hovered placeholder must stay'
+ page.wait_for_timeout(8500);assert page.evaluate(f"!!{ph}"),'hovered placeholder must stay'
+ page.mouse.move(5,5);page.wait_for_timeout(4000);assert page.evaluate(f"!!{ph}"),'no in-view timer after the pointer leaves'
+ ok('on screen it never folds by itself: hovered past 8 s, then 4 s after the pointer leaves, still there')
+ # 知道了: following cards glide into place (FLIP) and a spare card refills the row.
  page.evaluate("window.flipSeen=0;const A=Element.prototype.animate;Element.prototype.animate=function(k,o){if(this.matches?.('.feed-card')&&JSON.stringify(k).includes('translate('))flipSeen++;return A.call(this,k,o)};0")
- page.mouse.move(5,5)
- page.wait_for_function(f"!{ph}",timeout=5000);page.wait_for_timeout(500)
- assert page.evaluate("fixtureStorage.all.local.flowDislikes.includes(firstBv)")
- assert page.evaluate(f"{feed}.querySelector('.btr-batch .btr-grid').querySelectorAll(':scope>.feed-card').length")==25
- assert page.evaluate("flipSeen")>=3,page.evaluate("flipSeen")
- assert page.evaluate("opens.length")==0
- ok('hovered: stays past 8 s; after the pointer leaves it is dismissed, following cards glide into place (FLIP) and a spare card refills the row')
- page.evaluate(f"window.firstBv={c0}.dataset.bvid;0");hide_first()
  k=page.locator('#btr-flow-feed .btr-gone-card button',has_text='知道了').bounding_box();page.mouse.click(k['x']+k['width']/2,k['y']+k['height']/2)
  page.wait_for_function(f"!{ph}",timeout=1500);page.wait_for_timeout(500)
+ assert page.evaluate("fixtureStorage.all.local.flowDislikes.includes(firstBv)")
  assert page.evaluate(f"{feed}.querySelector('.btr-batch .btr-grid').querySelectorAll(':scope>.feed-card').length")==25 and page.evaluate("opens.length")==0
- page.evaluate(f"window.firstBv={c0}.dataset.bvid;0");hide_first()
- page.evaluate("scrollBy(0,innerHeight*1.5)");page.wait_for_function(f"!{ph}",timeout=2000);page.evaluate("scrollBy(0,-innerHeight*1.5)")
- ok('知道了 dismisses at once; scrolling the placeholder out of view dismisses it too')
+ assert page.evaluate("flipSeen")>=3,page.evaluate("flipSeen")
+ ok('知道了 dismisses at once; following cards glide into place (FLIP) and a spare card refills the row')
+ SY="scrollY"
+ def wheel_out():
+  page.mouse.move(400,300)
+  for _ in range(30):
+   page.mouse.wheel(0,200);page.wait_for_timeout(40)
+   if page.evaluate(f"(()=>{{const r={ph}.getBoundingClientRect();return r.bottom<0||r.top>innerHeight}})()"):return
+  raise AssertionError('placeholder never left the screen')
+ def wheel_back():
+  page.evaluate(f"{ph}.scrollIntoView({{block:'center'}})");page.wait_for_timeout(200)
+ # Scrolled out by the user, but on screen for less than 8 s → it waits off screen.
+ page.evaluate(f"window.firstBv={c0}.dataset.bvid;0");hide_first();page.mouse.move(5,5)
+ page.wait_for_timeout(1500);wheel_out();page.wait_for_timeout(2000)
+ assert page.evaluate(f"!!{ph}"),'must not fold before 8 s on screen'
+ ok('scrolled away by the user after only ~1.5 s on screen: it waits (minimum 8 s visible)')
+ # Back on screen until 8 s in total; then moved off screen by layout (not by the user) → stays.
+ wheel_back();page.wait_for_timeout(7000)
+ OFF=f"(()=>{{const r={ph}.getBoundingClientRect();return r.bottom<0||r.top>innerHeight}})()"
+ page.evaluate("document.documentElement.style.overflowAnchor='none';window.__sp=document.createElement('div');__sp.style.height='3000px';document.querySelector('#btr-flow-feed').prepend(__sp);0")
+ assert page.evaluate(OFF);page.wait_for_timeout(1600)
+ assert page.evaluate(f"!!{ph}"),'a layout shift is not a user scroll'
+ page.evaluate("__sp.remove();0")
+ # A short trip off screen (< 1 s) after a user wheel does not fold it either.
+ page.mouse.move(400,300);page.mouse.wheel(0,40);page.wait_for_timeout(200)
+ page.evaluate("document.querySelector('#btr-flow-feed').prepend(__sp);0");assert page.evaluate(OFF);page.wait_for_timeout(500);page.evaluate("__sp.remove();document.documentElement.style.overflowAnchor='';0");page.wait_for_timeout(1200)
+ assert page.evaluate(f"!!{ph}"),'off screen for only 0.5 s'
+ ok('layout shifts that push it off screen (without user scroll, or for < 1 s) do not fold it')
+ # Now the user scrolls it away: gone after it has been off screen for more than 1 s, not before.
+ wheel_out();page.wait_for_timeout(500);assert page.evaluate(f"!!{ph}"),'not before 1 s off screen'
+ page.wait_for_function(f"!{ph}",timeout=2500)
+ assert page.evaluate(f"{feed}.querySelector('.btr-batch .btr-grid').querySelectorAll(':scope>.feed-card').length")==25
+ ok('after ≥8 s on screen, a user scroll that keeps it out of the viewport for >1 s folds it (and refills the row)')
  page.evaluate(f"{feed}.querySelector('.btr-batch').scrollIntoView({{block:'center'}})");page.wait_for_timeout(500)
  side=page.evaluate(f"(()=>{{const s={ui}.querySelector('.side');return {{n:s.querySelector('b').textContent,off:s.classList.contains('off'),total:s.querySelector('.total').textContent}}}})()")
  assert side['n']=='2' and not side['off'],side
