@@ -10,7 +10,15 @@
    "passed": true
   },
   {
+   "test": "Alt+T is ignored while typing in an input",
+   "passed": true
+  },
+  {
    "test": "Alt+T opens the panel on the tab that fits the page (油门 on a video page)",
+   "passed": true
+  },
+  {
+   "test": "tabs are keyboard-navigable (arrows, roving tabindex, aria-controls)",
    "passed": true
   },
   {
@@ -23,6 +31,14 @@
   },
   {
    "test": "刹车 tab: usage meters and presets apply and highlight",
+   "passed": true
+  },
+  {
+   "test": "unrelated storage changes patch the panel in place instead of rebuilding it",
+   "passed": true
+  },
+  {
+   "test": "with the self-discipline lock on, loosening presets are deferred and listed with an undo button",
    "passed": true
   },
   {
