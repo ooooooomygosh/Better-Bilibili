@@ -14,7 +14,51 @@
    "passed": true
   },
   {
-   "test": "a 24-card batch merges two 12-card requests; numbered after the native batch; duplicates, ads, live dropped",
+   "test": "a 24-card setting becomes 25 in a 5-column grid (whole rows, leftovers carried); 12-card requests merged; duplicates, ads, live dropped",
+   "passed": true
+  },
+  {
+   "test": "cards on screen are fully visible shortly after landing; nothing waits hidden for an observer",
+   "passed": true
+  },
+  {
+   "test": "⋮ opens a small menu (稍后再看 / 不感兴趣 / 不想看此 UP 主) outside the card (fixed, no card / link ancestor); Esc closes it",
+   "passed": true
+  },
+  {
+   "test": "不感兴趣 shows a B 站-style placeholder (blurred cover, 已减少此类推荐, 撤销, ×, 知道了): no link inside, no card / link ancestor, links in the card lose href / target",
+   "passed": true
+  },
+  {
+   "test": "the placeholder stays put (no early refill): still there 4.5 s later with the pointer away",
+   "passed": true
+  },
+  {
+   "test": "撤销 (real mouse, plus a middle click) with B 站-style delegated window.open listeners registered first: nothing opens; the same card and its links come back",
+   "passed": true
+  },
+  {
+   "test": "on screen it never folds by itself: hovered past 8 s, then 4 s after the pointer leaves, still there",
+   "passed": true
+  },
+  {
+   "test": "知道了 dismisses at once; following cards glide into place (FLIP) and a spare card refills the row",
+   "passed": true
+  },
+  {
+   "test": "scrolled away by the user after only ~1.5 s on screen: it waits (minimum 8 s visible)",
+   "passed": true
+  },
+  {
+   "test": "layout shifts that push it off screen (without user scroll, or for < 1 s) do not fold it",
+   "passed": true
+  },
+  {
+   "test": "after ≥8 s on screen, a user scroll that keeps it out of the viewport for >1 s folds it (and refills the row)",
+   "passed": true
+  },
+  {
+   "test": "撤销 by real mouse after >8 s on screen and a user scroll (B 站-style delegated listeners present): the same card is back, visible, in the same grid slot, and its links work again",
    "passed": true
   },
   {
@@ -26,7 +70,7 @@
    "passed": true
   },
   {
-   "test": "risk-control answer pauses loading with a retry button and no further requests",
+   "test": "risk-control answer pauses loading with plain-language text, retry, one-click stable mode and collapsible details; no further requests",
    "passed": true
   },
   {
@@ -34,7 +78,15 @@
    "passed": true
   },
   {
-   "test": "36 cards × 3 lanes and 12 cards × 1 lane both keep loading, still ps=12",
+   "test": "36 → 35 cards × 3 lanes and 12 → 10 cards × 1 lane (whole 5-column rows) keep loading, still ps=12",
+   "passed": true
+  },
+  {
+   "test": "a native ad hidden in the first screen: its whole grid item goes, and a spare card (not shown elsewhere) completes the native last row — no hole; it has the same ⋮ menu",
+   "passed": true
+  },
+  {
+   "test": "when the native grid is whole again, the spare card is taken back (no lone card in an extra row)",
    "passed": true
   },
   {

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>欢迎使用哔哩节流阀</title>
-<link rel="stylesheet" href="common.css">
+<script src="../src/ui-kit.js"></script><link rel="stylesheet" href="common.css">
 <link rel="stylesheet" href="welcome.css">
 </head>
 <body class="welcome">
@@ -41,13 +41,14 @@
       <h3>⏱️ 观看额度</h3>
       <p>5 小时窗口 + 每周额度，到点重置；可随时在快捷面板里改。</p>
       <div class="w-presets" id="presets">
-        <button type="button" data-p="0">不限制</button>
+        <button type="button" data-p="0" title="只关闭额度，之前设好的时长会保留"><b>不限制</b>保留已设额度</button>
         <button type="button" data-p="1"><b>自律</b>45 分 / 周 5 时</button>
         <button type="button" data-p="2"><b>适中</b>90 分 / 周 10 时</button>
         <button type="button" data-p="3"><b>放纵</b>3 时 / 周 20 时</button>
       </div>
     </div>
     <p class="w-saved" id="saved" role="status" aria-live="polite"></p>
+    <p class="w-note">选「不限制」只是暂时关闭观看额度，之前设好的时长和用量都会保留；想再开，在快捷面板「刹车」里一键打开即可。需要防止自己随手放宽？在完整设置里开启<a href="options.html#lock">自律锁</a>。</p>
   </section>
 
   <section>

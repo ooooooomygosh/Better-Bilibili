@@ -135,25 +135,83 @@ with sync_playwright() as p:
  assert bar.get_by_role('button',name='换一批',exact=True).is_visible()
  ok('history can be disabled independently while keeping clean layout and native refresh')
  # Actual options markup and JS with mock browser APIs; never activates a real proxy.
- option=ctx.new_page();option.on('pageerror',lambda e:errors.append(str(e)))
+ option=ctx.new_page();option.on('pageerror',lambda e:errors.append(str(e)));option.on('dialog',lambda d:d.accept())
  markup=(ROOT/'ui/options.html').read_text();markup=re.sub(r'<script[^>]*>.*?</script>','',markup,flags=re.S);markup=re.sub(r'<link[^>]*>','',markup)
- option.set_content(markup);option.add_style_tag(content=(ROOT/'ui/common.css').read_text());script(option,'tests/browser-shim.js');script(option,'src/home-core.js');script(option,'src/focus-core.js');script(option,'src/proxy-core.js')
+ option.set_content(markup);option.add_style_tag(content=(ROOT/'ui/common.css').read_text())
+ script(option,'tests/browser-shim.js');option.evaluate("window.chrome=window.chromeMock;0")  # extension page: ui-kit reads chrome.storage for the theme
+ for f in ['src/ui-kit.js','src/home-core.js','src/focus-core.js','src/lock-core.js']:script(option,f)
+ # The service worker owns watch-limit writes (self-discipline lock); mock it as "no lock".
+ option.evaluate("chromeMock.runtime.sendMessage=async m=>{if(m.type==='lock-state')return {locked:false};if(m.type==='focus-set'){await chromeMock.storage.sync.set(m.changes);return {applied:m.changes,deferred:{}};}return {};};0")
  option.evaluate("code=>new Function('chrome',code)(window.chromeMock)",(ROOT/'ui/options.js').read_text())
- option.select_option('#homeTheme','oled');option.locator('#homeHideBanner').check();option.get_by_role('button',name='保存设置',exact=True).click()
- assert option.evaluate('fixtureStorage.all.sync.homeTheme')=='oled' and option.evaluate('fixtureStorage.all.sync.homeHideBanner')
- ok('options save all new homepage switches and theme selection')
- option.locator('#focusEnabled').check();option.locator('#focusWindowMinutes').fill('45');option.locator('#focusWeeklyHours').fill('6');option.get_by_role('button',name='保存设置',exact=True).click()
- option.wait_for_function('fixtureStorage.all.sync.focusWindowMinutes===45');assert option.evaluate('fixtureStorage.all.sync.focusEnabled===true&&fixtureStorage.all.sync.focusWeeklyHours===6')
- ok('options save 5-hour window and weekly limits as numbers')
- assert option.evaluate('permissionRequests')==0;option.locator('#enableProxy').click();assert '勾选' in option.locator('#proxyStatus').inner_text()
- option.locator('#proxyConsent').check();option.locator('#proxyUrl').fill('https://user:pass@example.com/');option.locator('#enableProxy').click();assert '账号密码' in option.locator('#proxyStatus').inner_text();assert option.evaluate('permissionRequests')==0
- ok('proxy stays opt-in; consent and credential rejection precede mock permission requests')
- option.locator('#proxyUrl').fill('http://127.0.0.1:7890');option.locator('#enableProxy').click();option.wait_for_function('proxyCalls.length===1');option.locator('#disableProxy').click()
- assert not option.evaluate("chromeMock.permissions.contains({permissions:['proxy']})")
- ok('legacy proxy controls set and revoke only mocked proxy state')
- option.locator('#restore').click();assert option.locator('#homeTheme').input_value()=='native' and not option.locator('#homeHideBanner').is_checked()
- ok('restore defaults returns native theme without modifying proxy configuration')
- option.locator('#proxyConsent').uncheck();option.locator('#proxyUrl').fill('');option.evaluate('scrollTo(0,0)');option.screenshot(path=str(ROOT/'docs/options-preview.png'),full_page=True)
+ option.wait_for_timeout(300)
+ option.select_option('#homeTheme','oled');option.locator('#homeHideBanner').check(force=True)
+ option.wait_for_function("fixtureStorage.all.sync.homeTheme==='oled'&&fixtureStorage.all.sync.homeHideBanner===true",timeout=3000)
+ assert '自动保存' in option.locator('#saved').inner_text()
+ ok('options auto-save homepage switches and theme selection with sticky save-bar feedback')
+ option.locator('#focusEnabled').check(force=True);option.locator('#focusWindowMinutes').fill('45');option.locator('#focusWindowMinutes').press('Tab');option.locator('#focusWeeklyHours').fill('6');option.locator('#focusWeeklyHours').press('Tab')
+ option.wait_for_function('fixtureStorage.all.sync.focusWindowMinutes===45&&fixtureStorage.all.sync.focusWeeklyHours===6',timeout=3000);assert option.evaluate('fixtureStorage.all.sync.focusEnabled===true')
+ ok('options save 5-hour window and weekly limits as numbers (on change, via the service worker)')
+ assert option.evaluate("getComputedStyle(document.querySelector('.savebar')).position")=='fixed'
+ assert option.evaluate("getComputedStyle(document.querySelector('.toc')).position")=='sticky'
+ ok('save bar is fixed to the window bottom; section navigation is sticky')
+ TH="document.documentElement.dataset.theme||''";TOK="getComputedStyle(document.documentElement).getPropertyValue('--btr-bg').trim()"
+ assert option.evaluate("document.querySelector('#uiTheme').value")=='bili' and option.evaluate(TH)=='light'
+ option.evaluate("chromeMock.storage.local.set({biliTheme:{dark:true,at:Date.now()}})");option.wait_for_function(f"({TH})==='dark'",timeout=2000)
+ assert option.evaluate(TOK)=='#1f2026',option.evaluate(TOK)
+ option.evaluate("chromeMock.storage.local.set({biliTheme:{dark:false,at:Date.now()}})");option.wait_for_function(f"({TH})==='light'",timeout=2000)
+ option.select_option('#uiTheme','dark');option.wait_for_function(f"fixtureStorage.all.sync.uiTheme==='dark'&&({TH})==='dark'",timeout=3000)
+ option.emulate_media(color_scheme='dark');option.select_option('#uiTheme','system');option.wait_for_function(f"({TH})==='dark'",timeout=3000)
+ option.emulate_media(color_scheme='light');option.wait_for_function(f"({TH})==='light'",timeout=3000)
+ option.select_option('#uiTheme','light');option.evaluate("chromeMock.storage.local.set({biliTheme:{dark:true,at:Date.now()}})");option.wait_for_timeout(300);assert option.evaluate(TH)=='light'
+ option.select_option('#uiTheme','bili');option.wait_for_function(f"({TH})==='dark'",timeout=3000)
+ option.wait_for_timeout(500);option.screenshot(path=str(ROOT/'docs/options-dark-preview.png'))
+ option.evaluate("chromeMock.storage.local.set({biliTheme:{dark:false,at:Date.now()}})");option.wait_for_function(f"({TH})==='light'",timeout=2000)
+ ok('extension page theme: 跟随 B 站 (default, live from the recorded B 站 theme) / 跟随系统 / 浅色 / 深色, switching live')
+ assert option.locator('#proxy').count()==0 and option.locator('.toc a[href="#proxy"]').count()==0 and option.evaluate('permissionRequests')==0
+ ok('no proxy section or permission request (feature removed)')
+ option.locator('#restore').click();option.wait_for_selector('.modal[role=dialog][aria-modal=true]')
+ assert option.evaluate("document.activeElement?.closest('.modal')!=null") and option.evaluate("document.querySelector('main').inert")
+ option.keyboard.press('Escape');option.wait_for_timeout(300);assert option.locator('.modal').count()==0 and option.locator('#homeTheme').input_value()=='oled'
+ ok('restore asks in a styled in-page dialog (focus inside, page inert); Esc cancels and changes nothing')
+ option.locator('#restore').click();option.wait_for_selector('.modal');option.get_by_role('button',name='恢复默认',exact=True).click()
+ option.wait_for_function("document.querySelector('#homeTheme').value==='native'",timeout=3000);assert not option.locator('#homeHideBanner').is_checked()
+ ok('restore defaults returns native theme')
+ option.wait_for_function("!document.querySelector('.modal-back')",timeout=3000)
+ option.evaluate("document.querySelector('#quickFab').scrollIntoView({block:'center'})");option.locator('#quickFab').uncheck(force=True);option.wait_for_function('fixtureStorage.all.sync.quickFab===false',timeout=3000)
+ ok('controls outside the form (快捷面板) auto-save too')
+ option.set_viewport_size({'width':1100,'height':700})
+ option.evaluate("document.querySelector('#lock').scrollIntoView({block:'start'})");option.wait_for_timeout(300)
+ BAR="(()=>{const r=document.querySelector('#savebar').getBoundingClientRect();return [r.bottom,innerHeight,r.top]})()"
+ bar=option.evaluate(BAR);assert abs(bar[1]-bar[0])<1,bar
+ CUR="document.querySelector('.toc a[aria-current=true]').getAttribute('href')"
+ assert option.evaluate(CUR)=='#lock',option.evaluate(CUR)
+ option.evaluate("scrollTo(0,document.documentElement.scrollHeight)");option.wait_for_timeout(300)
+ bar=option.evaluate(BAR);assert abs(bar[1]-bar[0])<1,bar
+ last=option.evaluate("(()=>{const m=document.querySelector('main.wrap');const kids=[...m.children].filter(n=>n.id!=='savebar');return Math.max(...kids.map(n=>n.getBoundingClientRect().bottom))})()")
+ assert last<=bar[2]+1,(last,bar)  # page end (footer) clears the fixed bar
+ assert option.evaluate(CUR)=='#help'
+ ok('save bar is truly fixed at bottom:0 everywhere, and the page end (footer) stays clear of it')
+ # Sections of very different heights: the section under the middle of the visible area is current.
+ ids=option.evaluate("[...document.querySelectorAll('.toc a')].map(a=>a.getAttribute('href').slice(1))")
+ hs=option.evaluate("[...document.querySelectorAll('.toc a')].map(a=>Math.round(document.querySelector(a.getAttribute('href')).getBoundingClientRect().height))")
+ assert max(hs)>2*min(hs),hs
+ MID="(()=>{const top=Math.max(0,document.querySelector('.toc').getBoundingClientRect().bottom),bot=innerHeight-document.querySelector('#savebar').offsetHeight;return (top+bot)/2})()"
+ checked=0
+ for i,sid in enumerate(ids):
+  for off,want in ((-20,sid),(20,ids[i-1] if i else sid)):
+   option.evaluate(f"(()=>{{const t=document.getElementById('{sid}');scrollTo(0,scrollY+t.getBoundingClientRect().top-({MID})-({off}))}})()");option.wait_for_timeout(120)
+   # skip the last stretch (the line slides toward the bottom there) and positions where another section owns >50%
+   if option.evaluate(f"document.documentElement.scrollHeight-innerHeight-scrollY<innerHeight-document.querySelector('#savebar').offsetHeight-({MID})"):continue
+   if option.evaluate(f"[...document.querySelectorAll('.toc a')].some(a=>{{const r=document.querySelector(a.getAttribute('href')).getBoundingClientRect(),top=Math.max(0,document.querySelector('.toc').getBoundingClientRect().bottom),bot=innerHeight-document.querySelector('#savebar').offsetHeight;return a.getAttribute('href')!=='#{want}'&&Math.min(r.bottom,bot)-Math.max(r.top,top)>(bot-top)/2}})"):continue
+   assert option.evaluate(CUR)=='#'+want,(sid,off,want,option.evaluate(CUR));checked+=1
+ assert checked>=len(ids),(checked,len(ids))
+ # A section owning more than half of the visible area is always current (the 1280×800 lag case).
+ option.evaluate("(()=>{const t=document.getElementById('lock');scrollTo(0,scrollY+t.getBoundingClientRect().top-innerHeight*.38)})()");option.wait_for_timeout(120)
+ own=option.evaluate("(()=>{const r=document.getElementById('lock').getBoundingClientRect(),top=document.querySelector('.toc').getBoundingClientRect().bottom,bot=innerHeight-document.querySelector('#savebar').offsetHeight;return (Math.min(r.bottom,bot)-Math.max(r.top,top))/(bot-top)})()")
+ assert own>.5,own;assert option.evaluate(CUR)=='#lock',option.evaluate(CUR)
+ option.set_viewport_size({'width':1704,'height':864})
+ ok(f'section nav: the section under the middle of the visible area ({checked} positions, heights {min(hs)}–{max(hs)}px); one owning >50% is always current')
+ option.evaluate('scrollTo(0,0)');option.screenshot(path=str(ROOT/'docs/options-preview.png'),full_page=True)
  assert not errors,errors;ok('no uncaught errors across homepage and options regression scenarios')
- (ROOT/'tests/browser-dom-results.json').write_text(json.dumps({'browser':browser.version,'environment':'Local fixture DOM only, mocked Chrome APIs; NOT installed extension or live Bilibili; proxy never enabled','tests':results,'uncaught_errors':errors},ensure_ascii=False,indent=2))
+ (ROOT/'tests/browser-dom-results.json').write_text(json.dumps({'browser':browser.version,'environment':'Local fixture DOM only, mocked Chrome APIs; NOT installed extension or live Bilibili','tests':results,'uncaught_errors':errors},ensure_ascii=False,indent=2))
  print('TOTAL',len(results),flush=True);browser.close()

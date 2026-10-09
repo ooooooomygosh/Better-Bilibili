@@ -1,4 +1,4 @@
-/* BiliThrottle 2.2.0 — isolated world. Native Vue cards stay mounted and retain their handlers.
+/* BiliThrottle 2.3.0 — isolated world. Native Vue cards stay mounted and retain their handlers.
  * Native refresh is the only source of fresh recommendations: no private API, prefetch loop,
  * synthetic scroll, raw-HTML snapshots or automatic document reload.
  */
@@ -31,6 +31,22 @@
   const active = () => ready && isHome() && settings.homeEnabled;
   const owns = n => !!(n?.nodeType === 1 ? n.closest(OWN) : n?.parentElement?.closest(OWN));
   const root = () => document.documentElement;
+  const ui = globalThis.__BTR_UI__;
+  // Flash guard: the last applied flags are mirrored in this origin's localStorage so the skin can be
+  // switched on synchronously at document_start, before chrome.storage answers and before first paint.
+  const FLAGS_KEY = 'btr-flow-flags', FLAG_ATTRS = {clean:'data-btr-home-clean',carousel:'data-btr-hide-carousel',banner:'data-btr-hide-banner',ads:'data-btr-hide-ads',infinite:'data-btr-infinite'};
+  let lastFlags = '';
+  try {
+    lastFlags = localStorage.getItem(FLAGS_KEY) || '';
+    const f = JSON.parse(lastFlags || '{}');
+    if (isHome() && f && f.clean) for (const [k, a] of Object.entries(FLAG_ATTRS)) if (f[k] === true) root()?.setAttribute(a, '');
+  } catch (_) {}
+  function mirrorFlags() {
+    const r = root(); if (!r || !isHome()) return;
+    const f = {}; for (const [k, a] of Object.entries(FLAG_ATTRS)) f[k] = r.hasAttribute(a);
+    const v = JSON.stringify(f);
+    if (v !== lastFlags) { lastFlags = v; try { localStorage.setItem(FLAGS_KEY, v); } catch (_) {} }
+  }
   function el(tag,text,cls) {
     const n = document.createElement(tag); if (text != null) n.textContent=text;
     if (cls) n.className=cls; return n;
@@ -45,9 +61,9 @@
 html[data-btr-home-clean][data-btr-hide-carousel] :is(.recommended-container_floor-aside,.recommended-container) .recommended-swipe{display:none!important}
 html[data-btr-home-clean][data-btr-hide-carousel] :is(.recommended-container_floor-aside,.recommended-container) .container{grid-template-areas:none!important;grid-template-rows:none!important;grid-auto-rows:auto!important;grid-auto-flow:row!important}
 html[data-btr-home-clean][data-btr-hide-carousel] :is(.recommended-container_floor-aside,.recommended-container) .container > :is(.feed-card,.bili-video-card,.video-card-reco,.floor-single-card){margin-top:0!important;grid-area:auto!important;align-self:start}
-html[data-btr-home-clean][data-btr-hide-carousel] [data-btr-grid] > .feed-card[data-btr-ready]{display:block!important}
+html[data-btr-home-clean][data-btr-hide-carousel] [data-btr-grid] > .feed-card[data-btr-ready]:not([data-btr-ad]){display:block!important}
 html[data-btr-home-clean] [data-btr-grid] > [data-btr-empty]{display:none!important}
-html[data-btr-home-clean][data-btr-hide-ads] [data-btr-grid] :is(.feed-card,.bili-video-card,.video-card-reco)[data-btr-ad]{display:none!important}
+html[data-btr-home-clean][data-btr-hide-ads] :is(.recommended-container_floor-aside,.recommended-container) .container > :not(.recommended-swipe,[data-btr-flow-owned]):has(${core.AD_SELECTOR}),html[data-btr-home-clean][data-btr-hide-ads] :is(.recommended-container_floor-aside,.recommended-container) .container > [data-btr-ad][data-btr-ad]{display:none!important}
 html[data-btr-home-clean][data-btr-hide-banner] .bili-header .bili-header__banner{height:64px!important;min-height:64px!important;background:var(--bg1,white)!important}
 html[data-btr-home-clean][data-btr-hide-banner] .bili-header .bili-header__banner > *{visibility:hidden!important}
 html[data-btr-home-clean][data-btr-hide-banner] .bili-header .bili-header__bar{background:var(--bg1,white)!important}
@@ -72,9 +88,9 @@ button:disabled{opacity:.35;cursor:default}.count{font-size:12px;opacity:.64;min
 button{transition:background-color .16s ease,color .16s ease,border-color .16s ease,opacity .16s ease,transform .12s ease}button:active:not(:disabled){transform:scale(.97)}
 .refresh{border-radius:999px;padding:4px 14px}.refresh[aria-busy=true]{color:var(--brand_blue,#00aeec)}
 .status:not(:empty){animation:btr-in .22s ease-out}
-#btr-flow-history{animation:btr-in .26s cubic-bezier(.2,.75,.25,1)}.card .cover img{transition:transform .3s cubic-bezier(.2,.75,.25,1)}.card:hover .cover img{transform:scale(1.04)}.title{transition:color .16s ease}
+.card .cover img{opacity:0;transition:opacity .3s ease,transform .3s cubic-bezier(.2,.75,.25,1)}.card .cover img.loaded{opacity:1}.card:hover .cover img{transform:scale(1.04)}.title{transition:color .16s ease}
 @keyframes btr-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.card .cover img{opacity:1}}
 @media(max-width:680px){.toolbar{gap:2px}.status{max-width:100%;flex-basis:100%}.history-head{align-items:flex-start}.grid{row-gap:18px}.title{font-size:14px}}
 `;
   function mountSkin() { if(root()&&!skin.isConnected)root().append(skin); }
@@ -85,6 +101,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     }
   }
   function detectDark() {
+    if(ui)return ui.isDark(); // Shared detection (same rules as the quick panel and focus overlay).
     // Temporarily remove our own OLED override before measuring; avoid latching black after native light is chosen.
     const had=root().hasAttribute('data-btr-oled'); if(had)root().removeAttribute('data-btr-oled');
     let dark=false;
@@ -121,16 +138,48 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     }
   }
   function applySkin() {
-    mountSkin(); toggle('data-btr-home-clean',active());
+    mountSkin();
+    if(!ready)return; // Keep the early flags from the mirror until real settings are known.
+    toggle('data-btr-home-clean',active());
     toggle('data-btr-hide-carousel',active()&&settings.homeHideCarousel);
     toggle('data-btr-hide-banner',active()&&settings.homeHideBanner);
     toggle('data-btr-hide-ads',active()&&settings.homeHideAds);
-    toggle('data-btr-infinite',active()&&settings.homeInfinite); theme();
+    toggle('data-btr-infinite',active()&&settings.homeInfinite); theme(); mirrorFlags();
   }
   function isAd(node) {
-    // Explicit promotion badges only. Never classify by video title or link keywords.
-    return !!node.querySelector('.bili-video-card__info--ad,.bili-video-card__info--ad-text,.bili-video-card__stats--ad,[data-ad-id]');
+    // Explicit promotion markers only (see home-core AD_MARKERS), plus a leaf badge reading exactly
+    // 广告 / 推广 on the cover. Never classify by video title, uploader name or link keywords in text.
+    if (node.matches?.(core.AD_SELECTOR) || node.querySelector(core.AD_SELECTOR)) return true;
+    for (const b of node.querySelectorAll('.bili-video-card__image *,.bili-video-card__cover *,.bili-video-card__stats *,.video-card-reco .info-box *'))
+      if (!b.firstElementChild && b.textContent.length < 8 && core.isAdBadge(b.textContent)) return true;
+    return false;
   }
+  /** The grid item that holds a card, so a hidden ad leaves no hole in the native grid. */
+  function gridItem(n) {
+    let h = n;
+    while (h.parentElement && !h.parentElement.matches('.container,[data-btr-grid]') && h.parentElement !== document.body) h = h.parentElement;
+    return h.parentElement && h.parentElement !== document.body ? h : (n.closest('.feed-card') || n);
+  }
+  // Fallback for markup the CSS :has() rule does not know yet: mark ad grid items as soon as they land.
+  let adFrame = 0;
+  function markAds() {
+    adFrame = 0;
+    if (!active() || !settings.homeHideAds) return;
+    for (const n of document.querySelectorAll(`:is(.recommended-container_floor-aside,.recommended-container) :is(${CARD})`)) {
+      if (owns(n) || n.closest('.recommended-swipe')) continue;
+      const holder = gridItem(n), ad = isAd(n);
+      if (ad !== holder.hasAttribute('data-btr-ad')) holder.toggleAttribute('data-btr-ad', ad);
+    }
+  }
+  const FEED = '.recommended-container_floor-aside,.recommended-container';
+  const adObserver = new MutationObserver(records => {
+    if (adFrame || !isHome()) return;
+    for (const r of records) {
+      const t = r.target.nodeType === 1 ? r.target : r.target.parentElement;
+      if (t && (t.closest(FEED) || (r.addedNodes.length && t.querySelector?.(FEED)))) { adFrame = requestAnimationFrame(markAds); return; }
+    }
+  });
+  try { adObserver.observe(document, {childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['href']}); } catch (_) {}
   function cardFrom(node) {
     const a=node.querySelector('.bili-video-card__info--tit a,a[href*="/video/"]');
     const title=node.querySelector('.bili-video-card__info--tit,.title');
@@ -156,11 +205,13 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     const nodes=[...grid.querySelectorAll(CARD)].filter(n=>!owns(n)&&!n.closest('.recommended-swipe'));
     const result=[];
     for(const n of nodes.slice(0,144)) {
-      const holder=n.closest('.feed-card')||n, ad=isAd(n), c=cardFrom(n);
+      const holder=gridItem(n), ad=isAd(n), c=cardFrom(n);
       if(ad!==holder.hasAttribute('data-btr-ad'))holder.toggleAttribute('data-btr-ad',ad);
       if(!!c!==holder.hasAttribute('data-btr-ready'))holder.toggleAttribute('data-btr-ready',!!c);
       if(c&&!(ad&&settings.homeHideAds))result.push(c);
     }
+    // After ads are hidden the native last row can be short; the infinite feed tops it up (it owns the spares).
+    if(settings.homeInfinite)requestAnimationFrame(()=>infinite?.fill?.());
     return core.cards(result);
   }
   function scheduleSave() {
@@ -202,7 +253,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     const count=parts[0]==='none'?Math.max(1,Math.floor(grid.clientWidth/250)):parts.length;
     bar.style.setProperty('--btr-columns',String(Math.max(1,Math.min(10,count))));
     bar.style.setProperty('--btr-gap',cs.columnGap==='normal'?'20px':cs.columnGap);
-    lastColumns={count:Math.max(1,Math.min(10,count)),gap:cs.columnGap==='normal'?'20px':cs.columnGap};infinite?.theme();
+    lastColumns={count:Math.max(1,Math.min(10,count)),gap:cs.columnGap==='normal'?'20px':cs.columnGap,rowGap:cs.rowGap==='normal'?'20px':cs.rowGap};infinite?.theme();
   }
   function ensureBar() {
     if(!grid?.parentElement)return;
@@ -228,7 +279,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     const wasHistory=!!view; if(!wasHistory)liveScroll=window.scrollY;
     index=wanted;closeHistory();render();
     if(wanted===snapshots.length-1&&liveReady) {
-      if(wasHistory)window.scrollTo({top:liveScroll,behavior:'instant'});
+      if(wasHistory){window.scrollTo({top:liveScroll,behavior:'instant'});ui?.animate(grid,[{opacity:0},{opacity:1}],{duration:ui.MOTION.mid});}
       return;
     }
     view=el('section');view.id='btr-flow-history';view.setAttribute('aria-label','已保存的推荐');
@@ -238,11 +289,13 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     for(const c of snapshots[index].cards) {
       const a=el('a',null,'card');a.href=c.url;a.target='_blank';a.rel='noopener noreferrer';
       const cover=el('div',null,'cover');
-      if(c.image){const img=el('img');img.src=c.image;img.alt='';img.loading='lazy';img.decoding='async';cover.append(img);}
+      if(c.image){const img=el('img');img.alt='';img.loading='lazy';img.decoding='async';img.addEventListener('load',()=>img.classList.add('loaded'),{once:true});img.addEventListener('error',()=>img.classList.add('loaded'),{once:true});img.src=c.image;cover.append(img);}
       if(c.duration)cover.append(el('span',c.duration,'duration'));
       a.append(cover,el('div',c.title,'title'),el('div',[c.author,c.stats].filter(Boolean).join(' · '),'meta'));cards.append(a);
     }
     view.append(cards);shadow.append(view);toggle('data-btr-history-open',true);infinite?.sync();
+    // Cross-fade between snapshots: the new grid fades up while the bar stays put.
+    ui?.animate(view,[{opacity:0,transform:'translateY(4px)'},{opacity:1,transform:'none'}],{duration:ui.MOTION.mid});
     // History lives in normal flow, never covers the search, navigation or bottom video row.
     if(bar.getBoundingClientRect().top<64)bar.scrollIntoView({block:'start',behavior:'instant'});
   }
@@ -415,7 +468,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
   });
   chrome.runtime.onMessage.addListener((m,sender,reply)=>{
     if(sender.id!==chrome.runtime.id)return false;
-    if(m?.type==='flow-get-state'){reply({telemetry,stats,historyCount:snapshots.length,home:isHome()});return false;}
+    if(m?.type==='flow-get-state'){reply({telemetry,stats,historyCount:snapshots.length,home:isHome(),feed:isHome()?(infinite?.state||null):null});return false;}
     if(m?.type==='flow-clear-history'){clearHistory(Date.now());reply({ok:true});}
     return false;
   });
@@ -452,8 +505,11 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
   }
   function domReady() {
     mountSkin();
-    themeObserver=new MutationObserver(theme);
-    for(const n of [root(),document.body])if(n)themeObserver.observe(n,{attributes:true,attributeFilter:['class','style','data-theme','theme','data-dark']});
+    if(ui)ui.onTheme(()=>theme()); // One shared observer for every surface.
+    else {
+      themeObserver=new MutationObserver(theme);
+      for(const n of [root(),document.body])if(n)themeObserver.observe(n,{attributes:true,attributeFilter:['class','style','data-theme','theme','data-dark']});
+    }
     syncRoute();
   }
   mountSkin();start();

@@ -1,0 +1,29 @@
+{
+ "environment": "local fixture rebuilt from laputa-home card template (index-12fc55c2.js), mocked chrome.*",
+ "results": [
+  {
+   "test": "ads in current B 站 markup (cover stats 广告 instead of duration, creative rocket icon, cm.bilibili.com link, bare .bili-video-card grid item) are hidden at the first style pass: CSS :has(), no flash",
+   "passed": true
+  },
+  {
+   "test": "unknown badge markup reading exactly 广告 on the cover is caught by the observer fallback (whole grid item marked)",
+   "passed": true
+  },
+  {
+   "test": "hidden ads take their grid item with them: the 7 normal cards fill cells 1–7 with no hole",
+   "passed": true
+  },
+  {
+   "test": "a normal card titled 广告人的一天 by an UP named 推广 stays (no keyword blocking)",
+   "passed": true
+  },
+  {
+   "test": "隐藏广告卡片 OFF shows every native card again",
+   "passed": true
+  },
+  {
+   "test": "no uncaught errors",
+   "passed": true
+  }
+ ]
+}

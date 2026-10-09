@@ -8,7 +8,8 @@ const PRESETS = [
 ];
 const keys = {...globalThis.__BTR_HOME_CORE__.defaults, ...globalThis.__BTR_FOCUS_CORE__.defaults};
 
-function said(text) { $('saved').textContent = text; }
+const ui = globalThis.__BTR_UI__;
+function said(text, kind) { ui.flash($('saved'), text, kind); }
 function show(s) {
   $('homeInfinite').checked = s.homeInfinite === true;
   const active = PRESETS.findIndex(p => Object.entries(p).every(([k, v]) => s[k] === v));
@@ -18,11 +19,17 @@ async function load() { show(await chrome.storage.sync.get(keys)); }
 
 $('homeInfinite').addEventListener('change', async e => {
   await chrome.storage.sync.set({homeInfinite: e.target.checked});
-  said(e.target.checked ? '已开启无限下滑，刷新 B 站首页即可看到。' : '已关闭无限下滑。');
+  said(e.target.checked ? '已开启无限下滑，刷新 B 站首页即可看到。' : '已关闭无限下滑。', 'ok');
 });
+// Watch limits go through the service worker, so a self-discipline lock can hold back loosening.
 document.querySelectorAll('#presets button').forEach(b => b.addEventListener('click', async () => {
-  await chrome.storage.sync.set(PRESETS[Number(b.dataset.p)]);
-  said(b.dataset.p === '0' ? '不限制观看时间。需要时可在快捷面板里打开。' : `已设为「${b.querySelector('b').textContent}」，从下一次观看开始计量。`);
+  try {
+    const r = await chrome.runtime.sendMessage({type: 'focus-set', changes: PRESETS[Number(b.dataset.p)]});
+    if (r?.error) throw new Error(r.error);
+    const later = Object.values(r?.deferred || {});
+    if (later.length) said(`🔒 自律锁开启中：放宽的部分将在 ${globalThis.__BTR_FOCUS_CORE__.fmtReset(Math.max(...later))} 生效。`);
+    else said(b.dataset.p === '0' ? '已关闭观看额度。之前设的时长都还在，随时可以在快捷面板里重新打开。' : `已设为「${b.querySelector('b').textContent}」，从下一次观看开始计量。`, 'ok');
+  } catch (e) { said(e.message, 'error'); }
   load();
 }));
 load().catch(e => said(e.message));

@@ -230,6 +230,12 @@
   // the page's error reporting. While a takeover is active, such a read answers with an
   // empty range instead; without one the browser behaves as before.
   let bufferedShimInstalled = false;
+  // Once BTR has taken over a video on this page, Bilibili's core may keep timers that read
+  // SourceBuffers detached from their MediaSource long after (also after a hand-back). Those
+  // reads answer with an empty range instead of throwing; a detached buffer has nothing in it.
+  // The shim is installed with the first takeover: on pages where BTR never plays, the browser
+  // behaves exactly as before and no error is attributed to the extension.
+  let takeoverSeen = false;
   const ownSourceBuffers = new WeakSet();
   function installBufferedShim() {
     if (bufferedShimInstalled || !root.SourceBuffer) return;
@@ -247,7 +253,7 @@
         try {
           return descriptor.get.call(this);
         } catch (error) {
-          if (error?.name === "InvalidStateError" && !ownSourceBuffers.has(this) && document.querySelector('[data-btr-mse-active="true"]')) return emptyRanges;
+          if (error?.name === "InvalidStateError" && !ownSourceBuffers.has(this) && (takeoverSeen || document.querySelector('[data-btr-mse-active="true"]'))) return emptyRanges;
           throw error;
         }
       }
@@ -937,6 +943,8 @@
       video.playbackRate = candidate.playbackRate;
       video.dataset.btrMediaEngine = "progressive-mse-0.8-core";
       options.container.dataset.btrMseActive = "true";
+      takeoverSeen = true;
+      installBufferedShim();
       publishState({ playerState: "loading", quality: qualityLabel(selectedVideo), lastError: "" });
       try {
         if (mediaSource.readyState !== "open") await waitEvent(mediaSource, "sourceopen", "error", candidate.controller.signal);
@@ -1290,7 +1298,7 @@
       urlDeadlineSeconds,
       video,
       getDebug: () => ({
-        version: "2.2.0",
+        version: "2.3.0",
         architecture: "bilibili-native-ui-progressive-mse-0.8-core",
         quality: qualityLabel(selectedVideo),
         qualityId: Number(selectedVideo?.id) || 0,
@@ -1330,7 +1338,6 @@
     });
   }
 
-  installBufferedShim();
   installNativeErrorGuard();
   installMediaSourceWatch();
   installCodecFailureGuard();

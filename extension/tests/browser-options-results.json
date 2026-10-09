@@ -1,0 +1,21 @@
+{
+ "environment": "unpacked extension in Playwright Chromium (headless), real options.html",
+ "results": [
+  {
+   "test": "1280×800: window scrolls; wheel through the page (23 samples) lights every section, a section filling >50% of the visible area is always current, page end lights the last",
+   "passed": true
+  },
+  {
+   "test": "1920×1200: window scrolls; wheel through the page (19 samples) lights every section, a section filling >50% of the visible area is always current, page end lights the last",
+   "passed": true
+  },
+  {
+   "test": "1280×800 dark (跟随 B 站, page background rgb(23, 24, 28)): save bar pinned to the window bottom at top / middle / end, nav lights 加载加速 at the top and 检查与回退 at the end",
+   "passed": true
+  },
+  {
+   "test": "no uncaught errors on the real options page",
+   "passed": true
+  }
+ ]
+}

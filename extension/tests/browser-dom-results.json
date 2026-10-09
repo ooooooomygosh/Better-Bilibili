@@ -1,6 +1,6 @@
 {
-  "browser": "141.0.7390.37",
-  "environment": "Local fixture DOM only, mocked Chrome APIs; NOT installed extension or live Bilibili; proxy never enabled",
+  "browser": "154.0.8037.97",
+  "environment": "Local fixture DOM only, mocked Chrome APIs; NOT installed extension or live Bilibili",
   "tests": [
     {
       "test": "initial stable batch is saved once",
@@ -99,23 +99,43 @@
       "passed": true
     },
     {
-      "test": "options save all new homepage switches and theme selection",
+      "test": "options auto-save homepage switches and theme selection with sticky save-bar feedback",
       "passed": true
     },
     {
-      "test": "options save 5-hour window and weekly limits as numbers",
+      "test": "options save 5-hour window and weekly limits as numbers (on change, via the service worker)",
       "passed": true
     },
     {
-      "test": "proxy stays opt-in; consent and credential rejection precede mock permission requests",
+      "test": "save bar is fixed to the window bottom; section navigation is sticky",
       "passed": true
     },
     {
-      "test": "legacy proxy controls set and revoke only mocked proxy state",
+      "test": "extension page theme: 跟随 B 站 (default, live from the recorded B 站 theme) / 跟随系统 / 浅色 / 深色, switching live",
       "passed": true
     },
     {
-      "test": "restore defaults returns native theme without modifying proxy configuration",
+      "test": "no proxy section or permission request (feature removed)",
+      "passed": true
+    },
+    {
+      "test": "restore asks in a styled in-page dialog (focus inside, page inert); Esc cancels and changes nothing",
+      "passed": true
+    },
+    {
+      "test": "restore defaults returns native theme",
+      "passed": true
+    },
+    {
+      "test": "controls outside the form (快捷面板) auto-save too",
+      "passed": true
+    },
+    {
+      "test": "save bar is truly fixed at bottom:0 everywhere, and the page end (footer) stays clear of it",
+      "passed": true
+    },
+    {
+      "test": "section nav: the section under the middle of the visible area (9 positions, heights 161–632px); one owning >50% is always current",
       "passed": true
     },
     {
