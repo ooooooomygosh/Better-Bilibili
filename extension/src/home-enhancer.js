@@ -1,4 +1,4 @@
-/* BiliThrottle 2.2.0 — isolated world. Native Vue cards stay mounted and retain their handlers.
+/* BiliThrottle 2.3.0 — isolated world. Native Vue cards stay mounted and retain their handlers.
  * Native refresh is the only source of fresh recommendations: no private API, prefetch loop,
  * synthetic scroll, raw-HTML snapshots or automatic document reload.
  */
@@ -31,6 +31,22 @@
   const active = () => ready && isHome() && settings.homeEnabled;
   const owns = n => !!(n?.nodeType === 1 ? n.closest(OWN) : n?.parentElement?.closest(OWN));
   const root = () => document.documentElement;
+  const ui = globalThis.__BTR_UI__;
+  // Flash guard: the last applied flags are mirrored in this origin's localStorage so the skin can be
+  // switched on synchronously at document_start, before chrome.storage answers and before first paint.
+  const FLAGS_KEY = 'btr-flow-flags', FLAG_ATTRS = {clean:'data-btr-home-clean',carousel:'data-btr-hide-carousel',banner:'data-btr-hide-banner',ads:'data-btr-hide-ads',infinite:'data-btr-infinite'};
+  let lastFlags = '';
+  try {
+    lastFlags = localStorage.getItem(FLAGS_KEY) || '';
+    const f = JSON.parse(lastFlags || '{}');
+    if (isHome() && f && f.clean) for (const [k, a] of Object.entries(FLAG_ATTRS)) if (f[k] === true) root()?.setAttribute(a, '');
+  } catch (_) {}
+  function mirrorFlags() {
+    const r = root(); if (!r || !isHome()) return;
+    const f = {}; for (const [k, a] of Object.entries(FLAG_ATTRS)) f[k] = r.hasAttribute(a);
+    const v = JSON.stringify(f);
+    if (v !== lastFlags) { lastFlags = v; try { localStorage.setItem(FLAGS_KEY, v); } catch (_) {} }
+  }
   function el(tag,text,cls) {
     const n = document.createElement(tag); if (text != null) n.textContent=text;
     if (cls) n.className=cls; return n;
@@ -72,9 +88,9 @@ button:disabled{opacity:.35;cursor:default}.count{font-size:12px;opacity:.64;min
 button{transition:background-color .16s ease,color .16s ease,border-color .16s ease,opacity .16s ease,transform .12s ease}button:active:not(:disabled){transform:scale(.97)}
 .refresh{border-radius:999px;padding:4px 14px}.refresh[aria-busy=true]{color:var(--brand_blue,#00aeec)}
 .status:not(:empty){animation:btr-in .22s ease-out}
-#btr-flow-history{animation:btr-in .26s cubic-bezier(.2,.75,.25,1)}.card .cover img{transition:transform .3s cubic-bezier(.2,.75,.25,1)}.card:hover .cover img{transform:scale(1.04)}.title{transition:color .16s ease}
+.card .cover img{opacity:0;transition:opacity .3s ease,transform .3s cubic-bezier(.2,.75,.25,1)}.card .cover img.loaded{opacity:1}.card:hover .cover img{transform:scale(1.04)}.title{transition:color .16s ease}
 @keyframes btr-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.card .cover img{opacity:1}}
 @media(max-width:680px){.toolbar{gap:2px}.status{max-width:100%;flex-basis:100%}.history-head{align-items:flex-start}.grid{row-gap:18px}.title{font-size:14px}}
 `;
   function mountSkin() { if(root()&&!skin.isConnected)root().append(skin); }
@@ -85,6 +101,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     }
   }
   function detectDark() {
+    if(ui)return ui.isDark(); // Shared detection (same rules as the quick panel and focus overlay).
     // Temporarily remove our own OLED override before measuring; avoid latching black after native light is chosen.
     const had=root().hasAttribute('data-btr-oled'); if(had)root().removeAttribute('data-btr-oled');
     let dark=false;
@@ -121,11 +138,13 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     }
   }
   function applySkin() {
-    mountSkin(); toggle('data-btr-home-clean',active());
+    mountSkin();
+    if(!ready)return; // Keep the early flags from the mirror until real settings are known.
+    toggle('data-btr-home-clean',active());
     toggle('data-btr-hide-carousel',active()&&settings.homeHideCarousel);
     toggle('data-btr-hide-banner',active()&&settings.homeHideBanner);
     toggle('data-btr-hide-ads',active()&&settings.homeHideAds);
-    toggle('data-btr-infinite',active()&&settings.homeInfinite); theme();
+    toggle('data-btr-infinite',active()&&settings.homeInfinite); theme(); mirrorFlags();
   }
   function isAd(node) {
     // Explicit promotion badges only. Never classify by video title or link keywords.
@@ -202,7 +221,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     const count=parts[0]==='none'?Math.max(1,Math.floor(grid.clientWidth/250)):parts.length;
     bar.style.setProperty('--btr-columns',String(Math.max(1,Math.min(10,count))));
     bar.style.setProperty('--btr-gap',cs.columnGap==='normal'?'20px':cs.columnGap);
-    lastColumns={count:Math.max(1,Math.min(10,count)),gap:cs.columnGap==='normal'?'20px':cs.columnGap};infinite?.theme();
+    lastColumns={count:Math.max(1,Math.min(10,count)),gap:cs.columnGap==='normal'?'20px':cs.columnGap,rowGap:cs.rowGap==='normal'?'20px':cs.rowGap};infinite?.theme();
   }
   function ensureBar() {
     if(!grid?.parentElement)return;
@@ -228,7 +247,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     const wasHistory=!!view; if(!wasHistory)liveScroll=window.scrollY;
     index=wanted;closeHistory();render();
     if(wanted===snapshots.length-1&&liveReady) {
-      if(wasHistory)window.scrollTo({top:liveScroll,behavior:'instant'});
+      if(wasHistory){window.scrollTo({top:liveScroll,behavior:'instant'});ui?.animate(grid,[{opacity:0},{opacity:1}],{duration:ui.MOTION.mid});}
       return;
     }
     view=el('section');view.id='btr-flow-history';view.setAttribute('aria-label','已保存的推荐');
@@ -238,11 +257,13 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     for(const c of snapshots[index].cards) {
       const a=el('a',null,'card');a.href=c.url;a.target='_blank';a.rel='noopener noreferrer';
       const cover=el('div',null,'cover');
-      if(c.image){const img=el('img');img.src=c.image;img.alt='';img.loading='lazy';img.decoding='async';cover.append(img);}
+      if(c.image){const img=el('img');img.alt='';img.loading='lazy';img.decoding='async';img.addEventListener('load',()=>img.classList.add('loaded'),{once:true});img.addEventListener('error',()=>img.classList.add('loaded'),{once:true});img.src=c.image;cover.append(img);}
       if(c.duration)cover.append(el('span',c.duration,'duration'));
       a.append(cover,el('div',c.title,'title'),el('div',[c.author,c.stats].filter(Boolean).join(' · '),'meta'));cards.append(a);
     }
     view.append(cards);shadow.append(view);toggle('data-btr-history-open',true);infinite?.sync();
+    // Cross-fade between snapshots: the new grid fades up while the bar stays put.
+    ui?.animate(view,[{opacity:0,transform:'translateY(4px)'},{opacity:1,transform:'none'}],{duration:ui.MOTION.mid});
     // History lives in normal flow, never covers the search, navigation or bottom video row.
     if(bar.getBoundingClientRect().top<64)bar.scrollIntoView({block:'start',behavior:'instant'});
   }
@@ -452,8 +473,11 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
   }
   function domReady() {
     mountSkin();
-    themeObserver=new MutationObserver(theme);
-    for(const n of [root(),document.body])if(n)themeObserver.observe(n,{attributes:true,attributeFilter:['class','style','data-theme','theme','data-dark']});
+    if(ui)ui.onTheme(()=>theme()); // One shared observer for every surface.
+    else {
+      themeObserver=new MutationObserver(theme);
+      for(const n of [root(),document.body])if(n)themeObserver.observe(n,{attributes:true,attributeFilter:['class','style','data-theme','theme','data-dark']});
+    }
     syncRoute();
   }
   mountSkin();start();
