@@ -1,5 +1,5 @@
 {
-  "browser": "141.0.7390.37",
+  "browser": "154.0.8037.97",
   "environment": "Local fixture DOM only, mocked Chrome APIs; NOT installed extension or live Bilibili; proxy never enabled",
   "tests": [
     {
@@ -99,11 +99,15 @@
       "passed": true
     },
     {
-      "test": "options save all new homepage switches and theme selection",
+      "test": "options auto-save homepage switches and theme selection with sticky save-bar feedback",
       "passed": true
     },
     {
-      "test": "options save 5-hour window and weekly limits as numbers",
+      "test": "options save 5-hour window and weekly limits as numbers (on change, via the service worker)",
+      "passed": true
+    },
+    {
+      "test": "save bar and section navigation are sticky",
       "passed": true
     },
     {
