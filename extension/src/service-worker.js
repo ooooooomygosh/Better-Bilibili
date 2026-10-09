@@ -49,15 +49,38 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (changeInfo.status === "loading") setThreadBadge(tabId, false, 0);
 });
 
-chrome.runtime.onMessage.addListener((message, sender) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (sender.id === chrome.runtime.id && message?.type === 'flow-open-options') {
     const hash = typeof message.hash === "string" && /^[a-z-]{1,20}$/.test(message.hash) ? message.hash : "";
-    if (hash) chrome.tabs.create({url: chrome.runtime.getURL(`ui/options.html#${hash}`)}).catch(() => {});
-    else chrome.runtime.openOptionsPage();
+    openExtensionPage("ui/options.html", hash).then(sendResponse, e => sendResponse({ok: false, error: String(e?.message || e)}));
+    return true;
   }
-  if (sender.id === chrome.runtime.id && message?.type === 'flow-open-welcome') chrome.tabs.create({url: chrome.runtime.getURL("ui/welcome.html")}).catch(() => {});
+  if (sender.id === chrome.runtime.id && message?.type === 'flow-open-welcome') {
+    openExtensionPage("ui/welcome.html", "").then(sendResponse, e => sendResponse({ok: false, error: String(e?.message || e)}));
+    return true;
+  }
   return false;
 });
+
+/** Focus an already open copy of one of our pages, else open a new tab. Always answers, so the
+ * caller can retry when a just-woken service worker dropped the first request. No "tabs" permission needed. */
+async function openExtensionPage(path, hash) {
+  const base = chrome.runtime.getURL(path), url = hash ? `${base}#${hash}` : base;
+  try {
+    const open = (await chrome.runtime.getContexts?.({contextTypes: ["TAB"]}) || [])
+      .find(c => c.tabId >= 0 && c.documentUrl && c.documentUrl.split("#")[0] === base);
+    if (open) {
+      await chrome.tabs.update(open.tabId, hash ? {active: true, url} : {active: true});
+      if (open.windowId >= 0) await chrome.windows.update(open.windowId, {focused: true}).catch(() => {});
+      return {ok: true, reused: true};
+    }
+  } catch (_) { /* fall through to a new tab */ }
+  try { await chrome.tabs.create({url}); return {ok: true}; }
+  catch (e) {
+    if (path === "ui/options.html") { await chrome.runtime.openOptionsPage(); return {ok: true, fallback: true}; }
+    throw e;
+  }
+}
 
 // Focus mode: the service worker is the only writer of today's usage, so several B 站 tabs
 // cannot overwrite each other's counts. Requests are applied strictly one after another.

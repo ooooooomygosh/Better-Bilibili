@@ -133,6 +133,8 @@ ${ui.scoped('.root')}
 .foot button{border:0;background:transparent;color:var(--muted);font:inherit;font-size:12px;padding:5px 8px;border-radius:8px;cursor:pointer;transition:background-color var(--btr-fast) ease,color var(--btr-fast) ease}
 .foot button:hover{background:var(--soft);color:var(--fg)}
 .foot .grow{flex:1}
+.panel{transition:opacity var(--btr-mid) var(--btr-ease)}.panel.veiled{opacity:0;pointer-events:none}
+@media (prefers-reduced-motion:reduce){.panel{transition:none}}
 .toast{position:fixed;right:22px;z-index:2147483002;display:flex;align-items:center;gap:10px;max-width:min(360px,calc(100vw - 44px));padding:8px 14px;border-radius:999px;background:rgba(24,25,28,.92);color:#fff;font-size:12px;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.25)}
 .toast button{pointer-events:auto;border:0;border-radius:999px;padding:3px 10px;background:var(--pink);color:#fff;font:inherit;font-size:12px;cursor:pointer;white-space:nowrap}
 button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
@@ -165,7 +167,20 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
     } catch (_) { toast('保存失败，请稍后再试'); patch(); }
     return null;
   }
-  const openOptions = hash => chrome.runtime.sendMessage({type: 'flow-open-options', hash}).catch(() => {});
+  /** Ask the service worker to open a page; a worker that is just waking up can drop the first
+   * request, so wait for its answer and try once more before telling the user. */
+  async function openPage(type, hash) {
+    for (let i = 0; i < 2; i++) {
+      const r = await Promise.race([
+        chrome.runtime.sendMessage({type, hash}).catch(() => null),
+        new Promise(res => setTimeout(res, 1500, null))
+      ]);
+      if (r?.ok) return true;
+    }
+    toast('没能打开页面，请从扩展图标的菜单进入「选项」');
+    return false;
+  }
+  const openOptions = hash => openPage('flow-open-options', hash);
 
   /* ---------- controls: build once, then patch in place ---------- */
   function sw(key, label, hint, opts = {}) {
@@ -454,6 +469,36 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
     panel.style.maxHeight = `${Math.max(240, Math.min(640, innerHeight - (low ? bottom : 16) - top))}px`;
   }
 
+  // B 站's header popovers (avatar, messages, history…) are translucent with a backdrop blur; the panel
+  // showing through one looks messy. While the pointer is in the header and a popover overlaps the
+  // panel, fade the panel out; it fades back as soon as the popover closes.
+  const HEADER = '.bili-header,.bili-header__bar,#biliMainHeader,.mini-header,#bili-header-container';
+  let inHeader = false, veilTimer = 0;
+  function overlappingPopover() {
+    if (!panel) return false;
+    const pr = panel.getBoundingClientRect();
+    for (const n of document.querySelectorAll('.v-popover,[class*="popover"]')) {
+      if (n.closest('#btr-quick')) continue;
+      const r = n.getBoundingClientRect();
+      if (r.width < 40 || r.height < 40 || r.right <= pr.left || r.left >= pr.right || r.bottom <= pr.top || r.top >= pr.bottom) continue;
+      const cs = getComputedStyle(n);
+      if (cs.visibility === 'hidden' || cs.display === 'none' || Number(cs.opacity) < .05) continue;
+      return true;
+    }
+    return false;
+  }
+  function veilCheck() {
+    const on = open && !!panel && overlappingPopover();
+    panel?.classList.toggle('veiled', on);
+    if (!on && !inHeader) { clearInterval(veilTimer); veilTimer = 0; }
+  }
+  document.addEventListener('pointerover', e => {
+    const t = e.target;
+    inHeader = !!(t && t.closest && t.closest(HEADER));
+    if (inHeader && open && !veilTimer) veilTimer = setInterval(veilCheck, 100);
+    if (open && panel && (inHeader || veilTimer)) veilCheck();
+  }, true);
+
   const TABS = [['brake', '刹车'], ['home', '首页'], ['play', '油门']];
   const sig = () => [tab, s.homeInfinite, !!usage?.window, lock.locked, lock.hasPassword, lock.cooldownHours, JSON.stringify(lock.pending || {}), isPlayer()].join('|');
 
@@ -517,7 +562,7 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
     const body = el('div', 'body'); body.id = 'q-panel'; body.setAttribute('role', 'tabpanel'); body.tabIndex = -1;
     const foot = el('div', 'foot');
     foot.append(btn('完整设置', null, () => openOptions()),
-      btn('使用指南', null, () => chrome.runtime.sendMessage({type: 'flow-open-welcome'}).catch(() => {})),
+      btn('使用指南', null, () => openPage('flow-open-welcome')),
       el('span', 'grow'),
       btn(s.quickFab ? '隐藏悬浮按钮' : '显示悬浮按钮', 'fabtoggle', () => {
         const next = !s.quickFab; save({quickFab: next});

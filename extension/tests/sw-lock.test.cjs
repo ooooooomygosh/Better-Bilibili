@@ -104,3 +104,26 @@ test('changing the password needs the current one', async () => {
   const ok = await sw.send({type: 'lock-remove', password: 'second2'});
   assert.equal(ok.locked, false);
 });
+
+test('flow-open-options always answers: new tab, focus an open one, fallback to openOptionsPage', async () => {
+  const sw = boot(), made = [], updated = [], J = x => JSON.parse(JSON.stringify(x));
+  let opened = 0;
+  sw.chrome.tabs.create = async o => { made.push(o.url); };
+  sw.chrome.tabs.update = async (id, o) => { updated.push([id, o]); };
+  sw.chrome.windows = {update: async () => {}};
+  sw.chrome.runtime.openOptionsPage = async () => { opened++; };
+  sw.chrome.runtime.getContexts = async () => [];
+  assert.deepEqual(J(await sw.send({type: 'flow-open-options'})), {ok: true});
+  assert.deepEqual(made, ['ui/options.html']);
+  await sw.send({type: 'flow-open-options', hash: 'lock'});
+  assert.equal(made[1], 'ui/options.html#lock');
+  sw.chrome.runtime.getContexts = async () => [{tabId: 7, windowId: 2, documentUrl: 'ui/options.html#focus'}];
+  assert.deepEqual(J(await sw.send({type: 'flow-open-options'})), {ok: true, reused: true});
+  assert.deepEqual(J(updated[0]), [7, {active: true}]);
+  sw.chrome.runtime.getContexts = async () => { throw new Error('old Chrome'); };
+  sw.chrome.tabs.create = async () => { throw new Error('no window'); };
+  assert.deepEqual(J(await sw.send({type: 'flow-open-options'})), {ok: true, fallback: true});
+  assert.equal(opened, 1);
+  const w = await sw.send({type: 'flow-open-welcome'});
+  assert.equal(w.ok, false);
+});
