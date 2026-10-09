@@ -30,7 +30,7 @@
     "renderer_home_options_fixture_passed": 36,
     "renderer_branch_diagnostics_fixture_passed": 9,
     "real_mse_synthetic_media_passed": "not re-run for 1.2.0 (open-source Chromium lacks H.264); 7 passed on 1.1.0",
-    "total_passed": 191,
+    "total_passed": 195,
     "real_bilibili_e2e_verified": false,
     "real_HDR_HiRes_hardware_verified": false,
     "firefox_safari_verified": false,
@@ -40,12 +40,13 @@
     "node": "22.22.0",
     "installed_extension_focus_e2e_passed": "loaded unpacked in Chromium (Playwright chromium-1194) on a routed fixture page: 5-hour window block + reset countdown, play() re-block, snooze, weekly block, automatic lift at window reset, Pomodoro countdown, in-page panel opens",
     "renderer_native_refresh_wrapper_passed": 4,
-    "renderer_infinite_feed_passed": 16,
+    "renderer_infinite_feed_passed": 18,
     "installed_extension_infinite_e2e": "loaded unpacked; content-script fetch to api.bilibili.com with page cookies and CORS on a routed homepage: 8 batches over 8 signed requests, no errors; launcher hidden on home, opens on video page",
-    "renderer_quick_panel_passed": 20,
+    "renderer_quick_panel_passed": 22,
     "ui_polish_2_3_0_live_bilibili": "Loaded unpacked (Playwright Chromium) on live, logged-out bilibili.com: 25-card batches in the 5-column grid, skeleton row always under the newest batch, ⋮ menu and 不感兴趣 blurred/undo state, popup flow-get-state reports current/loaded batches. Watch-later write not exercised (logged out).",
     "theme_detection_live": "Live bilibili.com (logged out, unpacked): html.bili_dark toggle on the homepage and bili-theme light->dark stylesheet href swap on a video page both flip the open quick panel; header login popover renders above the panel",
-    "ui_polish_round4_live": "Live bilibili.com (logged out, unpacked Playwright Chromium): 不感兴趣 swaps the card for a link-free placeholder; middle click + left click on 撤销 opened no tab and restored the same card with href/target; ⋮ menu outside the card; html.bili_dark recorded to storage.local biliTheme and options/popup/welcome opened with data-theme=dark; one click on 完整设置 opened options.html; hovering the header login entry fades the panel to opacity 0 and back. Fixture test simulates B 站 delegated window.open listeners registered before the content script."
+    "ui_polish_round4_live": "Live bilibili.com (logged out, unpacked Playwright Chromium): 不感兴趣 swaps the card for a link-free placeholder; middle click + left click on 撤销 opened no tab and restored the same card with href/target; ⋮ menu outside the card; html.bili_dark recorded to storage.local biliTheme and options/popup/welcome opened with data-theme=dark; one click on 完整设置 opened options.html; hovering the header login entry fades the panel to opacity 0 and back. Fixture test simulates B 站 delegated window.open listeners registered before the content script.",
+    "ui_polish_round5_live": "Live bilibili.com (logged out, unpacked): 不感兴趣 placeholder (blurred cover, 已减少此类推荐, 撤销, ×, 知道了) still present 6.6 s later with the pointer away, dismissed after the 8 s minimum; on a live video page Alt+T alternately opened and closed the panel, including with focus inside the panel; the panel top stayed ≥64px."
   },
   "previous_version": "2.2.0"
 }
