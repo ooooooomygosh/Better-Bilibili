@@ -153,8 +153,5 @@
     }
   ],
   "version_name": "2.3.0 · 油门帮你踩，刹车也帮你踩",
-  "optional_permissions": [
-    "proxy"
-  ],
   "options_page": "ui/options.html"
 }

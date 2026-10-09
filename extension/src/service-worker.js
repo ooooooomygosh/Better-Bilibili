@@ -17,7 +17,10 @@ function setThreadBadge(tabId, enabled, activeThreads) {
 async function prepareExtension() {
   const s = await chrome.storage.sync.get(null);
   const defaults = {mode:"auto", smartPolicy:true, strategy:"auto", memoryBudgetMB:64, maxAutoThreads:32};
-  // One-time schema migration: preserve playback and proxy settings, remove the old forced theme.
+  // The old "海外访问" proxy section was removed in 2.3.0 (Chrome never allowed `proxy` as an
+  // optional permission, so it could not be granted); drop its saved address, if any.
+  chrome.storage.local.remove("flowProxy").catch(() => {});
+  // One-time schema migration: preserve playback settings, remove the old forced theme.
   if (s.flowHomeSchema !== 2) {
     await chrome.storage.sync.set({flowHomeSchema:2,homeTheme:["native","oled"].includes(s.homeTheme)?s.homeTheme:"native",
       homeHideCarousel:s.homeHideCarousel !== false,homeHideBanner:s.homeHideBanner === true,homeHideAds:s.homeHideAds !== false});

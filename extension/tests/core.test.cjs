@@ -6,7 +6,7 @@ function load(files=['range-core.js','flow-policy.js','cdn-resolver.js','idm-dow
  for(const f of files)vm.runInContext(fs.readFileSync(path.join(root,'src',f),'utf8'),ctx,{filename:f});return ctx;
 }
 const c=load(),range=c.__BILI_RANGE_CORE__,policy=c.__BTR_FLOW_POLICY__,cdn=c.__BILI_CDN_RESOLVER_FACTORY__;
-const home=require('../src/home-core.js'),proxy=require('../src/proxy-core.js');
+const home=require('../src/home-core.js');
 function resolver(urls=['https://a.bilivideo.com/v.m4s']){
  const failures=[];return{failures,urls:()=>urls,ordered:()=>urls,rangeCandidates:()=>urls,startupCandidates:()=>urls,rescueCandidates:()=>urls,allows:()=>true,speed:()=>0,sample(){},success(){},failure(u,e,b){failures.push({u,e,b});}};
 }
@@ -38,10 +38,7 @@ function batch(n){return[1,2,3].map(i=>({url:`/video/BV${n}item${i}`,title:`่ง้
 test('history dedupes same batch',()=>{let h=home.append([],batch(1));h=home.append(h,batch(1));assert.equal(h.length,1);});
 test('history bounded to 25 and 7 days',()=>{let h=[];for(let n=0;n<30;n++)h=home.append(h,batch(n));assert.equal(h.length,25);assert.equal(home.history(h,Date.now()+8*86400000).length,0);});
 test('history dedupes duplicate cards',()=>{assert.equal(home.cards([batch(1)[0],batch(1)[0]]).length,1);});
-test('proxy parser excludes passwords, scripts and subscription URLs',()=>{for(const u of ['javascript:evil','http://user:pw@host:123','https://host/sub?token=x','http://host/a','file:///tmp/x'])assert.throws(()=>proxy.parse(u));});
-test('proxy parser supports local HTTP and IPv6',()=>{assert.equal(proxy.parse('http://127.0.0.1:7890').port,7890);assert.equal(proxy.parse('socks5://[::1]:1080').host,'[::1]');});
-test('PAC routes exact Bili boundaries only; no DIRECT fallback for Bili',()=>{const x={};vm.runInNewContext(proxy.pac('http://127.0.0.1:7890'),x);for(const host of ['bilibili.com','api.bilibili.com','a.bilivideo.com','upos-hz-mirrorakam.akamaized.net'])assert.equal(x.FindProxyForURL('',host),'PROXY 127.0.0.1:7890');for(const host of ['google.com','bilibili.com.evil.test','evilbilibili.com','another.akamaized.net'])assert.equal(x.FindProxyForURL('',host),'DIRECT');});
-test('manifest has no mandatory proxy or broad host permissions',()=>{const m=JSON.parse(fs.readFileSync(path.join(root,'manifest.json')));assert.deepEqual(m.permissions,['storage']);assert.deepEqual(m.optional_permissions,['proxy']);assert(!m.host_permissions);});
+test('manifest asks only for storage: no proxy (Chrome rejects it as optional), no broad host permissions',()=>{const m=JSON.parse(fs.readFileSync(path.join(root,'manifest.json')));assert.deepEqual(m.permissions,['storage']);assert(!m.optional_permissions);assert(!m.host_permissions);});
 test('all manifest and HTML local assets exist',()=>{const m=JSON.parse(fs.readFileSync(path.join(root,'manifest.json')));for(const e of m.content_scripts)for(const file of [...(e.js||[]),...(e.css||[])])assert(fs.existsSync(path.join(root,file)),file);for(const file of [m.background.service_worker,m.options_page,m.action.default_popup])assert(fs.existsSync(path.join(root,file)),file);});
 test('valid concurrent download reassembles exact bytes',async()=>{const d=makeDownload(load(),async(_u,init)=>response(requestRange(init)));const r=await d.downloadRange({start:0,end:524287,length:524288},resolver());assert.equal(r.bytes.length,524288);for(let i=0;i<r.bytes.length;i+=109)assert.equal(r.bytes[i],i%251);assert(r.pieceCount>1);});
 test('wire requests omit cookies and reject pre-aborted task',async()=>{let calls=0;const d=makeDownload(load(),async(_u,init)=>{calls++;assert.equal(init.credentials,'omit');return response(requestRange(init));});const controller=new AbortController();controller.abort();await assert.rejects(d.downloadRange({start:0,end:99,length:100},resolver(),{signal:controller.signal}));assert.equal(calls,0);});

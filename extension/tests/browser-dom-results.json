@@ -1,6 +1,6 @@
 {
   "browser": "154.0.8037.97",
-  "environment": "Local fixture DOM only, mocked Chrome APIs; NOT installed extension or live Bilibili; proxy never enabled",
+  "environment": "Local fixture DOM only, mocked Chrome APIs; NOT installed extension or live Bilibili",
   "tests": [
     {
       "test": "initial stable batch is saved once",
@@ -115,11 +115,7 @@
       "passed": true
     },
     {
-      "test": "proxy stays opt-in; consent and credential rejection precede mock permission requests",
-      "passed": true
-    },
-    {
-      "test": "legacy proxy controls set and revoke only mocked proxy state",
+      "test": "no proxy section or permission request (feature removed)",
       "passed": true
     },
     {
@@ -127,7 +123,7 @@
       "passed": true
     },
     {
-      "test": "restore defaults returns native theme without modifying proxy configuration",
+      "test": "restore defaults returns native theme",
       "passed": true
     },
     {
@@ -139,7 +135,7 @@
       "passed": true
     },
     {
-      "test": "section nav: the section whose top is closest above the 35% line (7 sections, heights 161–632px), or one owning >60% of the screen",
+      "test": "section nav: the section under the middle of the visible area (9 positions, heights 161–632px); one owning >50% is always current",
       "passed": true
     },
     {

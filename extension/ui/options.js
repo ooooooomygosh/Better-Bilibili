@@ -96,30 +96,6 @@ chrome.storage.onChanged.addListener((changes,area)=>{
  if(area==='local'&&changes.focusLock)refreshLock();
 });
 
-/* ---------- proxy (unchanged behaviour) ---------- */
-const proxyCall=(method,details)=>new Promise((resolve,reject)=>{chrome.proxy.settings[method](details,result=>{const e=chrome.runtime.lastError;if(e)reject(new Error(e.message));else resolve(result);});});
-async function proxyState(){
- const data=await chrome.storage.local.get('flowProxy');if(data.flowProxy?.url)$('proxyUrl').value=data.flowProxy.url;
- if(!await chrome.permissions.contains({permissions:['proxy']})){$('proxyStatus').textContent='未授权 / 未启用；浏览器代理保持不变。';return;}
- const s=await proxyCall('get',{incognito:false});$('proxyStatus').textContent=s.levelOfControl==='controlled_by_this_extension'?'本扩展的代理分流已配置。线路是否可用，需要在真实 B 站页面验证。':`本扩展未控制当前代理（${s.levelOfControl}）。`;
-}
-$('enableProxy').onclick=async()=>{
- const b=$('enableProxy');try{
-  if(!$('proxyConsent').checked)throw new Error('请先阅读并勾选代理影响说明。');
-  const url=$('proxyUrl').value.trim(),pac=globalThis.__BTR_PROXY_CORE__.pac(url);
-  const granted=await chrome.permissions.request({permissions:['proxy']});if(!granted)throw new Error('未获得代理权限，配置没有更改。');
-  b.disabled=true;const s=await proxyCall('get',{incognito:false});
-  if(!['controllable_by_this_extension','controlled_by_this_extension'].includes(s.levelOfControl))throw new Error('代理正由其他扩展或管理策略控制，未覆盖。请保留原来的分流方式。');
-  await proxyCall('set',{value:{mode:'pac_script',pacScript:{data:pac,mandatory:true}},scope:'regular_only'});
-  await chrome.storage.local.set({flowProxy:{url,at:Date.now()}});await proxyState();
- }catch(e){ui.flash($('proxyStatus'),e.message,'error');}finally{b.disabled=false;}
-};
-$('disableProxy').onclick=async()=>{try{
- if(await chrome.permissions.contains({permissions:['proxy']})){await proxyCall('clear',{scope:'regular_only'});await chrome.permissions.remove({permissions:['proxy']});}
- await chrome.storage.local.remove('flowProxy');ui.flash($('proxyStatus'),'已清除本扩展代理设置，并撤销本扩展代理权限。','ok');
-}catch(e){ui.flash($('proxyStatus'),e.message,'error');}};
-proxyState().catch(e=>$('proxyStatus').textContent=e.message);
-
 /* ---------- self-discipline lock ---------- */
 let lock={locked:false};
 const lockSay=(t,k)=>ui.flash($('lockStatus'),t,k);
@@ -217,25 +193,25 @@ async function focusUsage(){try{const r=await chrome.runtime.sendMessage({type:'
  let sn=$('focusUsage').querySelector('.snoozes');if(r.snoozes){if(!sn){sn=document.createElement('p');sn.className='hint snoozes';$('focusUsage').append(sn);}sn.textContent=`这个窗口里已经“再看”了 ${r.snoozes} 次`;}else sn?.remove();
 }catch(_){}}
 
-/* ---------- sticky section nav: the section under a reading line just below the nav is current ---------- */
+/* ---------- sticky section nav: the section under the middle of the visible area is current ---------- */
 const links=[...document.querySelectorAll('.toc a')],targets=links.map(a=>document.querySelector(a.getAttribute('href'))).filter(Boolean);
 let navFrame=0,navCurrent=null;
 let navPin=null;
 function navUpdate(){
  navFrame=0;
  if(navPin&&performance.now()<navPin.until){setNav(navPin.target);return;}navPin=null;
- // The section whose top is closest above the 35% line of the viewport (below the sticky nav)…
- const top=$('toc')?.getBoundingClientRect().bottom||0,bottom=innerHeight-($('savebar')?.offsetHeight||0);
- const line=Math.max(top+8,innerHeight*.35);
- let cur=targets[0],best=null,bestArea=0;
- for(const t of targets){
-  const r=t.getBoundingClientRect();
-  if(r.top<=line)cur=t;
-  const area=Math.max(0,Math.min(r.bottom,bottom)-Math.max(r.top,top));
-  if(area>bestArea){bestArea=area;best=t;}
- }
- // …unless another section clearly owns the screen (more than 60% of the visible area).
- if(best&&best!==cur&&bestArea>.6*(bottom-top))cur=best;
+ // The section under the middle of the visible area (between the sticky nav and the save bar).
+ // A 35%-line rule lagged on short screens: at 1280×800 a section filling 56% of the screen
+ // stayed unlit because its top was still below the line.
+ const top=Math.max(0,$('toc')?.getBoundingClientRect().bottom||0),bottom=innerHeight-($('savebar')?.offsetHeight||0);
+ // Over the last stretch of scrolling the line slides down to the bottom edge, so short sections
+ // at the end of a tall window still get their turn before the page runs out.
+ const mid=(top+bottom)/2,span=bottom-mid,remaining=document.documentElement.scrollHeight-innerHeight-scrollY;
+ const line=mid+Math.max(0,span-Math.max(0,remaining));
+ let cur=targets[0];
+ for(const t of targets){if(t.getBoundingClientRect().top<=line)cur=t;else break;}
+ // A section filling more than half of the visible area is always the current one.
+ for(const t of targets){const r=t.getBoundingClientRect();if(Math.min(r.bottom,bottom)-Math.max(r.top,top)>span){cur=t;break;}}
  if(innerHeight+scrollY>=document.documentElement.scrollHeight-4)cur=targets.at(-1); // Bottom of the page: the last section, even if short.
  setNav(cur);
 }
