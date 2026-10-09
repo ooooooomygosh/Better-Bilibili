@@ -64,7 +64,15 @@ with sync_playwright() as p:
  assert anim
  page.wait_for_timeout(400)
  assert page.evaluate(f"getComputedStyle({q}.querySelector('.panel')).zIndex")=='1001'
- ok('switching tabs glides the panel height; the panel sits under B 站 header popovers (z-index 1001)')
+ # The top edge stays put across tab switches (only the bottom edge moves), also mid-animation.
+ RECT=f"(()=>{{const r={q}.querySelector('.panel').getBoundingClientRect();return [Math.round(r.top),Math.round(r.height)]}})()"
+ seen=[]
+ for name in ['刹车','首页','油门','刹车','油门']:
+  page.evaluate(f"[...{q}.querySelectorAll('.tabs button')].find(b=>b.textContent==='{name}').click()")
+  for _ in range(4):page.wait_for_timeout(70);seen.append(page.evaluate(RECT))
+ tops={t for t,h in seen};heights={h for t,h in seen}
+ assert len(tops)==1 and len(heights)>2,(tops,heights)
+ ok(f'switching tabs glides the panel height with the top edge fixed (top {tops.pop()}px, heights {min(heights)}–{max(heights)}px); the panel sits under B 站 header popovers (z-index 1001)')
  R=f"{q}.querySelector('.root').classList.contains('dark')"
  assert not page.evaluate(R)
  page.evaluate("document.documentElement.classList.add('bili_dark')");page.wait_for_function(R,timeout=2000)

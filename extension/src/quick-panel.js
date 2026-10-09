@@ -463,7 +463,7 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
   const isFull = () => !!document.fullscreenElement || !!document.querySelector('.bpx-player-container[data-screen="web"],.bpx-player-container[data-screen="full"]') || !!document.body?.classList.contains('player-fullscreen-fix');
   /** Place the panel. Called once before it shows (and on resize / fullscreen changes) — never from
    * scroll or content changes, so an open panel doesn't move under the pointer. */
-  function positionPanel() {
+  function positionPanel(tallest = lastTallest) {
     if (!panel) return;
     // Sit just under B 站's header (z-index 1002) so its avatar / message popovers open above the panel,
     // and never reach under the header: the top is clamped below it (at least 64px from the top).
@@ -475,13 +475,32 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
     if (innerHeight - bottom - top < 360) { bottom = 16; right = fab ? 84 : 22; }
     panel.style.top = ''; panel.style.bottom = `${bottom}px`; panel.style.right = `${right}px`;
     panel.style.maxHeight = `${Math.max(160, Math.min(640, innerHeight - bottom - top))}px`;
+    // Measured from the corner, then pinned by its top edge: switching tabs (油门 is shorter) only
+    // moves the bottom edge and the height glides, instead of the whole panel jumping up or down.
+    // Room is reserved for the tallest tab, so a switch never needs to move the top.
+    lastTallest = tallest;
+    const placedTop = Math.max(top, Math.round(Math.min(panel.getBoundingClientRect().top, innerHeight - bottom - tallest)));
+    panel.style.top = `${placedTop}px`; panel.style.bottom = 'auto';
+    panel.style.maxHeight = `${Math.max(160, Math.min(640, innerHeight - bottom - placedTop))}px`;
+    panelBottomGap = bottom;
+  }
+  let panelBottomGap = 24, lastTallest = 0;
+  /** Natural height of the tallest tab (capped by the panel's max height), measured off screen. */
+  function measureTallest() {
+    const cur = tab; let tallest = 0;
+    for (const [id] of TABS) {
+      tab = id; render(); heightAnim?.cancel(); heightAnim = null;
+      tallest = Math.max(tallest, panel.getBoundingClientRect().height);
+    }
+    tab = cur; render(); heightAnim?.cancel(); heightAnim = null;
+    return Math.ceil(tallest);
   }
 
   /** While open, the panel never moves; it only gets shorter if a header slides in over its top. */
   function keepClearOfHeader() {
     if (!panel || isFull()) return;
     const need = Math.max(64, Math.ceil(headerBottom()) + 8), r = panel.getBoundingClientRect();
-    if (r.top < need) panel.style.maxHeight = `${Math.max(160, Math.round(r.bottom - need))}px`;
+    if (r.top < need) { panel.style.top = `${need}px`; panel.style.maxHeight = `${Math.max(160, Math.round(Math.min(r.bottom, innerHeight - panelBottomGap) - need))}px`; }
   }
 
   // B 站's header popovers (avatar, messages, history…) are translucent with a backdrop blur; the panel
@@ -614,7 +633,7 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
     open = true;
     if (!wasOpen) { panel.style.visibility = 'hidden'; positionPanel(); }
     render();
-    if (!wasOpen) positionPanel(); // Final placement with the real content height, before the first paint.
+    if (!wasOpen) { panel.style.top = ''; panel.style.bottom = `${panelBottomGap}px`; panel.style.maxHeight = ''; positionPanel(measureTallest()); } // Final placement, before the first paint.
     panel.style.visibility = '';
     // Grow out of the corner it is anchored to: no slide, so it never looks like it jumps into place.
     if (!wasOpen) { panel.style.transformOrigin = 'bottom right'; ui.animate(panel, [{opacity: 0, transform: 'scale(.97)'}, {opacity: 1, transform: 'none'}], {duration: MOTION.mid}); }
