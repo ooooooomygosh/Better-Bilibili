@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "哔哩节流阀 · BiliThrottle",
   "short_name": "BiliThrottle",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "B 站的油门和刹车：多 CDN 加速、首页净化、无限下滑推荐，再加上像 Claude Code 一样的 5 小时与每周观看额度。",
   "minimum_chrome_version": "114",
   "permissions": [
@@ -115,6 +115,7 @@
         "https://www.bilibili.com/*"
       ],
       "js": [
+        "src/ui-kit.js",
         "src/home-core.js",
         "src/feed-core.js",
         "src/home-infinite.js",
@@ -130,6 +131,7 @@
         "https://live.bilibili.com/*"
       ],
       "js": [
+        "src/ui-kit.js",
         "src/focus-core.js",
         "src/focus-guard.js"
       ],
@@ -141,6 +143,7 @@
         "https://*.bilibili.com/*"
       ],
       "js": [
+        "src/ui-kit.js",
         "src/home-core.js",
         "src/focus-core.js",
         "src/quick-panel.js"
@@ -149,7 +152,7 @@
       "world": "ISOLATED"
     }
   ],
-  "version_name": "2.2.0 · 油门帮你踩，刹车也帮你踩",
+  "version_name": "2.3.0 · 油门帮你踩，刹车也帮你踩",
   "optional_permissions": [
     "proxy"
   ],

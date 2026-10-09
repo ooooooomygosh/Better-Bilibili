@@ -76,7 +76,7 @@
   });
 
   const stats = {
-    version: "2.2.0",
+    version: "2.3.0",
     architecture: "bilibili-native-ui-progressive-mse-0.8-core",
     mode: settings.mode,
     playerState: "waiting",
@@ -1469,7 +1469,7 @@
           state: stats.playerState, lastError: stats.lastError, player: rest, nodes: stats.cdnHosts.map((item) => ({ ...item })), bannedNodes: cdnBans?.hosts?.() || [], page: pageEvents.slice(), timeline
         }, null, 1);
       },
-      version: "2.2.0"
+      version: "2.3.0"
     })
   });
   publish();
