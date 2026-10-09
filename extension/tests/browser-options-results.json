@@ -10,6 +10,10 @@
    "passed": true
   },
   {
+   "test": "1280×800 dark (跟随 B 站, page background rgb(23, 24, 28)): save bar pinned to the window bottom at top / middle / end, nav lights 加载加速 at the top and 检查与回退 at the end",
+   "passed": true
+  },
+  {
    "test": "no uncaught errors on the real options page",
    "passed": true
   }

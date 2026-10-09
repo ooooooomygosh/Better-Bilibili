@@ -31,6 +31,22 @@ with sync_playwright() as p:
   assert len(seen)==6,seen
   ok(f'{w}×{h}: window scrolls; wheel through the page ({samples} samples) lights every section, a section filling >50% of the visible area is always current, page end lights the last')
   pg.close()
+ # 1280×800, dark theme (as recorded from B 站): pinned save bar at the window bottom at top and end of the page,
+ # nav highlight follows, page is dark.
+ sw.evaluate("chrome.storage.local.set({biliTheme:{dark:true,at:Date.now()}})")
+ pg=ctx.new_page();pg.on('pageerror',lambda e:errors.append(str(e)));pg.set_viewport_size({'width':1280,'height':800})
+ pg.goto(f'chrome-extension://{eid}/ui/options.html');pg.wait_for_function("document.documentElement.dataset.theme==='dark'",timeout=3000);pg.wait_for_timeout(400)
+ bg=pg.evaluate("[document.body,document.documentElement].map(n=>getComputedStyle(n).backgroundColor).find(c=>c!=='rgba(0, 0, 0, 0)')");lum=sum(int(x) for x in bg[bg.index('(')+1:bg.index(')')].split(',')[:3])
+ assert lum<150,bg
+ BAR="(()=>{const r=document.querySelector('#savebar').getBoundingClientRect();return [Math.round(r.bottom),innerHeight,getComputedStyle(document.querySelector('#savebar')).position]})()"
+ for y in ('0','document.documentElement.scrollHeight/2','document.documentElement.scrollHeight'):
+  pg.evaluate(f"scrollTo(0,{y})");pg.wait_for_timeout(250)
+  b=pg.evaluate(BAR);assert b[0]==b[1] and b[2]=='fixed',b
+ assert pg.evaluate(STATE)['cur']=='#help'
+ pg.evaluate("scrollTo(0,0)");pg.wait_for_timeout(250);assert pg.evaluate(STATE)['cur']=='#speed'
+ pg.screenshot(path=str(ROOT/'docs/options-1280-dark.png'))
+ ok(f'1280×800 dark (跟随 B 站, page background {bg}): save bar pinned to the window bottom at top / middle / end, nav lights 加载加速 at the top and 检查与回退 at the end')
+ pg.close()
  assert not errors,errors;ok('no uncaught errors on the real options page')
  ctx.close()
 (ROOT/'tests/browser-options-results.json').write_text(json.dumps({'environment':'unpacked extension in Playwright Chromium (headless), real options.html','results':results},ensure_ascii=False,indent=1))

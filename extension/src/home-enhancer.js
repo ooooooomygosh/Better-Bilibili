@@ -61,9 +61,9 @@
 html[data-btr-home-clean][data-btr-hide-carousel] :is(.recommended-container_floor-aside,.recommended-container) .recommended-swipe{display:none!important}
 html[data-btr-home-clean][data-btr-hide-carousel] :is(.recommended-container_floor-aside,.recommended-container) .container{grid-template-areas:none!important;grid-template-rows:none!important;grid-auto-rows:auto!important;grid-auto-flow:row!important}
 html[data-btr-home-clean][data-btr-hide-carousel] :is(.recommended-container_floor-aside,.recommended-container) .container > :is(.feed-card,.bili-video-card,.video-card-reco,.floor-single-card){margin-top:0!important;grid-area:auto!important;align-self:start}
-html[data-btr-home-clean][data-btr-hide-carousel] [data-btr-grid] > .feed-card[data-btr-ready]{display:block!important}
+html[data-btr-home-clean][data-btr-hide-carousel] [data-btr-grid] > .feed-card[data-btr-ready]:not([data-btr-ad]){display:block!important}
 html[data-btr-home-clean] [data-btr-grid] > [data-btr-empty]{display:none!important}
-html[data-btr-home-clean][data-btr-hide-ads] :is(.recommended-container_floor-aside,.recommended-container) .container > :not(.recommended-swipe,[data-btr-flow-owned]):has(${core.AD_SELECTOR}),html[data-btr-home-clean][data-btr-hide-ads] [data-btr-ad]{display:none!important}
+html[data-btr-home-clean][data-btr-hide-ads] :is(.recommended-container_floor-aside,.recommended-container) .container > :not(.recommended-swipe,[data-btr-flow-owned]):has(${core.AD_SELECTOR}),html[data-btr-home-clean][data-btr-hide-ads] :is(.recommended-container_floor-aside,.recommended-container) .container > [data-btr-ad][data-btr-ad]{display:none!important}
 html[data-btr-home-clean][data-btr-hide-banner] .bili-header .bili-header__banner{height:64px!important;min-height:64px!important;background:var(--bg1,white)!important}
 html[data-btr-home-clean][data-btr-hide-banner] .bili-header .bili-header__banner > *{visibility:hidden!important}
 html[data-btr-home-clean][data-btr-hide-banner] .bili-header .bili-header__bar{background:var(--bg1,white)!important}
@@ -210,6 +210,8 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
       if(!!c!==holder.hasAttribute('data-btr-ready'))holder.toggleAttribute('data-btr-ready',!!c);
       if(c&&!(ad&&settings.homeHideAds))result.push(c);
     }
+    // After ads are hidden the native last row can be short; the infinite feed tops it up (it owns the spares).
+    if(settings.homeInfinite)requestAnimationFrame(()=>infinite?.fill?.());
     return core.cards(result);
   }
   function scheduleSave() {

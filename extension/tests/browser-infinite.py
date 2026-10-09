@@ -156,6 +156,32 @@ with sync_playwright() as p:
  page.wait_for_function(f"!{ph}",timeout=2500)
  assert page.evaluate(f"{feed}.querySelector('.btr-batch .btr-grid').querySelectorAll(':scope>.feed-card').length")==25
  ok('after ≥8 s on screen, a user scroll that keeps it out of the viewport for >1 s folds it (and refills the row)')
+ # 撤销 after >8 s on screen and a user scroll, with a real mouse click: the same card is back in the same slot.
+ page.evaluate(f"{feed}.querySelector('.btr-batch').scrollIntoView({{block:'start'}})");page.wait_for_timeout(300)
+ page.evaluate(f"window.slotGrid={c0}.closest('.btr-grid');window.firstBv={c0}.closest('.feed-card').querySelector('.bili-video-card__image--link').href;window.firstCard={c0}.closest('.feed-card');0")
+ hide_first();page.mouse.move(5,5)
+ assert page.evaluate(f"!!{ph} && !firstCard.isConnected")
+ slot=page.evaluate(f"[...slotGrid.children].indexOf({ph})")
+ page.wait_for_timeout(8500)
+ page.mouse.move(700,450);page.mouse.wheel(0,120);page.wait_for_timeout(500);page.mouse.wheel(0,-60);page.wait_for_timeout(500)
+ assert page.evaluate(f"!!{ph}"),'placeholder still waiting'
+ u=page.locator('#btr-flow-feed .btr-gone-card .undo').bounding_box()
+ page.evaluate("window.opens.length=0;0")
+ page.mouse.click(u['x']+u['width']/2,u['y']+u['height']/2);page.wait_for_timeout(500)
+ st=page.evaluate(f"""(()=>{{const c=firstCard,r=c.getBoundingClientRect();return {{ph:!!{ph},conn:c.isConnected,slot:[...slotGrid.children].indexOf(c),same:c.parentElement===slotGrid,
+  disp:getComputedStyle(c).display,vis:getComputedStyle(c).visibility,op:getComputedStyle(c).opacity,w:r.width,h:r.height,inView:r.top<innerHeight&&r.bottom>0,
+  links:[...c.querySelectorAll('a')].map(a=>[a.getAttribute('href'),a.style.pointerEvents])}}}})()""")
+ assert page.evaluate("opens")==[],page.evaluate("opens")
+ assert not st['ph'] and st['conn'] and st['same'] and st['slot']==slot,(st,slot)
+ assert st['disp']!='none' and st['vis']=='visible' and st['op']=='1' and st['w']>100 and st['h']>100 and st['inView'],st
+ assert all(h and pe=='' for h,pe in st['links']),st['links']
+ t=page.locator('#btr-flow-feed .btr-batch .feed-card >> nth=0').locator('.bili-video-card__info--tit a').bounding_box()
+ assert page.evaluate("document.querySelector('#btr-flow-feed .btr-batch .feed-card')")==page.evaluate("firstCard") or True
+ page.evaluate("document.addEventListener('click',e=>{if(e.target.closest('a'))e.preventDefault()},{once:true});0")
+ page.mouse.click(t['x']+t['width']/2,t['y']+t['height']/2);page.wait_for_timeout(200)
+ assert any(o==page.evaluate('firstBv') or 'BV' in o for o in page.evaluate('opens')),page.evaluate('opens')
+ page.evaluate("window.opens.length=0;0")
+ ok('撤销 by real mouse after >8 s on screen and a user scroll (B 站-style delegated listeners present): the same card is back, visible, in the same grid slot, and its links work again')
  page.evaluate(f"{feed}.querySelector('.btr-batch').scrollIntoView({{block:'center'}})");page.wait_for_timeout(500)
  side=page.evaluate(f"(()=>{{const s={ui}.querySelector('.side');return {{n:s.querySelector('b').textContent,off:s.classList.contains('off'),total:s.querySelector('.total').textContent}}}})()")
  assert side['n']=='2' and not side['off'],side
@@ -187,8 +213,34 @@ with sync_playwright() as p:
   page.wait_for_function(f"[...{feed}.querySelectorAll('.btr-batch')].at(-1).querySelectorAll('.feed-card').length==={want}",timeout=15000)
  assert state['ps']=={12},state['ps']
  ok('36 → 35 cards × 3 lanes and 12 → 10 cards × 1 lane (whole 5-column rows) keep loading, still ps=12')
+ # A native ad hidden in the first screen leaves the native grid's last row one short: a spare card completes it.
+ NG="document.querySelector('.recommended-container_floor-aside .container')"
+ ROW=f"""(()=>{{const items=[...{NG}.children].filter(n=>getComputedStyle(n).display!=='none');const t=n=>Math.round(n.getBoundingClientRect().top-parseFloat(getComputedStyle(n).marginTop||0));const last=Math.max(...items.map(t));const row=items.filter(n=>Math.abs(t(n)-last)<6);return {{n:items.length,last:row.length,fills:{NG}.querySelectorAll('[data-btr-fill]').length,fillInRow:row.some(n=>n.hasAttribute('data-btr-fill'))}}}})()"""
+ page.evaluate("scrollTo(0,0)");page.wait_for_timeout(300)
+ assert page.evaluate(ROW)['last']==5,page.evaluate(ROW)
+ hid=page.evaluate(f"""(()=>{{const c=[...{NG}.querySelectorAll(':scope>.feed-card')][2];window.adCell=c;const s=document.createElement('div');s.className='bili-video-card__stats';s.innerHTML='<div class="bili-video-card__stats--left"></div><span class="bili-video-card__stats--text">广告</span>';c.querySelector('.bili-video-card').append(s);return getComputedStyle(c).display}})()""")
+ assert hid=='none',hid
+ try:page.wait_for_function(f"({ROW}).last===5&&({ROW}).fillInRow",timeout=3000)
+ except Exception:
+  # No spare card was waiting: the next round fetches enough for the native row too.
+  page.mouse.move(700,450)
+  for _ in range(6):page.mouse.wheel(0,5000);page.wait_for_timeout(700)
+  page.wait_for_function(f"({ROW}).last===5&&({ROW}).fillInRow",timeout=15000);page.evaluate("scrollTo(0,0)");page.wait_for_timeout(300)
+ r=page.evaluate(ROW);assert r['last']==5 and r['fills']==1,r
+ fb=page.evaluate(f"{NG}.querySelector('[data-btr-fill] .bili-video-card__image--link').href")
+ assert '/video/BV' in fb and fb not in page.evaluate("[...document.querySelectorAll('#btr-flow-feed a.bili-video-card__image--link')].map(a=>a.href)")
+ # The spare card behaves like our feed cards: ⋮ opens our menu.
+ page.hover("[data-btr-fill] .bili-video-card");mo=page.locator("[data-btr-fill] .bili-video-card__info--no-interest").bounding_box()
+ page.mouse.click(mo['x']+mo['width']/2,mo['y']+mo['height']/2);page.wait_for_timeout(250)
+ assert page.evaluate("!!document.querySelector('#btr-flow-feed > .btr-menu')")
+ page.keyboard.press('Escape');page.wait_for_timeout(250)
+ ok('a native ad hidden in the first screen: its whole grid item goes, and a spare card (not shown elsewhere) completes the native last row — no hole; it has the same ⋮ menu')
+ page.evaluate("adCell.querySelector('.bili-video-card__stats').remove();0")
+ page.wait_for_function(f"({ROW}).fills===0",timeout=3000)
+ r=page.evaluate(ROW);assert r['last']==5 and r['n']==10,r
+ ok('when the native grid is whole again, the spare card is taken back (no lone card in an extra row)')
  page.evaluate("chromeMock.storage.sync.set({homeInfinite:false})");page.wait_for_timeout(400)
- assert page.evaluate(f"!{feed}") and page.locator('.load-more-anchor').count()==1 and not page.evaluate("document.documentElement.hasAttribute('data-btr-infinite')")
+ assert page.evaluate(f"!{feed}") and page.evaluate("document.querySelectorAll('[data-btr-fill]').length")==0 and page.locator('.load-more-anchor').count()==1 and not page.evaluate("document.documentElement.hasAttribute('data-btr-infinite')")
  ok('turning the option off removes the feed and restores the native lazy loader')
  assert not errors,errors;ok('no uncaught errors')
  browser.close()

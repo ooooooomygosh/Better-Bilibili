@@ -55,61 +55,65 @@
    * exactly like the native feed. Only layout glue and our extras are defined here. */
   const LIGHT_CSS = `
 #btr-flow-feed{display:block;margin-top:8px;color:var(--text1,#18191c)}
-#btr-flow-feed [hidden]{display:none!important}
-#btr-flow-feed .btr-batch{margin-top:8px}
+:is(#btr-flow-feed,[data-btr-fill]) [hidden]{display:none!important}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-batch{margin-top:8px}
 /* Only batches already scrolled past skip rendering; fresh ones always paint at once. */
-#btr-flow-feed .btr-batch.btr-cv{content-visibility:auto;contain-intrinsic-size:auto 900px}
-#btr-flow-feed .btr-divider{display:flex;align-items:center;gap:12px;margin:18px 0 16px;color:var(--btr-muted,#61666d);font-size:12px}
-#btr-flow-feed .btr-divider::before,#btr-flow-feed .btr-divider::after{content:"";flex:1;height:1px;background:var(--btr-line,rgba(128,128,128,.22))}
-#btr-flow-feed .btr-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 12px;border-radius:999px;background:var(--btr-chip,rgba(251,114,153,.1));color:#fb7299;font-weight:600;font-variant-numeric:tabular-nums}
-#btr-flow-feed .btr-chip small{font-weight:400;font-size:12px;color:var(--btr-muted,#61666d)}
-#btr-flow-feed .btr-grid{display:grid;grid-template-columns:repeat(var(--btr-columns,5),minmax(0,1fr));column-gap:var(--btr-gap,20px);row-gap:var(--btr-row-gap,20px)}
-#btr-flow-feed .btr-grid>.feed-card{min-width:0;margin:0!important;display:block}
-#btr-flow-feed .bili-video-card__image--wrap{position:relative}
-#btr-flow-feed .bili-video-card__image--wrap{background:var(--btr-placeholder,#f1f2f3);border-radius:var(--btr-radius,6px)}
-#btr-flow-feed .bili-video-card__cover img{opacity:0;transition:opacity .3s ease}
-#btr-flow-feed .bili-video-card__cover img.btr-loaded{opacity:1}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-batch.btr-cv{content-visibility:auto;contain-intrinsic-size:auto 900px}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-divider{display:flex;align-items:center;gap:12px;margin:18px 0 16px;color:var(--btr-muted,#61666d);font-size:12px}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-divider::before,:is(#btr-flow-feed,[data-btr-fill]) .btr-divider::after{content:"";flex:1;height:1px;background:var(--btr-line,rgba(128,128,128,.22))}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 12px;border-radius:999px;background:var(--btr-chip,rgba(251,114,153,.1));color:#fb7299;font-weight:600;font-variant-numeric:tabular-nums}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-chip small{font-weight:400;font-size:12px;color:var(--btr-muted,#61666d)}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-grid{display:grid;grid-template-columns:repeat(var(--btr-columns,5),minmax(0,1fr));column-gap:var(--btr-gap,20px);row-gap:var(--btr-row-gap,20px)}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-grid>.feed-card{min-width:0;margin:0!important;display:block}
+:is(#btr-flow-feed,[data-btr-fill]) .bili-video-card__image--wrap{position:relative}
+:is(#btr-flow-feed,[data-btr-fill]) .bili-video-card__image--wrap{background:var(--btr-placeholder,#f1f2f3);border-radius:var(--btr-radius,6px)}
+:is(#btr-flow-feed,[data-btr-fill]) .bili-video-card__cover img{opacity:0;transition:opacity .3s ease}
+:is(#btr-flow-feed,[data-btr-fill]) .bili-video-card__cover img.btr-loaded{opacity:1}
 /* Watch later & not interested: shown on hover, like the native card. */
-#btr-flow-feed .bili-watch-later{display:none;cursor:pointer}
-#btr-flow-feed .bili-video-card:hover .bili-watch-later,#btr-flow-feed .bili-watch-later.btr-done{display:flex}
-#btr-flow-feed .bili-watch-later__tip--lab{display:none}
-#btr-flow-feed .bili-watch-later:hover .bili-watch-later__tip--lab,#btr-flow-feed .bili-watch-later.btr-done .bili-watch-later__tip--lab{display:block}
-#btr-flow-feed .bili-video-card__info--no-interest{display:none;cursor:pointer}
-#btr-flow-feed .bili-video-card:hover .bili-video-card__info--no-interest,#btr-flow-feed .bili-video-card.btr-menu-open .bili-video-card__info--no-interest{display:flex}
-#btr-flow-feed .bili-video-card__info{position:relative}
-#btr-flow-feed .bili-video-card__wrap{position:relative}
+:is(#btr-flow-feed,[data-btr-fill]) .bili-watch-later{display:none;cursor:pointer}
+:is(#btr-flow-feed,[data-btr-fill]) .bili-video-card:hover .bili-watch-later,:is(#btr-flow-feed,[data-btr-fill]) .bili-watch-later.btr-done{display:flex}
+:is(#btr-flow-feed,[data-btr-fill]) .bili-watch-later__tip--lab{display:none}
+:is(#btr-flow-feed,[data-btr-fill]) .bili-watch-later:hover .bili-watch-later__tip--lab,:is(#btr-flow-feed,[data-btr-fill]) .bili-watch-later.btr-done .bili-watch-later__tip--lab{display:block}
+:is(#btr-flow-feed,[data-btr-fill]) .bili-video-card__info--no-interest{display:none;cursor:pointer}
+:is(#btr-flow-feed,[data-btr-fill]) .bili-video-card:hover .bili-video-card__info--no-interest,:is(#btr-flow-feed,[data-btr-fill]) .bili-video-card.btr-menu-open .bili-video-card__info--no-interest{display:flex}
+:is(#btr-flow-feed,[data-btr-fill]) .bili-video-card__info{position:relative}
+:is(#btr-flow-feed,[data-btr-fill]) .bili-video-card__wrap{position:relative}
 /* ⋮ menu, styled like B 站's own card popover. */
-#btr-flow-feed .btr-menu{position:fixed;z-index:1000;min-width:150px;padding:6px 0;border-radius:8px;background:var(--btr-menu-bg,#fff);border:1px solid var(--btr-line,rgba(0,0,0,.08));box-shadow:0 6px 20px rgba(0,0,0,.12);font-size:14px;color:var(--btr-text,#18191c);transform-origin:100% 0}
-#btr-flow-feed .btr-menu button{display:flex;align-items:center;gap:8px;width:100%;padding:8px 14px;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;white-space:nowrap}
-#btr-flow-feed .btr-menu button:hover,#btr-flow-feed .btr-menu button:focus-visible{background:var(--btr-menu-hover,#f1f2f3);color:#fb7299;outline:none}
-#btr-flow-feed .btr-menu small{margin-left:auto;padding-left:10px;font-size:12px;color:var(--btr-muted,#9499a0)}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-menu{position:fixed;z-index:1000;min-width:150px;padding:6px 0;border-radius:8px;background:var(--btr-menu-bg,#fff);border:1px solid var(--btr-line,rgba(0,0,0,.08));box-shadow:0 6px 20px rgba(0,0,0,.12);font-size:14px;color:var(--btr-text,#18191c);transform-origin:100% 0}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-menu button{display:flex;align-items:center;gap:8px;width:100%;padding:8px 14px;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;white-space:nowrap}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-menu button:hover,:is(#btr-flow-feed,[data-btr-fill]) .btr-menu button:focus-visible{background:var(--btr-menu-hover,#f1f2f3);color:#fb7299;outline:none}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-menu small{margin-left:auto;padding-left:10px;font-size:12px;color:var(--btr-muted,#9499a0)}
 /* Hidden-by-you state, B 站-style: the cover blurs under a dark veil with 「已减少此类推荐」 and 撤销. It
    stays until you close it, scroll it away, or ~8 s pass while you are not on it; then the row reflows. */
-#btr-flow-feed .btr-gone-card{position:relative;min-width:0;display:flex;flex-direction:column;cursor:default;user-select:none}
-#btr-flow-feed .btr-gone-cover{position:relative;overflow:hidden;border-radius:var(--btr-radius,6px);background:var(--btr-placeholder,#f1f2f3);aspect-ratio:16/9;flex:none}
-#btr-flow-feed .btr-gone-bg{position:absolute;inset:-20px;background:center/cover no-repeat;filter:blur(16px) saturate(.8);transform:scale(1.05)}
-#btr-flow-feed .btr-gone{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(0,0,0,.45);color:#fff;font-size:14px;line-height:20px;text-align:center}
-#btr-flow-feed .btr-gone .undo{min-width:76px;padding:4px 16px;border-radius:999px;border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.12);color:#fff;font:inherit;font-size:13px;cursor:pointer;transition:background-color .15s ease,border-color .15s ease}
-#btr-flow-feed .btr-gone .undo:hover,#btr-flow-feed .btr-gone .undo:focus-visible{background:rgba(255,255,255,.28);border-color:#fff;outline:none}
-#btr-flow-feed .btr-gone .x{position:absolute;top:6px;right:6px;width:24px;height:24px;display:grid;place-items:center;border:0;border-radius:50%;background:rgba(0,0,0,.25);color:#fff;font:16px/1 sans-serif;cursor:pointer;transition:background-color .15s ease}
-#btr-flow-feed .btr-gone .x:hover,#btr-flow-feed .btr-gone .x:focus-visible{background:rgba(0,0,0,.5);outline:none}
-#btr-flow-feed .btr-gone-info{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:var(--btr-muted,#9499a0)}
-#btr-flow-feed .btr-gone-info span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#btr-flow-feed .btr-gone-info button{flex:none;padding:2px 10px;border:0;border-radius:6px;background:var(--btr-menu-hover,#f1f2f3);color:var(--btr-text,#18191c);font:inherit;font-size:12px;cursor:pointer}
-#btr-flow-feed .btr-gone-info button:hover,#btr-flow-feed .btr-gone-info button:focus-visible{color:#fb7299;outline:none}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-gone-card{position:relative;min-width:0;display:flex;flex-direction:column;cursor:default;user-select:none}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-gone-cover{position:relative;overflow:hidden;border-radius:var(--btr-radius,6px);background:var(--btr-placeholder,#f1f2f3);aspect-ratio:16/9;flex:none}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-gone-bg{position:absolute;inset:-20px;background:center/cover no-repeat;filter:blur(16px) saturate(.8);transform:scale(1.05)}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-gone{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(0,0,0,.45);color:#fff;font-size:14px;line-height:20px;text-align:center}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-gone .undo{min-width:76px;padding:4px 16px;border-radius:999px;border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.12);color:#fff;font:inherit;font-size:13px;cursor:pointer;transition:background-color .15s ease,border-color .15s ease}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-gone .undo:hover,:is(#btr-flow-feed,[data-btr-fill]) .btr-gone .undo:focus-visible{background:rgba(255,255,255,.28);border-color:#fff;outline:none}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-gone .x{position:absolute;top:6px;right:6px;width:24px;height:24px;display:grid;place-items:center;border:0;border-radius:50%;background:rgba(0,0,0,.25);color:#fff;font:16px/1 sans-serif;cursor:pointer;transition:background-color .15s ease}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-gone .x:hover,:is(#btr-flow-feed,[data-btr-fill]) .btr-gone .x:focus-visible{background:rgba(0,0,0,.5);outline:none}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-gone-info{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:var(--btr-muted,#9499a0)}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-gone-info span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-gone-info button{flex:none;padding:2px 10px;border:0;border-radius:6px;background:var(--btr-menu-hover,#f1f2f3);color:var(--btr-text,#18191c);font:inherit;font-size:12px;cursor:pointer}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-gone-info button:hover,:is(#btr-flow-feed,[data-btr-fill]) .btr-gone-info button:focus-visible{color:#fb7299;outline:none}
 /* Hover preview: Bilibili's own storyboard frames, scrubbed by the pointer. */
-#btr-flow-feed .btr-shot{position:absolute;inset:0;z-index:2;border-radius:inherit;background-repeat:no-repeat;pointer-events:none;opacity:0;transition:opacity .14s ease}
-#btr-flow-feed .btr-shot.on{opacity:1}
-#btr-flow-feed .btr-shot i{position:absolute;left:0;bottom:0;height:3px;width:100%;background:#fb7299;transform-origin:0 50%;transform:scaleX(0)}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-shot{position:absolute;inset:0;z-index:2;border-radius:inherit;background-repeat:no-repeat;pointer-events:none;opacity:0;transition:opacity .14s ease}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-shot.on{opacity:1}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-shot i{position:absolute;left:0;bottom:0;height:3px;width:100%;background:#fb7299;transform-origin:0 50%;transform:scaleX(0)}
 /* Skeletons reuse B 站's own skeleton classes; the fallback below only applies if they are unstyled. */
-#btr-flow-feed .btr-skel .bili-video-card__skeleton--cover{aspect-ratio:16/9;border-radius:6px;background:var(--graph_bg_regular,rgba(128,128,128,.12))}
-#btr-flow-feed .btr-skel .bili-video-card__skeleton--text{height:16px;margin:10px 0 0;border-radius:4px;background:var(--graph_bg_regular,rgba(128,128,128,.12))}
-#btr-flow-feed .btr-skel .bili-video-card__skeleton--text.short{width:50%}
-#btr-flow-feed .btr-skel .bili-video-card__skeleton--light{height:14px;width:40%;margin:8px 0 0;border-radius:4px;background:var(--graph_bg_thin,rgba(128,128,128,.08))}
-#btr-flow-feed .btr-skel{animation:btr-skel 1.4s ease-in-out infinite}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-skel .bili-video-card__skeleton--cover{aspect-ratio:16/9;border-radius:6px;background:var(--graph_bg_regular,rgba(128,128,128,.12))}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-skel .bili-video-card__skeleton--text{height:16px;margin:10px 0 0;border-radius:4px;background:var(--graph_bg_regular,rgba(128,128,128,.12))}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-skel .bili-video-card__skeleton--text.short{width:50%}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-skel .bili-video-card__skeleton--light{height:14px;width:40%;margin:8px 0 0;border-radius:4px;background:var(--graph_bg_thin,rgba(128,128,128,.08))}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-skel{animation:btr-skel 1.4s ease-in-out infinite}
 @keyframes btr-skel{0%,100%{opacity:1}50%{opacity:.55}}
-#btr-flow-feed .btr-flash{position:absolute;left:50%;top:50%;z-index:5;transform:translate(-50%,-50%);padding:6px 12px;border-radius:999px;background:rgba(24,25,28,.86);color:#fff;font-size:12px;white-space:nowrap;pointer-events:none}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-flash{position:absolute;left:50%;top:50%;z-index:5;transform:translate(-50%,-50%);padding:6px 12px;border-radius:999px;background:rgba(24,25,28,.86);color:#fff;font-size:12px;white-space:nowrap;pointer-events:none}
 @media(prefers-reduced-motion:reduce){#btr-flow-feed *{animation:none!important;transition:none!important}#btr-flow-feed .bili-video-card__cover img{opacity:1}}
+
+/* Spare cards that complete the native grid's last row (after hidden ads): same look as the native cards. */
+[data-btr-grid]>.feed-card[data-btr-fill]{display:block!important;height:auto!important;margin-top:0!important;grid-area:auto!important;min-width:0}
+[data-btr-grid]>.btr-gone-card[data-btr-fill]{position:relative;min-width:0;display:flex;flex-direction:column;cursor:default;user-select:none;margin-top:0!important}
 `;
 
   function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
@@ -135,7 +139,7 @@
     globalThis.__BTR_ACT_GUARD__ = true;
     for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click', 'auxclick', 'dblclick']) {
       addEventListener(type, e => {
-        const n = e.target?.closest?.('#btr-flow-feed [data-btr-act]');
+        const n = e.target?.closest?.('#btr-flow-feed [data-btr-act],[data-btr-fill] [data-btr-act],[data-btr-fill][data-btr-act]');
         if (!n) return;
         e.stopImmediatePropagation(); e.preventDefault();
         if (type === 'pointerdown' && n.matches('button,[tabindex]')) n.focus({preventScroll: true});
@@ -212,12 +216,50 @@
 
     const isNear = () => !!sentinel?.isConnected && sentinel.getBoundingClientRect().top < innerHeight * 2.5;
 
+    /* ---------- the native grid's last row ----------
+       Hidden ads (and B 站's fixed first-screen count) can leave the native grid's last row short,
+       which shows as empty cells above our first batch. Spare cards complete that row; they are ours
+       (data-btr-flow-owned), sit at the end of the native grid, and are removed again when the native
+       grid no longer needs them. Rows are read from the layout, so the carousel, floor cards and
+       B 站's nth-of-type margins don't matter. */
+    const nativeGrid = () => { const g = document.querySelector('[data-btr-grid]'); return g && !g.closest('[data-btr-flow-owned]') ? g : null; };
+    function markFill(n, data) { n.setAttribute('data-btr-fill', ''); n.dataset.btrFlowOwned = ''; n.__btrCard = data; }
+    function lastRow(g) {
+      const items = [...g.children].filter(n => getComputedStyle(n).display !== 'none');
+      if (!items.length) return null;
+      const top = n => Math.round(n.getBoundingClientRect().top - (parseFloat(getComputedStyle(n).marginTop) || 0));
+      const tops = items.map(top), last = Math.max(...tops);
+      return items.filter((n, i) => Math.abs(tops[i] - last) < 6);
+    }
+    function holes() {
+      const g = box && host.enabled() && !host.hidden() ? nativeGrid() : null, row = g && lastRow(g);
+      return row ? Math.max(0, cols() - row.length) : 0;
+    }
+    function fillNative() {
+      const g = box && host.enabled() && !host.hidden() ? nativeGrid() : null;
+      if (!g) return;
+      const row = lastRow(g); if (!row) return;
+      const need = cols() - row.length;
+      if (need <= 0) return;
+      // A short row made only of our spares (the native grid shrank or columns changed): take them back.
+      if (row.every(n => n.matches('.feed-card[data-btr-fill]'))) {
+        for (const n of row.reverse()) { if (n.__btrCard) buffer.unshift(n.__btrCard); n.remove(); }
+        return;
+      }
+      const spare = buffer.filter(c => !hidden(c));
+      if (spare.length < need) return; // Only ever complete the row; never leave a different short row.
+      for (const data of spare.slice(0, need)) {
+        buffer.splice(buffer.indexOf(data), 1);
+        const n = card(data); n.setAttribute('role', 'listitem'); markFill(n, data); g.append(n);
+      }
+    }
+
     async function round() {
       clearTimeout(timer);
       if (loading || paused || !box?.isConnected || !host.enabled() || !isNear()) return;
       loading = true; status('loading'); side?.classList.add('loading'); skeleton(true);
       const s = host.settings(), size = target(s.homeInfiniteSize), lanes = s.homeInfiniteThreads;
-      const count = Math.max(lanes, Math.ceil(Math.max(0, size - buffer.length) / PAGE));
+      const count = Math.max(lanes, Math.ceil(Math.max(0, size + holes() - buffer.length) / PAGE));
       nativeSeen();
       const results = await pool(count, lanes);
       loading = false; side?.classList.remove('loading');
@@ -228,6 +270,7 @@
         else if (r.error?.kind === 'risk') risk = r.error;
         else error = r.error;
       }
+      fillNative();
       let added = 0;
       const want = target(host.settings().homeInfiniteSize); // The window may have been resized meanwhile.
       while (buffer.length >= want) { append(buffer.splice(0, want)); added++; }
@@ -478,6 +521,7 @@
       const okBtn = el('button', null, '知道了'); okBtn.type = 'button';
       info.append(note, okBtn); ph.append(cov, info);
       bind(ph, () => {}); // Presses anywhere on the placeholder stop here.
+      if (outer.hasAttribute('data-btr-fill')) { ph.setAttribute('data-btr-fill', ''); ph.dataset.btrFlowOwned = ''; }
       stripLinks(outer);
       outer.replaceWith(ph);
       if (ui) ui.animate(layer, [{opacity: 0}, {opacity: 1}], {duration: 220});
@@ -525,15 +569,25 @@
         refill([ph, ...others], !offscreen);
       }
       bind(x, () => dismiss()); bind(okBtn, () => dismiss());
+      // Where the card belongs, kept independently of the placeholder so 撤销 can always put it back.
+      const home = {grid: ph.parentElement, next: ph.nextElementSibling};
       bind(undo, () => {
-        if (done || !ph.isConnected) return;
-        finish();
+        if (!ph.isConnected && outer.isConnected) return;
+        finish(); ph.getAnimations?.().forEach(a => a.cancel());
         if (kind === 'up') blockedUps.delete(String(c.mid)); else dislikes.delete(c.bvid);
         persist();
-        ph.replaceWith(outer);
+        // Leftover animations (an entrance fade still pending for a card that left before it ran,
+        // a fill-forwards fade-out) or inline styles must not keep the card invisible.
+        for (const n of [outer, ...outer.querySelectorAll('*')]) n.getAnimations?.().forEach(a => a.cancel());
+        outer.style.removeProperty('opacity'); outer.style.removeProperty('transform'); outer.style.removeProperty('display'); outer.style.removeProperty('visibility');
+        revealer?.unobserve(outer);
+        if (ph.isConnected) ph.replaceWith(outer);
+        else if (home.grid?.isConnected) home.grid.insertBefore(outer, home.next?.parentElement === home.grid ? home.next : null);
         // Links come back a moment later, after this press (and any trailing mouseup/click) is over.
         setTimeout(() => restoreLinks(outer), 0);
         if (ui) ui.animate(outer, [{opacity: 0}, {opacity: 1}], {duration: 180});
+        const r = outer.getBoundingClientRect();
+        if (r.bottom < 0 || r.top > innerHeight) outer.scrollIntoView({block: 'nearest'});
         outer.querySelector('.bili-video-card__info--no-interest')?.focus({preventScroll: true});
       });
     }
@@ -554,7 +608,9 @@
           for (let k = 0; k < missing; k++) {
             const spare = buffer.findIndex(c => !hidden(c));
             if (spare < 0) break;
-            const fresh = card(buffer.splice(spare, 1)[0]); fresh.setAttribute('role', 'listitem'); g.append(fresh); added.push(fresh);
+            const data = buffer.splice(spare, 1)[0], fresh = card(data); fresh.setAttribute('role', 'listitem');
+            if (g.hasAttribute('data-btr-grid')) markFill(fresh, data);
+            g.append(fresh); added.push(fresh);
           }
         }
         if (!animate || reduced.matches) return;
@@ -743,7 +799,8 @@
       const v = {'--btr-text': t.dark ? '#e3e5e7' : '#18191c', '--btr-muted': t.dark ? '#a2a7ae' : '#61666d', '--btr-line': t.dark ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.08)',
         '--btr-placeholder': t.oled ? '#000' : t.dark ? '#222' : '#f1f2f3', '--btr-side': t.oled ? 'rgba(0,0,0,.85)' : t.dark ? 'rgba(36,37,42,.92)' : 'rgba(255,255,255,.92)',
         '--btr-chip': t.dark ? 'rgba(251,114,153,.16)' : 'rgba(251,114,153,.1)', '--btr-menu-bg': t.oled ? '#111' : t.dark ? '#232527' : '#fff', '--btr-menu-hover': t.dark ? 'rgba(255,255,255,.08)' : '#f1f2f3', '--btr-gone': t.oled ? 'rgba(0,0,0,.72)' : t.dark ? 'rgba(24,25,28,.72)' : 'rgba(255,255,255,.72)', '--btr-columns': String(cols.count), '--btr-gap': cols.gap, '--btr-row-gap': cols.rowGap || '20px'};
-      for (const [k, val] of Object.entries(v)) box.style.setProperty(k, val);
+      const g = nativeGrid();
+      for (const [k, val] of Object.entries(v)) { box.style.setProperty(k, val); g?.style.setProperty(k, val); }
       box.style.colorScheme = t.dark ? 'dark' : 'light';
     }
 
@@ -756,11 +813,11 @@
     function stop() {
       clearTimeout(timer);
       if (!box) return;
-      closeMenu(); box.remove(); box = shadow = list = foot = side = sentinel = skel = null; current?.disconnect(); current = null;
+      closeMenu(); for (const n of document.querySelectorAll('[data-btr-fill]')) n.remove(); box.remove(); box = shadow = list = foot = side = sentinel = skel = null; current?.disconnect(); current = null;
       sections = []; visible.clear(); seen.clear(); buffer = []; batches = 0; paused = false; fails = 0; loading = false;
     }
 
-    return {sync, stop, theme, get batches() { return batches; }, get state() { return box ? {loaded: batches + 1, current: shown, paused, loading} : null; }};
+    return {sync, stop, theme, fill: () => { try { fillNative(); } catch (_) {} }, get batches() { return batches; }, get state() { return box ? {loaded: batches + 1, current: shown, paused, loading} : null; }};
   }
 
   globalThis.__BTR_HOME_INFINITE__ = {create};
