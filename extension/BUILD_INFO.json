@@ -23,14 +23,13 @@
     "focus_mode_enabled": false,
     "infinite_feed": false
   },
-  "proxy_enabled_by_default": false,
   "automatic_updates": false,
   "testing": {
-    "node_core_passed": 106,
-    "renderer_home_options_fixture_passed": 36,
+    "node_core_passed": 103,
+    "renderer_home_options_fixture_passed": 35,
     "renderer_branch_diagnostics_fixture_passed": 9,
     "real_mse_synthetic_media_passed": "not re-run for 1.2.0 (open-source Chromium lacks H.264); 7 passed on 1.1.0",
-    "total_passed": 195,
+    "total_passed": 202,
     "real_bilibili_e2e_verified": false,
     "real_HDR_HiRes_hardware_verified": false,
     "firefox_safari_verified": false,
@@ -40,13 +39,17 @@
     "node": "22.22.0",
     "installed_extension_focus_e2e_passed": "loaded unpacked in Chromium (Playwright chromium-1194) on a routed fixture page: 5-hour window block + reset countdown, play() re-block, snooze, weekly block, automatic lift at window reset, Pomodoro countdown, in-page panel opens",
     "renderer_native_refresh_wrapper_passed": 4,
-    "renderer_infinite_feed_passed": 18,
+    "renderer_infinite_feed_passed": 21,
     "installed_extension_infinite_e2e": "loaded unpacked; content-script fetch to api.bilibili.com with page cookies and CORS on a routed homepage: 8 batches over 8 signed requests, no errors; launcher hidden on home, opens on video page",
     "renderer_quick_panel_passed": 22,
     "ui_polish_2_3_0_live_bilibili": "Loaded unpacked (Playwright Chromium) on live, logged-out bilibili.com: 25-card batches in the 5-column grid, skeleton row always under the newest batch, ⋮ menu and 不感兴趣 blurred/undo state, popup flow-get-state reports current/loaded batches. Watch-later write not exercised (logged out).",
     "theme_detection_live": "Live bilibili.com (logged out, unpacked): html.bili_dark toggle on the homepage and bili-theme light->dark stylesheet href swap on a video page both flip the open quick panel; header login popover renders above the panel",
     "ui_polish_round4_live": "Live bilibili.com (logged out, unpacked Playwright Chromium): 不感兴趣 swaps the card for a link-free placeholder; middle click + left click on 撤销 opened no tab and restored the same card with href/target; ⋮ menu outside the card; html.bili_dark recorded to storage.local biliTheme and options/popup/welcome opened with data-theme=dark; one click on 完整设置 opened options.html; hovering the header login entry fades the panel to opacity 0 and back. Fixture test simulates B 站 delegated window.open listeners registered before the content script.",
-    "ui_polish_round5_live": "Live bilibili.com (logged out, unpacked): 不感兴趣 placeholder (blurred cover, 已减少此类推荐, 撤销, ×, 知道了) still present 6.6 s later with the pointer away, dismissed after the 8 s minimum; on a live video page Alt+T alternately opened and closed the panel, including with focus inside the panel; the panel top stayed ≥64px."
+    "ui_polish_round5_live": "Live bilibili.com (logged out, unpacked): 不感兴趣 placeholder (blurred cover, 已减少此类推荐, 撤销, ×, 知道了) still present 6.6 s later with the pointer away, dismissed after the 8 s minimum; on a live video page Alt+T alternately opened and closed the panel, including with focus inside the panel; the panel top stayed ≥64px.",
+    "renderer_engine_slowstart_passed": 5,
+    "installed_extension_options_nav_passed": 3,
+    "playback_investigation_round5": "BV1cNd8BoEoW, logged out, Playwright Chromium + unpacked extension. Player code identical to origin/main except version strings. curl from the box: uncached upos ranges 24-102 KB/s on cosov (TTFB 4-11 s), akam 0.065-2 MB/s. Unthrottled 90 s: branch/main/no-extension all play (35-72 s buffered), no freeze (heartbeat lag <0.3 s). 400 kbps: branch and main both black ~65 s (takeover, fetch failure, auto-retake); no extension starts at ~76 s. With the new 20 s slow-start guard: takeover at ~43 s, handed back at ~63 s, no retake, native playing from ~93 s, 110 media requests instead of 169-179."
   },
-  "previous_version": "2.2.0"
+  "previous_version": "2.2.0",
+  "proxy_feature": "removed in 2.3.0 (Chrome rejects proxy as an optional permission)"
 }
