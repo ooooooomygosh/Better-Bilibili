@@ -64,6 +64,13 @@
   let autoRetakeRoute = "";
   let autoRetakeCount = 0;
   let autoRetakeAt = 0;
+  // Slow-link guard: a takeover that has not delivered a single media segment this long after
+  // it started (while the viewer wants to play) goes back to Bilibili's own player for this
+  // video, without automatic retakes, instead of leaving the picture black on a slow link.
+  const STARTUP_WATCH_MS = Math.max(1000, Number(root.__BTR_TEST_STARTUP_WATCH_MS__) || 20000);
+  let startupWatchTimer = null;
+  let startupSegments = 0;
+  const slowRoutes = new Set();
   let transferSequence = 1;
   const transfers = new Map();
   // 自动线程数 lives in the downloader; its steps are reported here.
@@ -153,6 +160,7 @@
   // changed. Most such failures are one slow CDN reply, so the takeover is tried again a few
   // times with a growing pause.
   function scheduleAutoRetake(route) {
+    if (slowRoutes.has(route)) return; // The link is too slow for a takeover: Bilibili keeps the video.
     const now = Date.now();
     if (autoRetakeRoute !== route || now - autoRetakeAt > 120000) {
       autoRetakeRoute = route;
@@ -170,6 +178,28 @@
       failedRoute = "";
       restartPlayer(true);
     }, 4000 * (2 ** (attempt - 1)));
+  }
+
+  function armStartupWatch(route, lifecycle, watched) {
+    clearTimeout(startupWatchTimer);
+    startupSegments = 0;
+    const check = () => {
+      startupWatchTimer = null;
+      if (lifecycle !== playerLifecycle || player !== watched || playerRoute !== route || startupSegments > 0) return;
+      let wants = true;
+      try { wants = watched.wantsToPlay ? Boolean(watched.wantsToPlay()) : nativeAutoplay(); } catch (_error) {}
+      // Nothing asked to play yet (autoplay off): keep watching, cheaply, until it is.
+      if (!wants) { startupWatchTimer = setTimeout(check, 5000); return; }
+      remember("slow start", `no media segment ${Math.round(STARTUP_WATCH_MS / 1000)} s after the takeover`);
+      notices?.log("网络太慢，已交还 B 站自己的播放器", `接管后 ${Math.round(STARTUP_WATCH_MS / 1000)} 秒还没下载到第一段视频，这个视频改由 B 站自己的播放器加载，不再自动接管。换个视频或刷新页面会重新尝试。`, "error", "", route, "takeover");
+      slowRoutes.add(route);
+      failedRoute = route;
+      clearTimeout(autoRetakeTimer);
+      stopPlayer(true);
+      stats.playerState = "native-fallback";
+      publish();
+    };
+    startupWatchTimer = setTimeout(check, STARTUP_WATCH_MS);
   }
 
   function transferSpeed(item, now) {
@@ -1269,6 +1299,7 @@
         },
         onSegment(event) {
           if (lifecycle !== playerLifecycle) return;
+          startupSegments += 1;
           notices?.log("下载好的数据已经交给播放器", `这段${KIND_LABELS[event.kind] || "视频"}数据有 ${Math.round(event.bytes / 1024)} KiB，由 ${event.pieces} 路下载完成。`, "success", `segment-${event.kind}`, route, "buffer");
           if (takeoverFailureRoute === route || stats.takeoverError?.route === route) {
             clearTakeoverFailure();
@@ -1306,6 +1337,8 @@
           if (lifecycle !== playerLifecycle) return;
           remember("playback failed", error?.message || error);
           failedRoute = route;
+          // Failing on the network before a single segment arrived: a retake would only repeat it.
+          if (!startupSegments && /fetch|network|timeout|超时|没有可用/i.test(String(error?.message || error))) slowRoutes.add(route);
           recordTakeoverFailure(route, "mse", error, true);
           setTimeout(() => {
             if (lifecycle === playerLifecycle && player && playerRoute === route && stats.playerState === "error") {
@@ -1323,6 +1356,7 @@
         return;
       }
       player = nextPlayer;
+      armStartupWatch(route, lifecycle, nextPlayer);
       remember("took over", `${route}${nextPlayer.nativeTransport ? " (兼容模式)" : ""}`);
       stats.architecture = nextPlayer.nativeTransport ? "native-player-range-transport" : "bilibili-native-ui-progressive-mse-0.8-core";
       playerRoute = route;
@@ -1396,6 +1430,7 @@
       publish();
     } else if (event.data.type === "retry-takeover") {
       clearTimeout(autoRetakeTimer);
+      slowRoutes.clear();
       autoRetakeCount = 0;
       clearTakeoverFailure();
       stats.lastError = "";

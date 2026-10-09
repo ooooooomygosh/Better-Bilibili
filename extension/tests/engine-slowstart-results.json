@@ -1,0 +1,25 @@
+{
+ "scope": "page-hook with a stub player; no network",
+ "results": [
+  {
+   "test": "no media segment within the startup window: handed back to Bilibili (resumeNative) and not retaken automatically",
+   "passed": true
+  },
+  {
+   "test": "a manual retry still takes the video over again",
+   "passed": true
+  },
+  {
+   "test": "a takeover that delivers its first segment keeps playing (no false hand-back)",
+   "passed": true
+  },
+  {
+   "test": "SourceBuffer.buffered is left native until the extension actually takes a player over (Bilibili errors are not attributed to us)",
+   "passed": true
+  },
+  {
+   "test": "no uncaught exceptions",
+   "passed": true
+  }
+ ]
+}
