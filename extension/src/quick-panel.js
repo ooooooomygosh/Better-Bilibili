@@ -502,7 +502,10 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
 
   async function openPanel(which) {
     ensureHost();
-    await Promise.all([refreshUsage(), refreshLock()]);
+    // Don't let a sleeping service worker delay the panel: wait briefly, then fill in when data arrives.
+    const fresh = Promise.all([refreshUsage(), refreshLock()]);
+    const inTime = await Promise.race([fresh.then(() => true), new Promise(r => setTimeout(r, 180, false))]);
+    if (!inTime) fresh.then(() => rebuildOrPatch());
     if (which === 'focus') which = 'brake';
     if (which && TABS.some(([id]) => id === which)) tab = which;
     if (!panel) build();
@@ -537,7 +540,7 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
   // One-time hint next to the button for new users.
   let tip = null;
   function showTip() {
-    if (!fab || tip) return;
+    if (!fab || tip || open) return;
     tip = el('div', 'tip'); tip.setAttribute('role', 'status');
     tip.append(el('b', null, '常用开关都在这里'), el('p', null, '观看额度、无限下滑、首页净化、播放加速——点一下就能开关。按钮可以上下拖动。'));
     tip.append(btn('知道了', null, dismissTip));
