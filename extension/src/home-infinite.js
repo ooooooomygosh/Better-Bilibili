@@ -79,16 +79,17 @@
 #btr-flow-feed .bili-video-card__info{position:relative}
 #btr-flow-feed .bili-video-card__wrap{position:relative}
 /* ⋮ menu, styled like B 站's own card popover. */
-#btr-flow-feed .btr-menu{position:absolute;right:0;top:26px;z-index:20;min-width:150px;padding:6px 0;border-radius:8px;background:var(--btr-menu-bg,#fff);border:1px solid var(--btr-line,rgba(0,0,0,.08));box-shadow:0 6px 20px rgba(0,0,0,.12);font-size:14px;color:var(--btr-text,#18191c);transform-origin:100% 0}
+#btr-flow-feed .btr-menu{position:fixed;z-index:1000;min-width:150px;padding:6px 0;border-radius:8px;background:var(--btr-menu-bg,#fff);border:1px solid var(--btr-line,rgba(0,0,0,.08));box-shadow:0 6px 20px rgba(0,0,0,.12);font-size:14px;color:var(--btr-text,#18191c);transform-origin:100% 0}
 #btr-flow-feed .btr-menu button{display:flex;align-items:center;gap:8px;width:100%;padding:8px 14px;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;white-space:nowrap}
 #btr-flow-feed .btr-menu button:hover,#btr-flow-feed .btr-menu button:focus-visible{background:var(--btr-menu-hover,#f1f2f3);color:#fb7299;outline:none}
 #btr-flow-feed .btr-menu small{margin-left:auto;padding-left:10px;font-size:12px;color:var(--btr-muted,#9499a0)}
 /* Hidden-by-you state: the card dims and blurs, one short line and 撤销 in the middle, then it folds away. */
-#btr-flow-feed .btr-gone{position:absolute;inset:-4px;z-index:15;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border-radius:8px;background:var(--btr-gone,rgba(255,255,255,.72));backdrop-filter:blur(10px) saturate(.6);-webkit-backdrop-filter:blur(10px) saturate(.6);color:var(--btr-text,#18191c);font-size:14px;text-align:center}
+#btr-flow-feed .btr-gone-card{position:relative;min-width:0;overflow:hidden;border-radius:8px;background:var(--btr-placeholder,#f1f2f3);cursor:default;user-select:none}
+#btr-flow-feed .btr-gone-bg{position:absolute;inset:-24px;background:center/cover no-repeat;filter:blur(18px) saturate(.6);opacity:.55}
+#btr-flow-feed .btr-gone{position:absolute;inset:0;z-index:15;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border-radius:8px;background:var(--btr-gone,rgba(255,255,255,.72));backdrop-filter:blur(10px) saturate(.6);-webkit-backdrop-filter:blur(10px) saturate(.6);color:var(--btr-text,#18191c);font-size:14px;text-align:center}
 #btr-flow-feed .btr-gone small{display:block;margin-top:2px;font-size:12px;color:var(--btr-muted,#9499a0)}
 #btr-flow-feed .btr-gone button{padding:5px 16px;border-radius:6px;border:1px solid var(--btr-line,rgba(0,0,0,.12));background:var(--btr-menu-bg,#fff);color:inherit;font:inherit;font-size:13px;cursor:pointer}
 #btr-flow-feed .btr-gone button:hover{color:#fb7299;border-color:#fb7299}
-#btr-flow-feed .btr-gone-on .bili-video-card__image--link,#btr-flow-feed .btr-gone-on .bili-video-card__info a,#btr-flow-feed .btr-gone-on .bili-video-card__info--no-interest{pointer-events:none}
 #btr-flow-feed .btr-gone{cursor:default}
 /* Hover preview: Bilibili's own storyboard frames, scrubbed by the pointer. */
 #btr-flow-feed .btr-shot{position:absolute;inset:0;z-index:2;border-radius:inherit;background-repeat:no-repeat;pointer-events:none;opacity:0;transition:opacity .14s ease}
@@ -403,49 +404,81 @@
         const items = [...node.querySelectorAll('button')], i = items.indexOf(document.activeElement);
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus(); }
         else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeMenu(true); }
-        else if (e.key === 'Tab') closeMenu();
+        else if (e.key === 'Tab') { e.preventDefault(); closeMenu(true); }
       });
-      more.after(node);
+      // The menu lives outside the card (fixed, at the end of our feed root), so presses on its items
+      // can never be read by B 站 listeners as presses on the card.
+      box.append(node);
+      const r = more.getBoundingClientRect(), w = node.offsetWidth, hgt = node.offsetHeight;
+      const below = r.bottom + 6 + hgt <= innerHeight - 8;
+      node.style.top = `${Math.round(below ? r.bottom + 6 : Math.max(8, r.top - 6 - hgt))}px`;
+      node.style.left = `${Math.round(Math.min(innerWidth - w - 8, Math.max(8, r.right - w)))}px`;
+      node.style.transformOrigin = below ? 'top right' : 'bottom right';
       v.classList.add('btr-menu-open'); more.setAttribute('aria-expanded', 'true');
       openMenu = {node, v, more};
       if (ui) ui.animate(node, [{opacity: 0, transform: 'scale(.96) translateY(-4px)'}, {opacity: 1, transform: 'none'}], {duration: 140});
       node.querySelector('button').focus({preventScroll: true});
     }
 
-    // Dim + blur the card with one short line and 撤销; after a few seconds it folds away
-    // and, when a spare card is waiting, a fresh one takes its place so the row stays full.
+    // The card steps out and a plain placeholder (one short line + 撤销) takes its cell; after a few
+    // seconds it folds away and, when a spare card is waiting, a fresh one takes its place so the row
+    // stays full. The placeholder is not a B 站 card, holds no link and sits inside no link, and the
+    // detached card's links lose their href / target — so no page listener, delegated window.open or
+    // middle-click can turn 撤销 into "open the video". 撤销 puts the very same card back.
+    function stripLinks(node) {
+      for (const a of node.querySelectorAll('a[href]')) {
+        a.dataset.btrHref = a.getAttribute('href'); a.removeAttribute('href');
+        if (a.hasAttribute('target')) { a.dataset.btrTarget = a.getAttribute('target'); a.removeAttribute('target'); }
+        a.style.pointerEvents = 'none';
+      }
+    }
+    function restoreLinks(node) {
+      for (const a of node.querySelectorAll('a[data-btr-href]')) {
+        a.setAttribute('href', a.dataset.btrHref); delete a.dataset.btrHref;
+        if (a.dataset.btrTarget != null) { a.setAttribute('target', a.dataset.btrTarget); delete a.dataset.btrTarget; }
+        a.style.pointerEvents = '';
+      }
+    }
     function gone(c, v, kind) {
       const outer = v.closest('.feed-card');
-      if (!outer || v.querySelector('.btr-gone')) return;
+      if (!outer || !outer.isConnected) return;
       if (kind === 'up') blockedUps.add(String(c.mid)); else dislikes.add(c.bvid);
       persist();
+      const ph = el('div', 'btr-gone-card'); ph.setAttribute('role', 'listitem');
+      ph.style.height = `${Math.round(outer.getBoundingClientRect().height)}px`;
+      const cover = v.querySelector('img'), src = cover?.currentSrc || cover?.src || '';
+      const bg = el('div', 'btr-gone-bg');
+      if (/^https:\/\/[^/"')\s]*hdslb\.com\/[^"')\s]*$/.test(src)) bg.style.backgroundImage = `url("${src}")`;
       const layer = el('div', 'btr-gone'); layer.setAttribute('role', 'status');
       const msg = el('div', null, kind === 'up' ? `不再显示「${c.author}」` : '已不再显示这条视频');
       msg.append(el('small', null, '只在本插件生效，不影响 B 站推荐'));
       const undo = el('button', null, '撤销'); undo.type = 'button';
-      layer.append(msg, undo);
-      bind(layer, () => {}); // The whole veil swallows clicks: nothing under it may open the video.
-      v.classList.add('btr-gone-on'); // CSS turns the card's own links off while the veil is up.
-      v.querySelector('.bili-video-card__wrap').append(layer);
-      if (ui) ui.animate(layer, [{opacity: 0}, {opacity: 1}], {duration: 220});
+      layer.append(msg, undo); ph.append(bg, layer);
+      bind(ph, () => {}); // Presses anywhere on the placeholder stop here.
+      stripLinks(outer);
+      outer.replaceWith(ph);
+      if (ui) ui.animate(layer, [{opacity: 0, transform: 'scale(.98)'}, {opacity: 1, transform: 'none'}], {duration: 220});
       undo.focus({preventScroll: true});
       let fold = 0;
       const arm = ms => { clearTimeout(fold); fold = setTimeout(() => {
-        if (!outer.isConnected || !layer.isConnected) return;
-        const others = kind === 'up' ? [...(list?.querySelectorAll(`.bili-video-card[data-mid="${String(c.mid).replace(/[^0-9]/g, "")}"]`) || [])].map(n => n.closest('.feed-card')).filter(n => n && n !== outer) : [];
-        for (const o of [outer, ...others]) collapse(o);
+        if (!ph.isConnected) return;
+        const others = kind === 'up' ? [...(list?.querySelectorAll(`.bili-video-card[data-mid="${String(c.mid).replace(/[^0-9]/g, "")}"]`) || [])].map(n => n.closest('.feed-card')).filter(Boolean) : [];
+        for (const o of [ph, ...others]) collapse(o);
       }, ms); };
       arm(3200);
       // Reading the message or reaching for 撤销 holds the fold.
-      layer.addEventListener('pointerenter', () => clearTimeout(fold));
-      layer.addEventListener('pointerleave', () => arm(1600));
+      ph.addEventListener('pointerenter', () => clearTimeout(fold));
+      ph.addEventListener('pointerleave', () => arm(1600));
       bind(undo, () => {
         clearTimeout(fold);
+        if (!ph.isConnected) return;
         if (kind === 'up') blockedUps.delete(String(c.mid)); else dislikes.delete(c.bvid);
         persist();
-        v.classList.remove('btr-gone-on');
-        if (ui) ui.fadeOut(layer, 140); else layer.remove();
-        v.querySelector('.bili-video-card__info--no-interest')?.focus({preventScroll: true});
+        // Links come back a moment later, after this press (and any trailing mouseup/click) is over.
+        ph.replaceWith(outer);
+        setTimeout(() => restoreLinks(outer), 0);
+        if (ui) ui.animate(outer, [{opacity: 0}, {opacity: 1}], {duration: 180});
+        outer.querySelector('.bili-video-card__info--no-interest')?.focus({preventScroll: true});
       });
     }
     function collapse(outer) {

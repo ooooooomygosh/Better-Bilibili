@@ -36,6 +36,12 @@ with sync_playwright() as p:
  page.goto('https://www.bilibili.com/')
  # In-page latency + in-flight counter: Playwright's sync route handlers run one at a time.
  page.evaluate("(()=>{const f=window.fetch;window.inflight=0;window.maxInflight=0;window.fetch=async(...a)=>{const rc=String(a[0]).includes('/feed/rcmd');if(rc){inflight++;maxInflight=Math.max(maxInflight,inflight);}try{const r=await f(...a);if(rc)await new Promise(z=>setTimeout(z,350));return r;}finally{if(rc)inflight--;}};})()")
+ # Simulate B 站's logged-in page, registered BEFORE the content script (so it runs ahead of any guard of
+ # ours on window capture): delegated listeners that window.open the card's video for any press inside a
+ # card or a link, on mousedown / pointerup / click / auxclick (incl. middle button).
+ page.evaluate("""window.opens=[];window.open=(u)=>{opens.push(String(u));return null};
+ for(const t of ['pointerdown','mousedown','pointerup','mouseup','click','auxclick'])window.addEventListener(t,e=>{const a=e.target.closest?.('a[href]'),c=e.target.closest?.('.bili-video-card,.feed-card');if(a||c){if(t==='click'||t==='auxclick'||t==='mousedown'&&e.button===1)window.open((a&&a.href)||'card:'+t);}},true);
+ document.addEventListener('click',e=>{if(e.target.closest?.('.bili-video-card'))window.open('doc-card');});0""")
  for f in ['tests/browser-shim.js','src/ui-kit.js','src/home-core.js','src/feed-core.js']:page.add_script_tag(content=(ROOT/f).read_text())
  page.evaluate("chromeMock.storage.sync.set({homeInfinite:true,homeInfiniteSize:24,homeInfiniteThreads:2})")
  page.evaluate("code=>new Function('chrome',code)(window.chromeMock)",(ROOT/'src/home-infinite.js').read_text())
@@ -69,32 +75,42 @@ with sync_playwright() as p:
  assert page.evaluate(f"{feed}.querySelectorAll('.btr-wait').length")==0
  ok('cards on screen are fully visible shortly after landing; nothing waits hidden for an observer')
  c0=f"{feed}.querySelector('.btr-batch .bili-video-card')"
+ menu=f"{feed}.querySelector(':scope>.btr-menu')"
  page.hover(f"#btr-flow-feed .btr-batch .bili-video-card >> nth=0");page.evaluate(f"{c0}.querySelector('.bili-video-card__info--no-interest').click()");page.wait_for_timeout(250)
- items=page.evaluate(f"[...{c0}.querySelectorAll('.btr-menu [role=menuitem]')].map(b=>b.textContent)")
+ items=page.evaluate(f"[...{menu}.querySelectorAll('[role=menuitem]')].map(b=>b.textContent)")
  assert len(items)==3 and items[0].startswith('添加至稍后再看') and items[1].startswith('不感兴趣') and items[2].startswith('不想看'),items
- assert not page.evaluate(f"!!{c0}.querySelector('.btr-gone')")
- page.keyboard.press('Escape');page.wait_for_timeout(250);assert not page.evaluate(f"!!{c0}.querySelector('.btr-menu')")
- ok('⋮ opens a small menu (稍后再看 / 不感兴趣 / 不想看此 UP 主) instead of hiding at once; Esc closes it')
- page.evaluate(f"window.firstBv={c0}.dataset.bvid;{c0}.querySelector('.bili-video-card__info--no-interest').click()");page.wait_for_timeout(200)
- page.evaluate(f"[...{c0}.querySelectorAll('.btr-menu button')].find(b=>b.textContent.startsWith('不感兴趣')).click()");page.wait_for_timeout(300)
- gone=page.evaluate(f"(()=>{{const g={c0}.querySelector('.btr-gone');return g&&[g.textContent,getComputedStyle(g).backdropFilter]}})()")
- assert gone and '撤销' in gone[0] and 'blur' in gone[1],gone
- # Simulate B 站's logged-in page: listeners on document that open the video for any press inside a card.
- page.evaluate("window.cardOpens=0;for(const t of ['mousedown','click','mouseup'])document.addEventListener(t,e=>{if(e.target.closest?.('.bili-video-card'))cardOpens++;},true);document.addEventListener('click',e=>{if(e.target.closest?.('.bili-video-card'))cardOpens++;});0")
- opened=[];ctx.on('page',lambda n:opened.append(n.url))
- bb=page.locator('#btr-flow-feed .btr-batch .bili-video-card >> nth=0').locator('.btr-gone button').bounding_box()
- page.mouse.click(bb['x']+bb['width']/2,bb['y']+bb['height']/2);page.wait_for_timeout(500)
- assert not page.evaluate(f"!!{c0}.querySelector('.btr-gone')") and not page.evaluate("fixtureStorage.all.local.flowDislikes?.includes(firstBv)")
- assert page.evaluate('cardOpens')==0 and not opened,(page.evaluate('cardOpens'),opened)
+ assert page.evaluate(f"!{menu}.closest('.bili-video-card,a') && getComputedStyle({menu}).position==='fixed'")
+ page.keyboard.press('Escape');page.wait_for_timeout(250);assert not page.evaluate(f"!!{menu}")
+ ok('⋮ opens a small menu (稍后再看 / 不感兴趣 / 不想看此 UP 主) outside the card (fixed, no card / link ancestor); Esc closes it')
+ page.evaluate(f"window.firstBv={c0}.dataset.bvid;window.firstCard={c0}.closest('.feed-card');{c0}.querySelector('.bili-video-card__info--no-interest').click()");page.wait_for_timeout(200)
+ page.evaluate("window.opens.length=0;0")  # (the simulated page reacts to ⋮ itself, which is B 站's own card control)
+ mb=page.locator('#btr-flow-feed > .btr-menu button',has_text='不感兴趣').bounding_box()
+ page.mouse.click(mb['x']+mb['width']/2,mb['y']+mb['height']/2);page.wait_for_timeout(300)
+ ph="document.querySelector('#btr-flow-feed .btr-gone-card')"
+ gone=page.evaluate(f"(()=>{{const g={ph};return g&&[g.textContent,!firstCard.isConnected,!g.closest('a,.bili-video-card,.feed-card'),g.querySelectorAll('a').length,[...firstCard.querySelectorAll('a')].every(a=>!a.hasAttribute('href')&&!a.hasAttribute('target')&&a.dataset.btrHref)]}})()")
+ assert gone and '撤销' in gone[0] and gone[1:]==[True,True,0,True],gone
+ assert page.evaluate("opens.length")==0,page.evaluate("opens")
+ ok('不感兴趣 swaps the card for a plain placeholder: no link inside, no card / link ancestor, links in the card lose href / target')
+ bb=page.locator('#btr-flow-feed .btr-gone-card button').bounding_box();x,y=bb['x']+bb['width']/2,bb['y']+bb['height']/2
+ # Middle click and a pointer press that is not completed must not open anything either.
+ page.mouse.move(x,y);page.mouse.down(button='middle');page.mouse.up(button='middle');page.wait_for_timeout(100)
+ page.mouse.click(x,y);page.wait_for_timeout(400)
+ assert page.evaluate("opens")==[],page.evaluate("opens")
+ assert page.evaluate("firstCard.isConnected && !document.querySelector('#btr-flow-feed .btr-gone-card')") and not page.evaluate("fixtureStorage.all.local.flowDislikes?.includes(firstBv)")
+ hrefs=page.evaluate("[...firstCard.querySelectorAll('a')].map(a=>[a.getAttribute('href'),a.getAttribute('target'),a.style.pointerEvents])")
+ assert all(h[0] and h[1]=='_blank' and h[2]=='' for h in hrefs if h[0]!=None) and hrefs[0][0].endswith(page.evaluate('firstBv')),hrefs
+ assert not ctx.pages[1:],[x.url for x in ctx.pages]
  page.wait_for_timeout(3500);assert page.evaluate(f"{c0}.dataset.bvid")==page.evaluate('firstBv')
- ok('撤销 with a real mouse click restores the card; the press never reaches the card link or page-level card listeners')
+ ok('撤销 (real mouse, plus a middle click) with B 站-style delegated window.open listeners registered first: nothing opens; the same card and its links come back')
  page.evaluate(f"{c0}.querySelector('.bili-video-card__info--no-interest').click()");page.wait_for_timeout(200)
- page.evaluate(f"[...{c0}.querySelectorAll('.btr-menu button')].find(b=>b.textContent.startsWith('不感兴趣')).click()")
- page.mouse.move(5,5)  # hovering the veil holds the fold; move away
- page.wait_for_function("!document.querySelector(`#btr-flow-feed .bili-video-card[data-bvid=\"${firstBv}\"]`)",timeout=6000)
+ page.evaluate(f"[...{menu}.querySelectorAll('button')].find(b=>b.textContent.startsWith('不感兴趣')).click()")
+ page.evaluate("window.opens.length=0;0")
+ page.mouse.move(5,5)  # hovering the placeholder holds the fold; move away
+ page.wait_for_function("!document.querySelector(`#btr-flow-feed .bili-video-card[data-bvid=\"${firstBv}\"]`)&&!document.querySelector('#btr-flow-feed .btr-gone-card')",timeout=6000)
  assert page.evaluate("fixtureStorage.all.local.flowDislikes.includes(firstBv)")
  assert page.evaluate(f"{feed}.querySelector('.btr-batch').querySelectorAll('.feed-card').length")==25
- ok('不感兴趣: blurred card with a short line and 撤销 (undo works), then it folds away and a spare card keeps the row full')
+ assert page.evaluate("opens.length")==0
+ ok('不感兴趣 then waiting: the placeholder folds away and a spare card keeps the row full')
  page.evaluate(f"{feed}.querySelector('.btr-batch').scrollIntoView({{block:'center'}})");page.wait_for_timeout(500)
  side=page.evaluate(f"(()=>{{const s={ui}.querySelector('.side');return {{n:s.querySelector('b').textContent,off:s.classList.contains('off'),total:s.querySelector('.total').textContent}}}})()")
  assert side['n']=='2' and not side['off'],side

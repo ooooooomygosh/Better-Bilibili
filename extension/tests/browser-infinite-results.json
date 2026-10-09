@@ -22,15 +22,19 @@
    "passed": true
   },
   {
-   "test": "⋮ opens a small menu (稍后再看 / 不感兴趣 / 不想看此 UP 主) instead of hiding at once; Esc closes it",
+   "test": "⋮ opens a small menu (稍后再看 / 不感兴趣 / 不想看此 UP 主) outside the card (fixed, no card / link ancestor); Esc closes it",
    "passed": true
   },
   {
-   "test": "撤销 with a real mouse click restores the card; the press never reaches the card link or page-level card listeners",
+   "test": "不感兴趣 swaps the card for a plain placeholder: no link inside, no card / link ancestor, links in the card lose href / target",
    "passed": true
   },
   {
-   "test": "不感兴趣: blurred card with a short line and 撤销 (undo works), then it folds away and a spare card keeps the row full",
+   "test": "撤销 (real mouse, plus a middle click) with B 站-style delegated window.open listeners registered first: nothing opens; the same card and its links come back",
+   "passed": true
+  },
+  {
+   "test": "不感兴趣 then waiting: the placeholder folds away and a spare card keeps the row full",
    "passed": true
   },
   {
