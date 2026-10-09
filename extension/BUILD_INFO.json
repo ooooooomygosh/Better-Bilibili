@@ -25,11 +25,11 @@
   },
   "automatic_updates": false,
   "testing": {
-    "node_core_passed": 103,
+    "node_core_passed": 105,
     "renderer_home_options_fixture_passed": 35,
     "renderer_branch_diagnostics_fixture_passed": 9,
     "real_mse_synthetic_media_passed": "not re-run for 1.2.0 (open-source Chromium lacks H.264); 7 passed on 1.1.0",
-    "total_passed": 202,
+    "total_passed": 210,
     "real_bilibili_e2e_verified": false,
     "real_HDR_HiRes_hardware_verified": false,
     "firefox_safari_verified": false,
@@ -48,7 +48,9 @@
     "ui_polish_round5_live": "Live bilibili.com (logged out, unpacked): 不感兴趣 placeholder (blurred cover, 已减少此类推荐, 撤销, ×, 知道了) still present 6.6 s later with the pointer away, dismissed after the 8 s minimum; on a live video page Alt+T alternately opened and closed the panel, including with focus inside the panel; the panel top stayed ≥64px.",
     "renderer_engine_slowstart_passed": 5,
     "installed_extension_options_nav_passed": 3,
-    "playback_investigation_round5": "BV1cNd8BoEoW, logged out, Playwright Chromium + unpacked extension. Player code identical to origin/main except version strings. curl from the box: uncached upos ranges 24-102 KB/s on cosov (TTFB 4-11 s), akam 0.065-2 MB/s. Unthrottled 90 s: branch/main/no-extension all play (35-72 s buffered), no freeze (heartbeat lag <0.3 s). 400 kbps: branch and main both black ~65 s (takeover, fetch failure, auto-retake); no extension starts at ~76 s. With the new 20 s slow-start guard: takeover at ~43 s, handed back at ~63 s, no retake, native playing from ~93 s, 110 media requests instead of 169-179."
+    "playback_investigation_round5": "BV1cNd8BoEoW, logged out, Playwright Chromium + unpacked extension. Player code identical to origin/main except version strings. curl from the box: uncached upos ranges 24-102 KB/s on cosov (TTFB 4-11 s), akam 0.065-2 MB/s. Unthrottled 90 s: branch/main/no-extension all play (35-72 s buffered), no freeze (heartbeat lag <0.3 s). 400 kbps: branch and main both black ~65 s (takeover, fetch failure, auto-retake); no extension starts at ~76 s. With the new 20 s slow-start guard: takeover at ~43 s, handed back at ~63 s, no retake, native playing from ~93 s, 110 media requests instead of 169-179.",
+    "renderer_home_ads_passed": 6,
+    "home_ads_markup_source": "laputa-home index-12fc55c2.js (2026-10-09): ad cards render <span class=bili-video-card__stats--text>广告</span> (or a rocket icon for creative ads, card_type 82) directly in .bili-video-card__stats instead of the duration; url/spaceUrl point at the ad link. Recording frame: 腾讯 WorkBuddy card with a 广告 corner label."
   },
   "previous_version": "2.2.0",
   "proxy_feature": "removed in 2.3.0 (Chrome rejects proxy as an optional permission)"
