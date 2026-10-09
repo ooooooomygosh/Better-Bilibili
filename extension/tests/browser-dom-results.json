@@ -119,7 +119,19 @@
       "passed": true
     },
     {
+      "test": "restore asks in a styled in-page dialog (focus inside, page inert); Esc cancels and changes nothing",
+      "passed": true
+    },
+    {
       "test": "restore defaults returns native theme without modifying proxy configuration",
+      "passed": true
+    },
+    {
+      "test": "controls outside the form (快捷面板) auto-save too",
+      "passed": true
+    },
+    {
+      "test": "save bar stays pinned to the window bottom on any section; section nav follows the scroll exactly",
       "passed": true
     },
     {

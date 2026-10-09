@@ -26,6 +26,10 @@
    "passed": true
   },
   {
+   "test": "撤销 with a real mouse click restores the card; the press never reaches the card link or page-level card listeners",
+   "passed": true
+  },
+  {
    "test": "不感兴趣: blurred card with a short line and 撤销 (undo works), then it folds away and a spare card keeps the row full",
    "passed": true
   },

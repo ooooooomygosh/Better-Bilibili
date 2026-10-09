@@ -120,3 +120,32 @@ body.popup{width:380px;padding:20px;background:var(--btr-bg)}
 @media(max-width:640px){.grid{grid-template-columns:1fr}.hero{padding:28px 24px}.wrap{padding:20px 14px}.card{padding:18px}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
 @media (prefers-color-scheme:dark){.hero{background:radial-gradient(120% 160% at 50% -30%,#b4527a 0%,#7e3a63 45%,#2b2140 100%)}.status.dirty{color:#f0b35a}}
+
+/* ---------- inline field errors ---------- */
+.field-error{display:flex;align-items:center;gap:6px;margin:0;font-size:12.5px;line-height:1.5;color:var(--btr-danger)}
+.field-error::before{content:"!";display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;background:var(--btr-danger);color:#fff;font-size:11px;font-weight:700;flex:none}
+.field-error[hidden]{display:none}
+input[aria-invalid]{border-color:var(--btr-danger)!important}
+input[aria-invalid]:focus{box-shadow:0 0 0 3px color-mix(in srgb,var(--btr-danger) 18%,transparent)!important}
+#lock .honest{margin-top:14px;padding-top:12px;border-top:1px dashed var(--btr-line)}
+
+/* ---------- in-page dialog (replaces confirm / prompt) ---------- */
+.modal-back{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:20px;background:rgba(14,15,18,.42);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+.modal{width:min(420px,100%);padding:22px 22px 18px;border-radius:18px;background:var(--btr-bg);color:var(--btr-text1);border:1px solid var(--btr-line);box-shadow:0 24px 60px rgba(0,0,0,.22)}
+.modal h3{margin:0 0 6px;font-size:17px}
+.modal p.muted{margin:0 0 14px;line-height:1.6}
+.modal .field{margin-bottom:12px}
+.modal .field span{font-size:13px;font-weight:600}
+.modal .actions{display:flex;justify-content:flex-end;gap:10px;margin-top:6px}
+button.danger-fill{background:var(--btr-danger);border-color:var(--btr-danger);color:#fff}
+button.danger-fill:hover{background:color-mix(in srgb,var(--btr-danger) 88%,#000);border-color:transparent}
+
+/* ---------- save bar: pinned to the bottom of the window for the whole page ---------- */
+.wrap>.savebar{position:sticky;bottom:14px;margin:8px 0 0;backdrop-filter:blur(12px) saturate(1.2);-webkit-backdrop-filter:blur(12px) saturate(1.2);background:color-mix(in srgb,var(--btr-bg) 88%,transparent);box-shadow:0 10px 30px rgba(0,0,0,.10),0 1px 0 rgba(255,255,255,.04) inset}
+
+/* ---------- small refinements ---------- */
+.card{transition:border-color var(--btr-mid) ease,box-shadow var(--btr-mid) ease}
+.card:hover{box-shadow:0 6px 22px rgba(0,0,0,.05)}
+button{transition:border-color var(--btr-fast) ease,background-color var(--btr-fast) ease,color var(--btr-fast) ease,transform var(--btr-fast) ease,box-shadow var(--btr-fast) ease}
+button.primary:hover{box-shadow:0 4px 14px color-mix(in srgb,var(--btr-brand) 32%,transparent)}
+@media (prefers-reduced-motion:reduce){.card,button{transition:none}}

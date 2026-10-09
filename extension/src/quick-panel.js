@@ -57,7 +57,7 @@ ${ui.scoped('.root')}
 .tip button{margin-top:8px;border:0;border-radius:999px;padding:4px 12px;background:var(--pink);color:#fff;font:inherit;font-size:12px;cursor:pointer}
 .tip::after{content:"";position:absolute;right:-6px;top:50%;width:12px;height:12px;background:inherit;transform:translateY(-50%) rotate(45deg);border-radius:2px}
 .panel:focus{outline:none}
-.panel{position:fixed;right:22px;z-index:2147483001;width:348px;max-width:calc(100vw - 24px);max-height:min(640px,calc(100vh - 32px));display:flex;flex-direction:column;
+.panel{position:fixed;right:22px;z-index:var(--btr-panel-z,1001);width:348px;max-width:calc(100vw - 24px);max-height:min(640px,calc(100vh - 32px));display:flex;flex-direction:column;
   border-radius:20px;background:var(--bg);box-shadow:var(--btr-shadow),0 0 0 1px var(--line);backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);
   transform-origin:100% 100%;overflow:hidden}
 .head{display:flex;align-items:center;gap:10px;padding:14px 14px 10px 16px}
@@ -126,6 +126,8 @@ ${ui.scoped('.root')}
 .lock form{display:flex;gap:6px;margin-top:8px}
 .lock input{flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:var(--btr-bg);color:var(--fg);font:inherit;font-size:12px}
 .lock input:focus{outline:none;border-color:var(--pink);box-shadow:0 0 0 3px var(--btr-brand-soft)}
+.lock .pwerr{margin:6px 0 0;font-size:12px;color:var(--btr-danger)}.lock .pwerr[hidden]{display:none}
+.lock input[aria-invalid]{border-color:var(--btr-danger)}
 .lock form button{border:0;border-radius:8px;padding:5px 10px;background:var(--pink);color:#fff;font:inherit;font-size:12px;cursor:pointer}
 .foot{display:flex;gap:4px;align-items:center;padding:8px 12px 12px;border-top:1px solid var(--line)}
 .foot button{border:0;background:transparent;color:var(--muted);font:inherit;font-size:12px;padding:5px 8px;border-radius:8px;cursor:pointer;transition:background-color var(--btr-fast) ease,color var(--btr-fast) ease}
@@ -263,14 +265,24 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
       box.append(ul);
       if (lock.hasPassword) {
         const f = el('form'), pw = el('input'); pw.type = 'password'; pw.placeholder = '输入密码立即生效'; pw.autocomplete = 'off'; pw.setAttribute('aria-label', '自律锁密码');
+        const err = el('p', 'pwerr'); err.id = 'q-pwerr'; err.setAttribute('role', 'alert'); err.hidden = true;
+        pw.setAttribute('aria-describedby', 'q-pwerr');
         f.append(pw, btn('立即生效'));
         f.querySelector('button').type = 'submit';
+        pw.addEventListener('input', () => { err.hidden = true; pw.removeAttribute('aria-invalid'); });
         f.addEventListener('submit', async e => {
           e.preventDefault();
-          const r = await applyPendingNow(pw.value); pw.value = '';
-          toast(r?.error || '已用密码立即生效');
+          if (!pw.value) { pw.focus(); return; }
+          const r = await applyPendingNow(pw.value);
+          if (r?.error) {
+            // Wrong password: say so right under the field and nudge it, keep the panel as it is.
+            err.textContent = r.error; err.hidden = false; pw.setAttribute('aria-invalid', 'true'); pw.select();
+            ui.animate(pw, [{transform: 'translateX(0)'}, {transform: 'translateX(-6px)'}, {transform: 'translateX(5px)'}, {transform: 'translateX(-3px)'}, {transform: 'translateX(0)'}], {duration: 320, easing: 'ease-out'});
+            return;
+          }
+          pw.value = ''; await refreshLock(); rebuildOrPatch(true); toast('密码正确，已立即生效');
         });
-        box.append(f);
+        box.append(f, err);
       }
     }
     return box;
@@ -290,7 +302,7 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
       if (!r?.error && p.cooldownHours) r = await chrome.runtime.sendMessage({type: 'lock-cooldown', cooldownHours: p.cooldownHours.value, password});
       if (!r?.error && p.remove) r = await chrome.runtime.sendMessage({type: 'lock-remove', password});
     } catch (e) { r = {error: String(e?.message || e)}; }
-    await refreshLock(); rebuildOrPatch(true);
+    if (r?.error) await refreshLock(); // Fail count / lockout changed; the caller keeps the form on screen.
     return r;
   }
 
@@ -427,17 +439,32 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
     if (!panel) return;
     const bottom = fab ? fabY() + 60 : 24;
     const room = innerHeight - bottom - 16;
-    if (room >= 360) { panel.style.bottom = `${bottom}px`; panel.style.right = '22px'; }
+    const low = room >= 360;
+    if (low) { panel.style.bottom = `${bottom}px`; panel.style.right = '22px'; }
     else { panel.style.bottom = '16px'; panel.style.right = fab ? '84px' : '22px'; }
     panel.style.top = '';
+    // Sit just under B 站's header (z-index 1002) so its avatar / message popovers open above the panel,
+    // and never extend underneath the header. In web-fullscreen / fullscreen video, go topmost instead.
+    const full = !!document.fullscreenElement || !!document.querySelector('.bpx-player-container[data-screen="web"],.bpx-player-container[data-screen="full"]') || document.body?.classList.contains('player-fullscreen-fix');
+    panel.style.setProperty('--btr-panel-z', full ? '2147483001' : '1001');
+    let top = 12;
+    if (!full) for (const h of document.querySelectorAll('.bili-header__bar,#biliMainHeader,.bili-header.fixed-header')) {
+      const r = h.getBoundingClientRect(); if (r.height && r.bottom > 0 && r.top <= 0) top = Math.max(top, r.bottom + 10);
+    }
+    panel.style.maxHeight = `${Math.max(240, Math.min(640, innerHeight - (low ? bottom : 16) - top))}px`;
   }
 
   const TABS = [['brake', '刹车'], ['home', '首页'], ['play', '油门']];
   const sig = () => [tab, s.homeInfinite, !!usage?.window, lock.locked, lock.hasPassword, lock.cooldownHours, JSON.stringify(lock.pending || {}), isPlayer()].join('|');
 
+  let heightAnim = null;
   function render() {
     if (!panel) return;
     const body = panel.querySelector('.body'), switched = body.dataset.tab !== tab, keep = switched ? 0 : body.scrollTop;
+    // Measure before and after so a tab switch (or a toggle revealing more controls) glides to the new height.
+    const shown = body.dataset.tab != null && panel.isConnected;
+    const from = shown ? panel.getBoundingClientRect().height : 0;
+    heightAnim?.cancel(); heightAnim = null;
     controls = [];
     const page = tab === 'brake' ? brake() : tab === 'home' ? homepage() : throttle();
     if (!switched) page.style.animation = 'none'; // A structural rebuild after a toggle: no entrance motion.
@@ -445,6 +472,13 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
     body.setAttribute('aria-labelledby', `q-tab-${tab}`);
     body.scrollTop = keep;
     structure = sig();
+    if (shown) {
+      const to = panel.getBoundingClientRect().height;
+      if (Math.abs(to - from) > 2) {
+        heightAnim = ui.animate(panel, [{height: `${from}px`}, {height: `${to}px`}], {duration: MOTION.mid});
+        if (heightAnim) heightAnim.onfinish = heightAnim.oncancel = () => { heightAnim = null; };
+      }
+    }
     const tabs = [...panel.querySelectorAll('.tabs button')];
     tabs.forEach((b, i) => {
       const on = b.dataset.tab === tab;
@@ -580,9 +614,10 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
   // The native dock appears lazily (e.g. after the first scroll); follow it until the user drags the button.
   let dockFrame = 0;
   addEventListener('scroll', () => {
-    if (posY != null || dockFrame || !fab) return;
-    dockFrame = requestAnimationFrame(() => { dockFrame = 0; placeFab(); if (open) positionPanel(); });
+    if (dockFrame || (!fab && !open) || (posY != null && !open)) return;
+    dockFrame = requestAnimationFrame(() => { dockFrame = 0; if (posY == null && fab) placeFab(); if (open) positionPanel(); });
   }, {passive: true});
+  document.addEventListener('fullscreenchange', () => { if (open) positionPanel(); });
 
   chrome.runtime.onMessage.addListener((m, sender) => {
     if (sender.id !== chrome.runtime.id) return false;

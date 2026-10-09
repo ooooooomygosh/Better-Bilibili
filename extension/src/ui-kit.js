@@ -48,7 +48,9 @@
     if (!el) return Promise.resolve();
     const a = animate(el, frames || [{opacity: 1}, {opacity: 0}], {duration: ms, easing: EASE_IN, fill: 'forwards'});
     if (!a) { el.remove(); return Promise.resolve(); }
-    return a.finished.then(() => el.remove(), () => el.remove());
+    // Background tabs may never tick the animation: remove on a timer as well.
+    const t = setTimeout(() => el.remove(), ms + 120);
+    return a.finished.then(() => { clearTimeout(t); el.remove(); }, () => { clearTimeout(t); el.remove(); });
   }
   /** Replace a status line's text and replay its entrance, even if the text is unchanged. */
   function flash(el, text, kind) {
@@ -59,34 +61,58 @@
     animate(el, [{opacity: 0, transform: 'translateY(-3px)'}, {opacity: 1, transform: 'none'}], {duration: MOTION.mid});
   }
 
-  /* ---------- Bilibili theme detection (content scripts) ---------- */
-  function luminanceDark(node) {
-    const m = getComputedStyle(node).backgroundColor.match(/[\d.]+/g);
-    if (!m || m.length < 3 || (m.length >= 4 && Number(m[3]) <= .1)) return null;
-    return (Number(m[0]) * .2126 + Number(m[1]) * .7152 + Number(m[2]) * .0722) < 110;
+  /* ---------- Bilibili theme detection (content scripts) ----------
+     How B 站 signals its theme today (checked against the live site, 2026-10):
+       - homepage (laputa-home): toggles class `bili_dark` on <html>; tokens such as --bg1 / --Ga0 flip with it
+       - video & older pages: swap <link> stylesheets bili-theme/light(.css|_u.css) <-> bili-theme/dark(...)
+         by changing the link's href (an attribute change, not an insertion), the new sheet loads async
+       - the server-side cookie `theme_style` only matters at page load (already reflected by the above)
+     Order: explicit markers -> theme tokens (not transitioned, so no mid-fade misreads) -> painted background -> OS. */
+  function rgbDark(text) {
+    const t = String(text || '').trim();
+    let r, g, b, a = 1;
+    const hex = t.match(/^#([\da-f]{3}|[\da-f]{6})$/i);
+    if (hex) { const h = hex[1].length === 3 ? hex[1].replace(/./g, '$&$&') : hex[1]; r = parseInt(h.slice(0, 2), 16); g = parseInt(h.slice(2, 4), 16); b = parseInt(h.slice(4, 6), 16); }
+    else { const m = t.match(/[\d.]+/g); if (!/^rgba?\(/.test(t) || !m || m.length < 3) return null; [r, g, b] = m.map(Number); if (m.length >= 4) a = Number(m[3]); }
+    if (a <= .1) return null;
+    return (r * .2126 + g * .7152 + b * .0722) < 110;
+  }
+  const luminanceDark = node => rgbDark(getComputedStyle(node).backgroundColor);
+  function themeLinks() {
+    let dark = false, light = false;
+    for (const l of document.querySelectorAll('link[rel~="stylesheet"][href*="bili-theme/"]')) {
+      if (l.disabled || (l.media && l.media !== 'all' && !matchMedia(l.media).matches)) continue;
+      const name = (l.getAttribute('href').split('bili-theme/')[1] || '').toLowerCase();
+      if (/^dark/.test(name)) dark = true; else if (/^light/.test(name)) light = true;
+    }
+    return dark ? true : light ? false : null;
   }
   /** True when the Bilibili page itself is dark, independent of the OS setting. */
   function isDark() {
     if (typeof document === 'undefined') return false;
-    const html = document.documentElement;
+    const html = document.documentElement, body = document.body;
+    if (!html) return darkOS.matches;
+    if (html.classList.contains('bili_dark') || body?.classList.contains('bili_dark')) return true;
+    for (const n of [html, body]) {
+      const marker = n?.getAttribute('data-theme') || n?.getAttribute('theme');
+      if (marker === 'dark' || marker === 'light') return marker === 'dark';
+    }
+    const linked = themeLinks();
+    if (linked != null) return linked;
     // Our own OLED override must not decide the theme it depends on.
-    const had = html?.hasAttribute('data-btr-oled');
+    const had = html.hasAttribute('data-btr-oled');
     if (had) html.removeAttribute('data-btr-oled');
-    let dark = null;
     try {
-      for (const n of [document.body, html]) {
-        if (!n) continue;
-        const marker = n.getAttribute('data-theme') || n.getAttribute('theme');
-        if (marker === 'dark' || marker === 'light') { dark = marker === 'dark'; break; }
-        const l = luminanceDark(n);
-        if (l != null) { dark = l; break; }
-      }
+      const cs = getComputedStyle(html);
+      for (const v of ['--bg1', '--Ga0']) { const d = rgbDark(cs.getPropertyValue(v)); if (d != null) return d; }
+      for (const n of [body, html]) { if (!n) continue; const l = luminanceDark(n); if (l != null) return l; }
     } finally { if (had) html.setAttribute('data-btr-oled', ''); }
-    return dark ?? darkOS.matches;
+    return darkOS.matches;
   }
   // One observer per isolated world, shared by every surface that cares about the theme.
   const listeners = new Set();
-  let observer = null, last = null, pending = 0;
+  let observer = null, last = null, pending = 0, poll = 0;
+  const late = [];
   function notify() {
     pending = 0;
     const d = isDark();
@@ -94,17 +120,30 @@
     last = d;
     for (const f of listeners) { try { f(d); } catch (_) {} }
   }
-  const schedule = () => { if (!pending) pending = requestAnimationFrame(notify); };
+  // Check now, and again once a swapped stylesheet has had time to load / a CSS fade to settle.
+  function schedule() {
+    if (!pending) pending = requestAnimationFrame(notify);
+    while (late.length) clearTimeout(late.pop());
+    late.push(setTimeout(notify, 350), setTimeout(notify, 1200));
+  }
   function startObserver() {
     if (observer || typeof MutationObserver !== 'function' || !document.documentElement) return;
     observer = new MutationObserver(schedule);
     const opts = {attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'theme', 'data-dark']};
     observer.observe(document.documentElement, opts);
-    const body = () => { if (document.body) observer.observe(document.body, opts); };
-    if (document.body) body(); else document.addEventListener('DOMContentLoaded', () => { body(); schedule(); }, {once: true});
-    // B 站 may swap a theme stylesheet without touching attributes.
-    if (document.head) observer.observe(document.head, {childList: true});
+    const later = () => {
+      if (document.body) observer.observe(document.body, opts);
+      // Stylesheets added, removed, or re-pointed (href / media / disabled) anywhere in <head>.
+      if (document.head) observer.observe(document.head, {childList: true, subtree: true, attributes: true, attributeFilter: ['href', 'media', 'disabled']});
+      schedule();
+    };
+    if (document.body) later(); else document.addEventListener('DOMContentLoaded', later, {once: true});
+    // A stylesheet finishing its download changes the painted colours: load events don't bubble, so capture.
+    document.addEventListener('load', e => { if (e.target?.tagName === 'LINK') schedule(); }, true);
     darkOS.addEventListener?.('change', schedule);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) schedule(); });
+    // Last resort for theme switches we cannot observe: a cheap check every 4 s while the tab is visible.
+    poll = setInterval(() => { if (!document.hidden && listeners.size) notify(); }, 4000);
   }
   /** Subscribe to Bilibili theme changes. Calls back immediately with the current value. */
   function onTheme(fn) {

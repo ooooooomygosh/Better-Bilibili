@@ -121,7 +121,8 @@ button:focus-visible{outline:2px solid var(--btr-brand);outline-offset:2px}
 .pw{display:flex;gap:6px}
 .pw input{flex:1;min-width:0;border:1px solid var(--btr-line);border-radius:12px;padding:9px 12px;background:var(--btr-bg);color:var(--btr-text1);font:inherit;font-size:13px}
 .pw input:focus{outline:none;border-color:var(--btr-brand);box-shadow:0 0 0 3px var(--btr-brand-soft)}
-.err{color:var(--btr-danger);font-size:12px;min-height:0}
+.err{color:var(--btr-danger);font-size:12px;min-height:0;margin:6px 0 0}
+.pw input[aria-invalid]{border-color:var(--btr-danger)}
 .toast{position:fixed;left:50%;bottom:32px;z-index:2147483646;transform:translateX(-50%);padding:10px 18px;border-radius:999px;background:rgba(24,25,28,.92);color:#fff;font-size:13px;line-height:1.4;box-shadow:0 8px 24px rgba(0,0,0,.25);pointer-events:none}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 `;
@@ -235,9 +236,16 @@ button:focus-visible{outline:2px solid var(--btr-brand);outline-offset:2px}
     if (left <= 0) { state = {...state, block: null}; show('break-done'); }
   }
 
-  function snooze(kind, password, err) {
+  function snooze(kind, password, err, input) {
     send({type: 'focus-snooze', kind, password}).then(res => {
-      if (res?.error) { if (err) { err.textContent = res.error; err.hidden = false; } return; }
+      if (res?.error) {
+        if (err) { err.textContent = res.error; err.hidden = false; }
+        if (input) {
+          input.setAttribute('aria-invalid', 'true'); input.focus();
+          if (!reduced.matches) input.animate([{transform: 'translateX(0)'}, {transform: 'translateX(-6px)'}, {transform: 'translateX(5px)'}, {transform: 'translateX(-3px)'}, {transform: 'translateX(0)'}], {duration: 320, easing: 'ease-out'});
+        }
+        return;
+      }
       warned.clear(); apply(res); if (!res?.block) hide();
     }).catch(() => {});
   }
@@ -249,7 +257,9 @@ button:focus-visible{outline:2px solid var(--btr-brand);outline-offset:2px}
     input.type = 'password'; input.placeholder = '自律锁密码'; input.autocomplete = 'off'; input.setAttribute('aria-label', '自律锁密码');
     const go = btn('确认', 'ghost', null); go.type = 'submit';
     form.append(input, go);
-    form.addEventListener('submit', e => { e.preventDefault(); snooze(kind, input.value, err); input.value = ''; });
+    form.addEventListener('submit', e => { e.preventDefault(); if (!input.value) { input.focus(); return; } snooze(kind, input.value, err, input); input.value = ''; });
+    input.addEventListener('input', () => { err.hidden = true; input.removeAttribute('aria-invalid'); });
+    input.setAttribute('aria-describedby', 'btr-pw-err'); err.id = 'btr-pw-err'; err.setAttribute('role', 'alert');
     const open = btn(`${label}（需要密码）`, 'ghost', () => { open.hidden = true; form.hidden = false; input.focus(); });
     return [open, form, err];
   }

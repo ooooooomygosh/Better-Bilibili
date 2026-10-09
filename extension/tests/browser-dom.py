@@ -158,8 +158,27 @@ with sync_playwright() as p:
  option.locator('#proxyUrl').fill('http://127.0.0.1:7890');option.locator('#enableProxy').click();option.wait_for_function('proxyCalls.length===1');option.locator('#disableProxy').click()
  assert not option.evaluate("chromeMock.permissions.contains({permissions:['proxy']})")
  ok('legacy proxy controls set and revoke only mocked proxy state')
- option.locator('#restore').click();option.wait_for_function("document.querySelector('#homeTheme').value==='native'",timeout=3000);assert not option.locator('#homeHideBanner').is_checked()
+ option.locator('#restore').click();option.wait_for_selector('.modal[role=dialog][aria-modal=true]')
+ assert option.evaluate("document.activeElement?.closest('.modal')!=null") and option.evaluate("document.querySelector('main').inert")
+ option.keyboard.press('Escape');option.wait_for_timeout(300);assert option.locator('.modal').count()==0 and option.locator('#homeTheme').input_value()=='oled'
+ ok('restore asks in a styled in-page dialog (focus inside, page inert); Esc cancels and changes nothing')
+ option.locator('#restore').click();option.wait_for_selector('.modal');option.get_by_role('button',name='恢复默认',exact=True).click()
+ option.wait_for_function("document.querySelector('#homeTheme').value==='native'",timeout=3000);assert not option.locator('#homeHideBanner').is_checked()
  ok('restore defaults returns native theme without modifying proxy configuration')
+ option.wait_for_function("!document.querySelector('.modal-back')",timeout=3000)
+ option.evaluate("document.querySelector('#quickFab').scrollIntoView({block:'center'})");option.locator('#quickFab').uncheck(force=True);option.wait_for_function('fixtureStorage.all.sync.quickFab===false',timeout=3000)
+ ok('controls outside the form (快捷面板) auto-save too')
+ option.set_viewport_size({'width':1100,'height':700})
+ option.evaluate("document.querySelector('#proxy').scrollIntoView({block:'start'})");option.wait_for_timeout(300)
+ bar=option.evaluate("(()=>{const r=document.querySelector('#savebar').getBoundingClientRect();return [r.bottom,innerHeight]})()")
+ assert abs(bar[1]-14-bar[0])<2,bar
+ assert option.evaluate("document.querySelector('.toc a[aria-current=true]').getAttribute('href')")=='#proxy'
+ option.evaluate("document.querySelector('#lock').scrollIntoView({block:'start'})");option.wait_for_timeout(300)
+ assert option.evaluate("document.querySelector('.toc a[aria-current=true]').getAttribute('href')")=='#lock'
+ option.evaluate("scrollTo(0,document.documentElement.scrollHeight)");option.wait_for_timeout(300)
+ assert option.evaluate("document.querySelector('.toc a[aria-current=true]').getAttribute('href')")=='#help'
+ option.set_viewport_size({'width':1704,'height':864})
+ ok('save bar stays pinned to the window bottom on any section; section nav follows the scroll exactly')
  option.locator('#proxyConsent').uncheck();option.locator('#proxyUrl').fill('');option.evaluate('scrollTo(0,0)');option.screenshot(path=str(ROOT/'docs/options-preview.png'),full_page=True)
  assert not errors,errors;ok('no uncaught errors across homepage and options regression scenarios')
  (ROOT/'tests/browser-dom-results.json').write_text(json.dumps({'browser':browser.version,'environment':'Local fixture DOM only, mocked Chrome APIs; NOT installed extension or live Bilibili; proxy never enabled','tests':results,'uncaught_errors':errors},ensure_ascii=False,indent=2))

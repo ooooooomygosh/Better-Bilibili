@@ -22,6 +22,18 @@
    "passed": true
   },
   {
+   "test": "switching tabs glides the panel height; the panel sits under B 站 header popovers (z-index 1001)",
+   "passed": true
+  },
+  {
+   "test": "homepage-style switch (html.bili_dark) flips the open panel live, both ways",
+   "passed": true
+  },
+  {
+   "test": "video-page-style switch (bili-theme stylesheet href swap) flips the open panel live, both ways",
+   "passed": true
+  },
+  {
    "test": "油门 tab: switch and segmented control write settings and re-render live",
    "passed": true
   },
@@ -39,6 +51,10 @@
   },
   {
    "test": "with the self-discipline lock on, loosening presets are deferred and listed with an undo button",
+   "passed": true
+  },
+  {
+   "test": "wrong lock password shows inline right under the field (aria-invalid), the form stays put",
    "passed": true
   },
   {

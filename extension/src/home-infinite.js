@@ -88,6 +88,8 @@
 #btr-flow-feed .btr-gone small{display:block;margin-top:2px;font-size:12px;color:var(--btr-muted,#9499a0)}
 #btr-flow-feed .btr-gone button{padding:5px 16px;border-radius:6px;border:1px solid var(--btr-line,rgba(0,0,0,.12));background:var(--btr-menu-bg,#fff);color:inherit;font:inherit;font-size:13px;cursor:pointer}
 #btr-flow-feed .btr-gone button:hover{color:#fb7299;border-color:#fb7299}
+#btr-flow-feed .btr-gone-on .bili-video-card__image--link,#btr-flow-feed .btr-gone-on .bili-video-card__info a,#btr-flow-feed .btr-gone-on .bili-video-card__info--no-interest{pointer-events:none}
+#btr-flow-feed .btr-gone{cursor:default}
 /* Hover preview: Bilibili's own storyboard frames, scrubbed by the pointer. */
 #btr-flow-feed .btr-shot{position:absolute;inset:0;z-index:2;border-radius:inherit;background-repeat:no-repeat;pointer-events:none;opacity:0;transition:opacity .14s ease}
 #btr-flow-feed .btr-shot.on{opacity:1}
@@ -117,6 +119,23 @@
     more: 'M12 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm0 5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm0 5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z',
     sad: 'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18zm-3 6v2m6-2v2m-6 5c1.5-1.5 4.5-1.5 6 0', undo: 'M8 4 4 8l4 4M4 8h10a6 6 0 0 1 0 12H8'
   };
+  /* Our own controls on and over the cards. B 站's page (especially when logged in) listens for clicks
+     on whole cards; to make sure a click on 撤销 / a menu item / 稍后再看 never reaches the card link or a
+     page listener, the press is claimed at the very top of the capture phase and dispatched here. */
+  const BOUND = new WeakMap();
+  function bind(node, fn) { node.dataset.btrAct = ''; BOUND.set(node, fn); }
+  if (!globalThis.__BTR_ACT_GUARD__) {
+    globalThis.__BTR_ACT_GUARD__ = true;
+    for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click', 'auxclick', 'dblclick']) {
+      addEventListener(type, e => {
+        const n = e.target?.closest?.('#btr-flow-feed [data-btr-act]');
+        if (!n) return;
+        e.stopImmediatePropagation(); e.preventDefault();
+        if (type === 'pointerdown' && n.matches('button,[tabindex]')) n.focus({preventScroll: true});
+        if (type === 'click' && e.button === 0) { const fn = BOUND.get(n); if (fn) fn(e); }
+      }, true);
+    }
+  }
   const csrf = () => (document.cookie.match(/(?:^|;\s*)bili_jct=([^;]+)/) || [])[1] || '';
 
   function create(host) {
@@ -318,7 +337,7 @@
       right.append(more, tit, bottom); info.append(right);
       wrap.append(link, info); v.append(wrap); inner.append(v); outer.append(inner);
 
-      const act = (n, fn) => { n.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); fn(); }); n.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } }); };
+      const act = (n, fn) => { bind(n, () => { if (openMenu && openMenu.more !== n) closeMenu(); fn(); }); n.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); fn(); } }); };
       act(later, () => watchLater(c, later, laterLab));
       act(more, () => menu(c, v, more, later, laterLab));
       preview(c, iwrap, link);
@@ -374,7 +393,7 @@
       const item = (text, note, fn) => {
         const b = el('button', null, text); b.type = 'button'; b.setAttribute('role', 'menuitem'); b.tabIndex = -1;
         if (note) b.append(el('small', null, note));
-        b.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); closeMenu(); fn(); });
+        bind(b, () => { closeMenu(true); fn(); });
         node.append(b); return b;
       };
       item('添加至稍后再看', null, () => watchLater(c, later, laterLab));
@@ -405,19 +424,28 @@
       msg.append(el('small', null, '只在本插件生效，不影响 B 站推荐'));
       const undo = el('button', null, '撤销'); undo.type = 'button';
       layer.append(msg, undo);
+      bind(layer, () => {}); // The whole veil swallows clicks: nothing under it may open the video.
+      v.classList.add('btr-gone-on'); // CSS turns the card's own links off while the veil is up.
       v.querySelector('.bili-video-card__wrap').append(layer);
       if (ui) ui.animate(layer, [{opacity: 0}, {opacity: 1}], {duration: 220});
       undo.focus({preventScroll: true});
-      const fold = setTimeout(() => {
-        if (!outer.isConnected) return;
+      let fold = 0;
+      const arm = ms => { clearTimeout(fold); fold = setTimeout(() => {
+        if (!outer.isConnected || !layer.isConnected) return;
         const others = kind === 'up' ? [...(list?.querySelectorAll(`.bili-video-card[data-mid="${String(c.mid).replace(/[^0-9]/g, "")}"]`) || [])].map(n => n.closest('.feed-card')).filter(n => n && n !== outer) : [];
         for (const o of [outer, ...others]) collapse(o);
-      }, 3200);
-      undo.addEventListener('click', e => {
-        e.preventDefault(); e.stopPropagation(); clearTimeout(fold);
+      }, ms); };
+      arm(3200);
+      // Reading the message or reaching for 撤销 holds the fold.
+      layer.addEventListener('pointerenter', () => clearTimeout(fold));
+      layer.addEventListener('pointerleave', () => arm(1600));
+      bind(undo, () => {
+        clearTimeout(fold);
         if (kind === 'up') blockedUps.delete(String(c.mid)); else dislikes.delete(c.bvid);
         persist();
+        v.classList.remove('btr-gone-on');
         if (ui) ui.fadeOut(layer, 140); else layer.remove();
+        v.querySelector('.bili-video-card__info--no-interest')?.focus({preventScroll: true});
       });
     }
     function collapse(outer) {

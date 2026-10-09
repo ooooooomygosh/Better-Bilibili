@@ -79,10 +79,18 @@ with sync_playwright() as p:
  page.evaluate(f"[...{c0}.querySelectorAll('.btr-menu button')].find(b=>b.textContent.startsWith('不感兴趣')).click()");page.wait_for_timeout(300)
  gone=page.evaluate(f"(()=>{{const g={c0}.querySelector('.btr-gone');return g&&[g.textContent,getComputedStyle(g).backdropFilter]}})()")
  assert gone and '撤销' in gone[0] and 'blur' in gone[1],gone
- page.evaluate(f"[...{c0}.querySelectorAll('.btr-gone button')].find(b=>b.textContent==='撤销').click()");page.wait_for_timeout(400)
+ # Simulate B 站's logged-in page: listeners on document that open the video for any press inside a card.
+ page.evaluate("window.cardOpens=0;for(const t of ['mousedown','click','mouseup'])document.addEventListener(t,e=>{if(e.target.closest?.('.bili-video-card'))cardOpens++;},true);document.addEventListener('click',e=>{if(e.target.closest?.('.bili-video-card'))cardOpens++;});0")
+ opened=[];ctx.on('page',lambda n:opened.append(n.url))
+ bb=page.locator('#btr-flow-feed .btr-batch .bili-video-card >> nth=0').locator('.btr-gone button').bounding_box()
+ page.mouse.click(bb['x']+bb['width']/2,bb['y']+bb['height']/2);page.wait_for_timeout(500)
  assert not page.evaluate(f"!!{c0}.querySelector('.btr-gone')") and not page.evaluate("fixtureStorage.all.local.flowDislikes?.includes(firstBv)")
+ assert page.evaluate('cardOpens')==0 and not opened,(page.evaluate('cardOpens'),opened)
+ page.wait_for_timeout(3500);assert page.evaluate(f"{c0}.dataset.bvid")==page.evaluate('firstBv')
+ ok('撤销 with a real mouse click restores the card; the press never reaches the card link or page-level card listeners')
  page.evaluate(f"{c0}.querySelector('.bili-video-card__info--no-interest').click()");page.wait_for_timeout(200)
  page.evaluate(f"[...{c0}.querySelectorAll('.btr-menu button')].find(b=>b.textContent.startsWith('不感兴趣')).click()")
+ page.mouse.move(5,5)  # hovering the veil holds the fold; move away
  page.wait_for_function("!document.querySelector(`#btr-flow-feed .bili-video-card[data-bvid=\"${firstBv}\"]`)",timeout=6000)
  assert page.evaluate("fixtureStorage.all.local.flowDislikes.includes(firstBv)")
  assert page.evaluate(f"{feed}.querySelector('.btr-batch').querySelectorAll('.feed-card').length")==25

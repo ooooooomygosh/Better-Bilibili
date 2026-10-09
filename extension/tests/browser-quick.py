@@ -8,6 +8,7 @@ with sync_playwright() as p:
  browser=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH','/usr/lib/chromium/chromium'),headless=True,args=['--no-sandbox'])
  ctx=browser.new_context(viewport={'width':1400,'height':900})
  ctx.route('https://www.bilibili.com/**',lambda r:r.fulfill(status=200,content_type='text/html',body='<!doctype html><html><body style="margin:0;background:#fff"><h1>video</h1></body></html>'))
+ ctx.route('https://s1.hdslb.com/bfs/seed/jinkela/short/bili-theme/**',lambda r:r.fulfill(status=200,content_type='text/css',body=':root{--bg1:#17181A}body{background:#17181a}' if '/dark' in r.request.url else ':root{--bg1:#FFFFFF}body{background:#fff}'))
  page=ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
  page.goto('https://www.bilibili.com/video/BV1xx411c7mD/')
  for f in ['tests/browser-shim.js','src/ui-kit.js','src/home-core.js','src/focus-core.js']:page.add_script_tag(content=(ROOT/f).read_text())
@@ -40,6 +41,23 @@ with sync_playwright() as p:
  page.keyboard.press('ArrowRight');page.wait_for_timeout(150)
  assert page.evaluate(f"{q}.querySelector('.tabs [aria-selected=true]').textContent")=='油门'
  ok('tabs are keyboard-navigable (arrows, roving tabindex, aria-controls)')
+ page.evaluate(f"[...{q}.querySelectorAll('.tabs button')].find(b=>b.textContent==='刹车').click()");page.wait_for_timeout(400)
+ anim=page.evaluate(f"(()=>{{[...{q}.querySelectorAll('.tabs button')].find(b=>b.textContent==='油门').click();return {q}.querySelector('.panel').getAnimations().some(a=>a.effect.getKeyframes().some(k=>'height' in k))}})()")
+ assert anim
+ page.wait_for_timeout(400)
+ assert page.evaluate(f"getComputedStyle({q}.querySelector('.panel')).zIndex")=='1001'
+ ok('switching tabs glides the panel height; the panel sits under B 站 header popovers (z-index 1001)')
+ R=f"{q}.querySelector('.root').classList.contains('dark')"
+ assert not page.evaluate(R)
+ page.evaluate("document.documentElement.classList.add('bili_dark')");page.wait_for_function(R,timeout=2000)
+ page.evaluate("document.documentElement.classList.remove('bili_dark')");page.wait_for_function(f"!{R}",timeout=2000)
+ ok('homepage-style switch (html.bili_dark) flips the open panel live, both ways')
+ page.evaluate("(()=>{const l=document.createElement('link');l.rel='stylesheet';l.id='th';l.href='https://s1.hdslb.com/bfs/seed/jinkela/short/bili-theme/light.css';document.head.append(l);})()");page.wait_for_timeout(400)
+ assert not page.evaluate(R)
+ page.evaluate("document.getElementById('th').href='https://s1.hdslb.com/bfs/seed/jinkela/short/bili-theme/dark.css'");page.wait_for_function(R,timeout=2500)
+ page.evaluate("document.getElementById('th').href='https://s1.hdslb.com/bfs/seed/jinkela/short/bili-theme/light.css'");page.wait_for_function(f"!{R}",timeout=2500)
+ page.evaluate("document.getElementById('th').remove()")
+ ok('video-page-style switch (bili-theme stylesheet href swap) flips the open panel live, both ways')
  assert page.evaluate(f"[...{q}.querySelectorAll('.wide')].some(b=>b.textContent.includes('高级播放设置'))")
  page.evaluate(f"{q}.querySelector('#q-enabled').click()");page.wait_for_timeout(200)
  assert page.evaluate("fixtureStorage.all.sync.enabled")==False
@@ -70,8 +88,15 @@ with sync_playwright() as p:
  page.evaluate(f"[...{q}.querySelectorAll('.presets button')].find(b=>b.textContent.startsWith('适中')).click()");page.wait_for_timeout(400)
  assert page.evaluate("fixtureStorage.all.sync.focusWindowMinutes")==45
  assert page.evaluate(f"[...{q}.querySelectorAll('button')].some(b=>b.textContent==='撤销')"),page.evaluate(f"{q}.querySelector('.panel').innerText")
- page.evaluate("window.lockView={locked:false}")
  ok('with the self-discipline lock on, loosening presets are deferred and listed with an undo button')
+ page.evaluate("window.lockView.hasPassword=true;const o=chromeMock.runtime.sendMessage;chromeMock.runtime.sendMessage=async m=>m.type==='focus-set'&&m.password?(m.password==='right'?{applied:{},deferred:{}}:{error:'密码不对（还可以再试 4 次）。'}):o(m);0")
+ page.keyboard.press('Escape');page.wait_for_timeout(400);page.evaluate("__BTR_QUICK__.open('brake')");page.wait_for_function(f"{q}.querySelector('.lock form input')",timeout=3000)
+ page.evaluate(f"(()=>{{const i={q}.querySelector('.lock form input');i.value='wrong';{q}.querySelector('.lock form').requestSubmit();}})()");page.wait_for_timeout(400)
+ e=page.evaluate(f"(()=>{{const e={q}.querySelector('.lock .pwerr');return e&&!e.hidden&&e.textContent}})()")
+ assert e and '密码不对' in e,e
+ assert page.evaluate(f"{q}.querySelector('.lock form input').getAttribute('aria-invalid')")=='true'
+ page.evaluate("window.lockView={locked:false}")
+ ok('wrong lock password shows inline right under the field (aria-invalid), the form stays put')
  page.keyboard.press('Escape');page.wait_for_timeout(400)
  assert not page.evaluate(f"!!{q}.querySelector('.panel')")
  page.evaluate(f"{q}.querySelector('.fab').click()");page.wait_for_function(f"{q}.querySelector('.panel')",timeout=3000)
