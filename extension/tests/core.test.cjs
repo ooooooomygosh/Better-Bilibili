@@ -54,3 +54,8 @@ test('manual auto cap applies even without smart content policy',()=>{const x=lo
 
 test('short 4K videos retain bitrate headroom without a long ahead target',()=>{const p=policy.compute({}, {duration:60,height:2160,bitrate:15000000});assert.equal(p.cap,32);assert(p.ahead<=24);});
 test('diagnostic postMessage failure cannot break playback observation',()=>{const x=load(undefined,{postMessage(){throw Error('fixture diagnostic channel failure');}});assert.doesNotThrow(()=>x.__BTR_FLOW_POLICY__.observe({duration:60,playbackRate:1,videoHeight:270,paused:false}, {bandwidth:1000000},{}));});
+test('home ad helpers: badge text is exact, API ad items are recognised',()=>{const h=require('../src/home-core.js');
+ for(const t of ['广告',' 广告 ','推广','AD'])assert(h.isAdBadge(t),t);for(const t of ['广告人','不是广告','推广曲','','12:34'])assert(!h.isAdBadge(t),t);
+ assert(h.isAdItem({goto:'ad'})&&h.isAdItem({goto:'av',is_ad:true})&&h.isAdItem({goto:'av',business_info:{}})&&h.isAdItem({goto:'av',uri:'https://cm.bilibili.com/x'}));
+ assert(!h.isAdItem({goto:'av',uri:'https://www.bilibili.com/video/BV1x'}));
+ assert(h.AD_SELECTOR.includes('.bili-video-card__stats > .bili-video-card__stats--text'));});

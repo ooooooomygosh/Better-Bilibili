@@ -17,3 +17,10 @@ test('infinite feed is opt-in and its numbers are clamped',()=>{assert.equal(hom
 test('manifest loads feed core and infinite module before the home enhancer, no new permissions',()=>{const m=JSON.parse(fs.readFileSync(path.join(__dirname,'../manifest.json'),'utf8'));const e=m.content_scripts.find(c=>c.js.includes('src/home-enhancer.js'));assert.deepEqual(e.js,['src/ui-kit.js','src/home-core.js','src/feed-core.js','src/home-infinite.js','src/home-enhancer.js']);assert.deepEqual(m.permissions,['storage']);assert(!m.host_permissions);});
 test('quick panel runs in the top frame of every B 站 page after its cores; welcome page assets exist',()=>{const root=path.join(__dirname,'..');const m=JSON.parse(fs.readFileSync(path.join(root,'manifest.json'),'utf8'));const e=m.content_scripts.find(c=>c.js.includes('src/quick-panel.js'));assert.deepEqual(e.js,['src/ui-kit.js','src/home-core.js','src/focus-core.js','src/quick-panel.js']);assert.deepEqual(e.matches,['https://*.bilibili.com/*']);assert(!e.all_frames);assert.equal(e.world,'ISOLATED');
  const html=fs.readFileSync(path.join(root,'ui/welcome.html'),'utf8');for(const ref of html.matchAll(/(?:src|href)="([^"#:]+)"/g))assert(fs.existsSync(path.join(root,'ui',ref[1])),ref[1]);assert(fs.readFileSync(path.join(root,'src/service-worker.js'),'utf8').includes('ui/welcome.html'));});
+test('every ad shape the web feed API uses is skipped; plain videos with ad-ish titles stay',()=>{
+ const ads=[item('BV1aaaaaaaa1',{is_ad:true}),item('BV1aaaaaaaa2',{is_ad:1}),item('BV1aaaaaaaa3',{goto:'ad'}),item('BV1aaaaaaaa4',{business_info:{id:7,is_ad:true}}),
+  item('BV1aaaaaaaa5',{ad_info:{creative_id:1}}),item('BV1aaaaaaaa6',{uri:'https://cm.bilibili.com/cm/api/fees/pc/sync/v2?x=1'}),item('BV1aaaaaaaa7',{room_info:{room_id:1}}),item('BV1aaaaaaaa8',{goto:'live'})];
+ assert.equal(f.cards(ads).length,0);
+ const ok=f.cards([item('BV1bbbbbbbb1',{title:'广告人的一天',owner:{name:'推广'},uri:'https://www.bilibili.com/video/BV1bbbbbbbb1',business_info:null,is_ad:false})]);
+ assert.equal(ok.length,1);
+});

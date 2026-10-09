@@ -63,7 +63,7 @@ html[data-btr-home-clean][data-btr-hide-carousel] :is(.recommended-container_flo
 html[data-btr-home-clean][data-btr-hide-carousel] :is(.recommended-container_floor-aside,.recommended-container) .container > :is(.feed-card,.bili-video-card,.video-card-reco,.floor-single-card){margin-top:0!important;grid-area:auto!important;align-self:start}
 html[data-btr-home-clean][data-btr-hide-carousel] [data-btr-grid] > .feed-card[data-btr-ready]{display:block!important}
 html[data-btr-home-clean] [data-btr-grid] > [data-btr-empty]{display:none!important}
-html[data-btr-home-clean][data-btr-hide-ads] [data-btr-grid] :is(.feed-card,.bili-video-card,.video-card-reco)[data-btr-ad]{display:none!important}
+html[data-btr-home-clean][data-btr-hide-ads] :is(.recommended-container_floor-aside,.recommended-container) .container > :not(.recommended-swipe,[data-btr-flow-owned]):has(${core.AD_SELECTOR}),html[data-btr-home-clean][data-btr-hide-ads] [data-btr-ad]{display:none!important}
 html[data-btr-home-clean][data-btr-hide-banner] .bili-header .bili-header__banner{height:64px!important;min-height:64px!important;background:var(--bg1,white)!important}
 html[data-btr-home-clean][data-btr-hide-banner] .bili-header .bili-header__banner > *{visibility:hidden!important}
 html[data-btr-home-clean][data-btr-hide-banner] .bili-header .bili-header__bar{background:var(--bg1,white)!important}
@@ -147,9 +147,39 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     toggle('data-btr-infinite',active()&&settings.homeInfinite); theme(); mirrorFlags();
   }
   function isAd(node) {
-    // Explicit promotion badges only. Never classify by video title or link keywords.
-    return !!node.querySelector('.bili-video-card__info--ad,.bili-video-card__info--ad-text,.bili-video-card__stats--ad,[data-ad-id]');
+    // Explicit promotion markers only (see home-core AD_MARKERS), plus a leaf badge reading exactly
+    // 广告 / 推广 on the cover. Never classify by video title, uploader name or link keywords in text.
+    if (node.matches?.(core.AD_SELECTOR) || node.querySelector(core.AD_SELECTOR)) return true;
+    for (const b of node.querySelectorAll('.bili-video-card__image *,.bili-video-card__cover *,.bili-video-card__stats *,.video-card-reco .info-box *'))
+      if (!b.firstElementChild && b.textContent.length < 8 && core.isAdBadge(b.textContent)) return true;
+    return false;
   }
+  /** The grid item that holds a card, so a hidden ad leaves no hole in the native grid. */
+  function gridItem(n) {
+    let h = n;
+    while (h.parentElement && !h.parentElement.matches('.container,[data-btr-grid]') && h.parentElement !== document.body) h = h.parentElement;
+    return h.parentElement && h.parentElement !== document.body ? h : (n.closest('.feed-card') || n);
+  }
+  // Fallback for markup the CSS :has() rule does not know yet: mark ad grid items as soon as they land.
+  let adFrame = 0;
+  function markAds() {
+    adFrame = 0;
+    if (!active() || !settings.homeHideAds) return;
+    for (const n of document.querySelectorAll(`:is(.recommended-container_floor-aside,.recommended-container) :is(${CARD})`)) {
+      if (owns(n) || n.closest('.recommended-swipe')) continue;
+      const holder = gridItem(n), ad = isAd(n);
+      if (ad !== holder.hasAttribute('data-btr-ad')) holder.toggleAttribute('data-btr-ad', ad);
+    }
+  }
+  const FEED = '.recommended-container_floor-aside,.recommended-container';
+  const adObserver = new MutationObserver(records => {
+    if (adFrame || !isHome()) return;
+    for (const r of records) {
+      const t = r.target.nodeType === 1 ? r.target : r.target.parentElement;
+      if (t && (t.closest(FEED) || (r.addedNodes.length && t.querySelector?.(FEED)))) { adFrame = requestAnimationFrame(markAds); return; }
+    }
+  });
+  try { adObserver.observe(document, {childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['href']}); } catch (_) {}
   function cardFrom(node) {
     const a=node.querySelector('.bili-video-card__info--tit a,a[href*="/video/"]');
     const title=node.querySelector('.bili-video-card__info--tit,.title');
@@ -175,7 +205,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     const nodes=[...grid.querySelectorAll(CARD)].filter(n=>!owns(n)&&!n.closest('.recommended-swipe'));
     const result=[];
     for(const n of nodes.slice(0,144)) {
-      const holder=n.closest('.feed-card')||n, ad=isAd(n), c=cardFrom(n);
+      const holder=gridItem(n), ad=isAd(n), c=cardFrom(n);
       if(ad!==holder.hasAttribute('data-btr-ad'))holder.toggleAttribute('data-btr-ad',ad);
       if(!!c!==holder.hasAttribute('data-btr-ready'))holder.toggleAttribute('data-btr-ready',!!c);
       if(c&&!(ad&&settings.homeHideAds))result.push(c);

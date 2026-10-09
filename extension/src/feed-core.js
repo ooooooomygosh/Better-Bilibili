@@ -88,11 +88,14 @@
     } catch (_) { return ''; }
   }
 
-  // Videos only: ads (business_info / goto ad), live rooms and anything without a valid BV id are dropped.
+  // Videos only: ads (goto 'ad', is_ad, business_info, ad_info, cm.bilibili.com links), live rooms and
+  // anything without a valid BV id are dropped.
+  const isAdOrNotVideo = it => !it || typeof it !== 'object' || it.goto !== 'av' || !!it.is_ad || !!it.business_info || !!it.ad_info || !!it.room_info ||
+    /cm\.bilibili\.com|\/cm\/api\//i.test(String(it.uri || '') + String(it.url || ''));
   function cards(items, seen = new Set(), now = Date.now()) {
     const out = [];
     for (const it of Array.isArray(items) ? items : []) {
-      if (!it || typeof it !== 'object' || it.goto !== 'av' || it.business_info || it.is_ad) continue;
+      if (isAdOrNotVideo(it)) continue;
       const bvid = String(it.bvid || '');
       if (!/^BV[0-9A-Za-z]{10}$/.test(bvid) || seen.has(bvid)) continue;
       const title = text(it.title, 180);

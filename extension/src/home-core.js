@@ -60,7 +60,28 @@
   function grows(previous, next) {
     return previous.length > 0 && next.length >= previous.length && previous.every((c,i) => c.url === next[i]?.url);
   }
-  const api = Object.freeze({defaults,settings,card,cards,key,history,append,grows,MAX_SNAPSHOTS,MAX_CARDS,TTL});
+  // Native home-feed ads. Current B 站 (laputa-home) renders an ad card as a normal .bili-video-card whose
+  // cover stats end with a bare <span class="bili-video-card__stats--text">广告</span> (or a rocket icon for
+  // creative ads) instead of the duration; normal cards keep those classes inside .bili-video-card__stats--item.
+  // Ad links and the "UP" link go to the advertiser (cm.bilibili.com click tracker). Older class names kept.
+  const AD_MARKERS = Object.freeze([
+    '.bili-video-card__stats > .bili-video-card__stats--text',
+    '.bili-video-card__stats > .bili-video-card__stats--icon',
+    '.bili-video-card__info--ad', '.bili-video-card__info--ad-text', '.bili-video-card__info--creative-ad',
+    '.bili-video-card__stats--ad', '.bili-video-card__info--no-interest-panel--ad',
+    '[data-ad-id]', '[data-is-ad="true"]', '.ad-report', '.ad-floor-cover',
+    'a[href*="cm.bilibili.com"]', 'a[href*="/cm/api/"]'
+  ]);
+  const AD_SELECTOR = AD_MARKERS.join(',');
+  /** A badge is a short leaf text that says exactly 广告 / 推广 (never a title or uploader name). */
+  const isAdBadge = t => /^(?:广告|推广|商业推广|AD)$/i.test(String(t || '').replace(/\s+/g, ''));
+  /** Web feed API items that are not plain videos: ads (is_ad, business_info, ad_info, cm links), live rooms. */
+  function isAdItem(it) {
+    if (!it || typeof it !== 'object') return true;
+    if (it.goto !== 'av' || it.is_ad || it.business_info || it.ad_info || it.room_info) return true;
+    return /cm\.bilibili\.com|\/cm\/api\//i.test(String(it.uri || '') + String(it.url || ''));
+  }
+  const api = Object.freeze({defaults,settings,card,cards,key,history,append,grows,AD_MARKERS,AD_SELECTOR,isAdBadge,isAdItem,MAX_SNAPSHOTS,MAX_CARDS,TTL});
   root.__BTR_HOME_CORE__ = api;
   if (typeof module === 'object') module.exports = api;
 })(globalThis);
