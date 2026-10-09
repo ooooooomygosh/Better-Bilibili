@@ -26,7 +26,7 @@
    "passed": true
   },
   {
-   "test": "risk-control answer pauses loading with a retry button and no further requests",
+   "test": "risk-control answer pauses loading with plain-language text, retry, one-click stable mode and collapsible details; no further requests",
    "passed": true
   },
   {

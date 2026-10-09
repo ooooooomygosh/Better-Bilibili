@@ -10,54 +10,103 @@
 
   const GAP_MS = 700, TIMEOUT_MS = 10000, KEY_TTL = 12 * 3600000, MAX_FAILS = 3, PAGE = 12, STAGGER_MS = 250;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const ui = globalThis.__BTR_UI__;
+  const EASE = 'cubic-bezier(.2,.75,.25,1)';
+  const FONT = ui ? ui.FONT : '-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif';
+  const SHOT = 'https://api.bilibili.com/x/player/videoshot';
+  const TOVIEW = 'https://api.bilibili.com/x/v2/history/toview/add';
+  const DISLIKE_KEY = 'flowDislikes', MAX_DISLIKES = 500;
+
+  /* Shadow UI: footer status and the floating "第 N 批" indicator. */
   const CSS = `
-:host{display:block;box-sizing:border-box;margin-top:8px;font:13px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--btr-text,#18191c)}
+:host{display:block;box-sizing:border-box;font:13px/1.5 ${FONT};color:var(--btr-text,#18191c)}
 *{box-sizing:border-box}[hidden]{display:none!important}
-.batch{content-visibility:auto;contain-intrinsic-size:auto 900px;margin-top:8px}
-.batch.enter{animation:btr-rise .42s cubic-bezier(.2,.75,.25,1) both}
-.divider{display:flex;align-items:center;gap:12px;margin:18px 0 16px;color:var(--btr-muted,#9499a0);font-size:12px}
-.divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--btr-line,rgba(128,128,128,.22))}
-.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 12px;border-radius:999px;background:var(--btr-chip,rgba(251,114,153,.1));color:#fb7299;font-weight:600;font-variant-numeric:tabular-nums}
-.chip small{font-weight:400;color:var(--btr-muted,#9499a0)}
-.grid{display:grid;grid-template-columns:repeat(var(--btr-columns,5),minmax(0,1fr));column-gap:var(--btr-gap,20px);row-gap:24px}
-.card{color:inherit;text-decoration:none;display:block;min-width:0}
-.cover{position:relative;aspect-ratio:16/9;border-radius:6px;overflow:hidden;background:var(--btr-placeholder,#f1f2f3)}
-.cover img{width:100%;height:100%;object-fit:cover;display:block;opacity:0;transition:opacity .3s ease,transform .3s cubic-bezier(.2,.75,.25,1)}
-.cover img.loaded{opacity:1}
-.card:hover .cover img{transform:scale(1.04)}
-.stats{position:absolute;left:0;right:0;bottom:0;display:flex;gap:10px;padding:14px 8px 5px;font-size:12px;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.6))}
-.stats .dur{margin-left:auto}
-.title{font-size:15px;line-height:22px;margin-top:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:44px;transition:color .16s ease}
-.card:hover .title{color:var(--brand_blue,#00aeec)}
-.meta{color:var(--btr-muted,#9499a0);font-size:13px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.meta .followed{color:#fb7299;margin-right:4px}
-.foot{display:flex;justify-content:center;align-items:center;gap:10px;min-height:72px;color:var(--btr-muted,#9499a0);font-size:13px}
-.foot .why{font:11px ui-monospace,Menlo,monospace;opacity:.75;padding:2px 6px;border-radius:4px;background:var(--btr-chip,rgba(251,114,153,.1))}
-.foot{flex-wrap:wrap}
-.foot button{font:inherit;padding:6px 16px;border-radius:999px;border:1px solid var(--btr-line,rgba(128,128,128,.3));background:transparent;color:inherit;cursor:pointer;transition:border-color .16s ease,color .16s ease}
+.foot{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:10px;min-height:72px;padding:8px 0;color:var(--btr-muted,#61666d);font-size:13px;text-align:center}
+.foot .msg{flex-basis:100%}
+.foot .msg b{display:block;color:var(--btr-text,#18191c);font-size:14px;margin-bottom:2px}
+.foot button{font:inherit;padding:6px 16px;border-radius:999px;border:1px solid var(--btr-line,rgba(128,128,128,.3));background:transparent;color:inherit;cursor:pointer;transition:border-color .14s ease,color .14s ease,background-color .14s ease}
 .foot button:hover{border-color:#fb7299;color:#fb7299}
+.foot button.primary{background:#fb7299;border-color:#fb7299;color:#fff}
+.foot button.primary:hover{background:#e8618a;color:#fff}
+.foot button:focus-visible{outline:2px solid #fb7299;outline-offset:2px}
+.foot details{flex-basis:100%;font-size:12px}
+.foot summary{cursor:pointer;display:inline-block;color:var(--btr-muted,#61666d)}
+.foot code{display:inline-block;margin-top:6px;font:11px ui-monospace,Menlo,monospace;padding:2px 6px;border-radius:4px;background:var(--btr-chip,rgba(251,114,153,.1));overflow-wrap:anywhere}
 .dots{display:inline-flex;gap:5px}.dots i{width:6px;height:6px;border-radius:50%;background:#fb7299;animation:btr-dot 1s ease-in-out infinite}
 .dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
 .side{position:fixed;right:18px;top:50%;z-index:1000;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:2px;min-width:64px;padding:10px 10px 9px;border-radius:16px;
   background:var(--btr-side,rgba(255,255,255,.92));box-shadow:0 6px 24px rgba(0,0,0,.14);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);cursor:pointer;user-select:none;
-  transition:opacity .25s ease,transform .25s cubic-bezier(.2,.75,.25,1)}
+  transition:opacity .22s ease,transform .22s ${EASE}}
+.side:focus-visible{outline:2px solid #fb7299;outline-offset:2px}
 .side.tight{right:4px;min-width:44px;padding:7px 5px;opacity:.88}.side.tight b{font-size:17px}.side.tight .total{display:none}
 .side:not(.tight){right:auto}
 .side.off{opacity:0;transform:translate(12px,-50%);pointer-events:none}
-.side small{font-size:11px;color:var(--btr-muted,#9499a0)}
+.side small{font-size:12px;color:var(--btr-muted,#61666d)}
 .side b{font-size:22px;line-height:1.15;color:#fb7299;font-variant-numeric:tabular-nums}
-.side b.bump{animation:btr-bump .3s cubic-bezier(.2,.75,.25,1)}
-.side .total{font-size:11px;color:var(--btr-muted,#9499a0);font-variant-numeric:tabular-nums}
+.side .total{font-size:12px;color:var(--btr-muted,#61666d);font-variant-numeric:tabular-nums}
 .side .live{width:6px;height:6px;border-radius:50%;background:#fb7299;margin-top:3px;opacity:0;transition:opacity .2s ease}
 .side.loading .live{opacity:1;animation:btr-dot 1s ease-in-out infinite}
-@keyframes btr-rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 @keyframes btr-dot{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
-@keyframes btr-bump{from{transform:translateY(5px);opacity:.3}to{transform:none;opacity:1}}
-@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.cover img{opacity:1}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 @media(max-width:900px){.side{right:8px;min-width:54px;padding:8px 7px}.side b{font-size:18px}}
 `;
 
+  /* Light DOM: the cards use B 站's own markup and classes, so the site's stylesheet styles them
+   * exactly like the native feed. Only layout glue and our extras are defined here. */
+  const LIGHT_CSS = `
+#btr-flow-feed{display:block;margin-top:8px;color:var(--text1,#18191c)}
+#btr-flow-feed [hidden]{display:none!important}
+#btr-flow-feed .btr-batch{content-visibility:auto;contain-intrinsic-size:auto 900px;margin-top:8px}
+#btr-flow-feed .btr-divider{display:flex;align-items:center;gap:12px;margin:18px 0 16px;color:var(--btr-muted,#61666d);font-size:12px}
+#btr-flow-feed .btr-divider::before,#btr-flow-feed .btr-divider::after{content:"";flex:1;height:1px;background:var(--btr-line,rgba(128,128,128,.22))}
+#btr-flow-feed .btr-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 12px;border-radius:999px;background:var(--btr-chip,rgba(251,114,153,.1));color:#fb7299;font-weight:600;font-variant-numeric:tabular-nums}
+#btr-flow-feed .btr-chip small{font-weight:400;font-size:12px;color:var(--btr-muted,#61666d)}
+#btr-flow-feed .btr-grid{display:grid;grid-template-columns:repeat(var(--btr-columns,5),minmax(0,1fr));column-gap:var(--btr-gap,20px);row-gap:var(--btr-row-gap,20px)}
+#btr-flow-feed .btr-grid>.feed-card{min-width:0;margin:0!important;display:block}
+#btr-flow-feed .feed-card.btr-wait{opacity:0}
+#btr-flow-feed .bili-video-card__image--wrap{position:relative}
+#btr-flow-feed .bili-video-card__cover img{opacity:0;transition:opacity .3s ease}
+#btr-flow-feed .bili-video-card__cover img.btr-loaded{opacity:1}
+/* Watch later & not interested: shown on hover, like the native card. */
+#btr-flow-feed .bili-watch-later{display:none;cursor:pointer}
+#btr-flow-feed .bili-video-card:hover .bili-watch-later,#btr-flow-feed .bili-watch-later.btr-done{display:flex}
+#btr-flow-feed .bili-watch-later__tip--lab{display:none}
+#btr-flow-feed .bili-watch-later:hover .bili-watch-later__tip--lab,#btr-flow-feed .bili-watch-later.btr-done .bili-watch-later__tip--lab{display:block}
+#btr-flow-feed .bili-video-card__info--no-interest{display:none;cursor:pointer}
+#btr-flow-feed .bili-video-card:hover .bili-video-card__info--no-interest{display:flex}
+#btr-flow-feed .bili-video-card__no-interest{display:none}
+#btr-flow-feed .bili-video-card.btr-disliked .bili-video-card__no-interest{display:flex}
+#btr-flow-feed .bili-video-card__no-interest .revert-btn{cursor:pointer}
+/* Hover preview: Bilibili's own storyboard frames, scrubbed by the pointer. */
+#btr-flow-feed .btr-shot{position:absolute;inset:0;z-index:2;border-radius:inherit;background-repeat:no-repeat;pointer-events:none;opacity:0;transition:opacity .14s ease}
+#btr-flow-feed .btr-shot.on{opacity:1}
+#btr-flow-feed .btr-shot i{position:absolute;left:0;bottom:0;height:3px;width:100%;background:#fb7299;transform-origin:0 50%;transform:scaleX(0)}
+/* Skeletons reuse B 站's own skeleton classes; the fallback below only applies if they are unstyled. */
+#btr-flow-feed .btr-skel .bili-video-card__skeleton--cover{aspect-ratio:16/9;border-radius:6px;background:var(--graph_bg_regular,rgba(128,128,128,.12))}
+#btr-flow-feed .btr-skel .bili-video-card__skeleton--text{height:16px;margin:10px 0 0;border-radius:4px;background:var(--graph_bg_regular,rgba(128,128,128,.12))}
+#btr-flow-feed .btr-skel .bili-video-card__skeleton--text.short{width:50%}
+#btr-flow-feed .btr-skel .bili-video-card__skeleton--light{height:14px;width:40%;margin:8px 0 0;border-radius:4px;background:var(--graph_bg_thin,rgba(128,128,128,.08))}
+#btr-flow-feed .btr-skel{animation:btr-skel 1.4s ease-in-out infinite}
+@keyframes btr-skel{0%,100%{opacity:1}50%{opacity:.55}}
+#btr-flow-feed .btr-flash{position:absolute;left:50%;top:50%;z-index:5;transform:translate(-50%,-50%);padding:6px 12px;border-radius:999px;background:rgba(24,25,28,.86);color:#fff;font-size:12px;white-space:nowrap;pointer-events:none}
+@media(prefers-reduced-motion:reduce){#btr-flow-feed *{animation:none!important;transition:none!important}#btr-flow-feed .bili-video-card__cover img{opacity:1}#btr-flow-feed .feed-card.btr-wait{opacity:1}}
+`;
+
   function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+  const svgNS = 'http://www.w3.org/2000/svg';
+  function svg(path, cls, box = '0 0 24 24') {
+    const s = document.createElementNS(svgNS, 'svg'); s.setAttribute('viewBox', box); s.setAttribute('width', '24'); s.setAttribute('height', '24'); s.setAttribute('fill', 'currentColor');
+    if (cls) s.setAttribute('class', cls);
+    const p = document.createElementNS(svgNS, 'path'); p.setAttribute('d', path); s.append(p); return s;
+  }
+  // Fallback glyphs, used only if the native card's icons cannot be borrowed.
+  const GLYPH = {
+    play: 'M8 5.5v13l10.5-6.5z', danmaku: 'M4 5h16v11H9l-4 3v-3H4zM7 9h10M7 12h7',
+    later: 'M12 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-7-7zm-1 4v6l5 3 1-1.7-4-2.3V7z', up: 'M4 6h16v12H4zM8 10v4m0 0h2m4-4v4h2a2 2 0 0 0 0-4h-2',
+    more: 'M12 5.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm0 5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm0 5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z',
+    sad: 'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18zm-3 6v2m6-2v2m-6 5c1.5-1.5 4.5-1.5 6 0', undo: 'M8 4 4 8l4 4M4 8h10a6 6 0 0 1 0 12H8'
+  };
+  const csrf = () => (document.cookie.match(/(?:^|;\s*)bili_jct=([^;]+)/) || [])[1] || '';
 
   function create(host) {
     let box = null, shadow = null, list = null, foot = null, side = null, sentinel = null;
@@ -126,16 +175,16 @@
     async function round() {
       clearTimeout(timer);
       if (loading || paused || !box?.isConnected || !host.enabled() || !isNear()) return;
-      loading = true; status('loading'); side?.classList.add('loading');
+      loading = true; status('loading'); side?.classList.add('loading'); skeleton(true);
       const s = host.settings(), size = s.homeInfiniteSize, lanes = s.homeInfiniteThreads;
       const count = Math.max(lanes, Math.ceil(Math.max(0, size - buffer.length) / PAGE));
       nativeSeen();
       const results = await pool(count, lanes);
-      loading = false; side?.classList.remove('loading');
+      loading = false; side?.classList.remove('loading'); skeleton(false);
       if (!box?.isConnected || !host.enabled()) return;
       let fresh = 0, risk = null, error = null;
       for (const r of results) {
-        if (r.ok) { const cards = feed.cards(r.items, seen); fresh += cards.length; buffer.push(...cards); }
+        if (r.ok) { const cards = feed.cards(r.items, seen).filter(c => !dislikes.has(c.bvid)); fresh += cards.length; buffer.push(...cards); }
         else if (r.error?.kind === 'risk') risk = r.error;
         else error = r.error;
       }
@@ -148,50 +197,240 @@
       timer = setTimeout(round, GAP_MS);
     }
 
+    function retry() { paused = false; fails = 0; round(); }
     function status(kind, err) {
       if (!foot) return;
       foot.replaceChildren();
       if (kind === 'loading') {
         const dots = el('span', 'dots'); dots.append(el('i'), el('i'), el('i'));
-        foot.append(dots, el('span', null, `正在同时加载 ${host.settings().homeInfiniteThreads} 批推荐…`));
+        foot.append(dots, el('span', null, `正在加载第 ${batches + 2} 批推荐…`));
       } else if (kind === 'risk' || kind === 'error') {
-        foot.append(el('span', null, kind === 'risk' ? 'B 站暂时限制了推荐请求，已暂停自动加载，过一会儿再试。' : '暂时没取到新推荐，已暂停自动加载。'));
-        // Show B 站's own answer so a report says exactly what went wrong.
-        if (err) foot.append(el('code', 'why', `B 站返回 ${err.code ?? ''} ${String(err.message || '').slice(0, 60)}`.trim()));
-        const retry = el('button', null, '重试'); retry.type = 'button';
-        retry.onclick = () => { paused = false; fails = 0; round(); };
-        foot.append(retry);
+        // Plain words first; B 站's raw answer is one click away for bug reports.
+        const msg = el('div', 'msg'), b = el('b', null, kind === 'risk' ? '刷得有点快，B 站让我们先歇一会儿' : '暂时没取到新的推荐');
+        msg.append(b, el('span', null, kind === 'risk' ? '已暂停自动加载，不会继续请求。过几分钟再试，或者换成更稳的加载速度。' : '已暂停自动加载。可能是网络波动，稍后点「重试」即可。'));
+        foot.append(msg);
+        const again = el('button', null, '重试'); again.type = 'button'; again.onclick = retry;
+        const threads = host.settings().homeInfiniteThreads;
+        if (kind === 'risk' && threads > 1) {
+          const calm = el('button', 'primary', '切到「稳」再试'); calm.type = 'button';
+          calm.onclick = async () => { try { await chrome.storage.sync.set({homeInfiniteThreads: 1}); } catch (_) {} retry(); };
+          foot.append(calm);
+        }
+        foot.append(again);
+        if (err) {
+          const d = el('details'), sum = el('summary', null, '技术详情');
+          d.append(sum, el('code', null, `B 站返回 ${err.code ?? ''} ${String(err.message || '').slice(0, 80)}`.trim()));
+          foot.append(d);
+        }
       } else foot.append(el('span', null, batches ? `已加载 ${batches + 1} 批 · 继续下滑自动加载` : '继续下滑，自动加载更多推荐'));
     }
 
-    function card(c) {
-      const a = el('a', 'card'); a.href = c.url; a.target = '_blank'; a.rel = 'noopener';
-      const cover = el('div', 'cover');
-      if (c.cover) {
-        const img = el('img'); img.alt = ''; img.loading = 'lazy'; img.decoding = 'async'; img.referrerPolicy = 'no-referrer';
-        img.onload = () => img.classList.add('loaded'); img.src = c.cover; cover.append(img);
-      }
-      const stats = el('div', 'stats');
-      stats.append(el('span', null, `▶ ${c.views}`), el('span', null, `弹 ${c.danmaku}`), el('span', 'dur', c.duration));
-      cover.append(stats);
-      const meta = el('div', 'meta');
-      if (c.followed) meta.append(el('span', 'followed', '已关注'));
-      meta.append(document.createTextNode([c.author, c.date].filter(Boolean).join(' · ')));
-      a.append(cover, el('div', 'title', c.title), meta);
-      a.title = c.title;
-      return a;
+    /* ---------- native look: borrow B 站's markup details from a real card ---------- */
+    let hints = null;
+    function nativeHints() {
+      if (hints) return hints;
+      const native = [...document.querySelectorAll('.feed-card')].find(n => !n.closest('#btr-flow-feed') && n.querySelector('.bili-video-card__image--link[href*="/video/"]'));
+      const pick = sel => { const n = native?.querySelector(sel); return n ? n.cloneNode(true) : null; };
+      const attrs = el => el ? [...el.attributes].filter(a => a.name.startsWith('data-v-')).map(a => a.name) : [];
+      const stats = native ? [...native.querySelectorAll('.bili-video-card__stats--item svg')].map(n => n.cloneNode(true)) : [];
+      const h = {
+        feedAttrs: attrs(native), innerAttrs: attrs(native?.querySelector('.bili-feed-card')),
+        play: stats[0] || null, danmaku: stats[1] || null, later: pick('.bili-watch-later svg'), up: pick('.bili-video-card__info--owner svg'),
+        more: pick('.bili-video-card__info--no-interest svg'), sad: pick('.bili-video-card__no-interest--left svg'), undo: pick('.revert-btn svg'),
+        radio: native?.querySelector('.bili-video-card')?.style.getPropertyValue('--cover-radio') || '56.25%'
+      };
+      if (native) hints = h; // Cache only a real reading; retry while the page is still rendering.
+      return h;
     }
+    const icon = (h, name, cls, box) => { const n = h[name] ? h[name].cloneNode(true) : svg(GLYPH[name], cls, box); if (cls) n.setAttribute('class', cls); return n; };
+
+    function picture(c, title) {
+      const pic = el('picture', 'v-img bili-video-card__cover');
+      const img = el('img'); img.alt = title; img.loading = 'lazy'; img.decoding = 'async';
+      img.addEventListener('load', () => img.classList.add('btr-loaded'), {once: true});
+      img.addEventListener('error', () => img.classList.add('btr-loaded'), {once: true});
+      if (c.coverBase) {
+        for (const [ext, type] of [['avif', 'image/avif'], ['webp', 'image/webp']]) {
+          const src = el('source'); src.type = type; src.srcset = `${c.coverBase}@672w_378h_1c_!web-home-common-cover.${ext}`; pic.append(src);
+        }
+        img.src = `${c.coverBase}@672w_378h_1c_!web-home-common-cover`;
+      } else if (c.cover) img.src = c.cover;
+      pic.append(img);
+      return pic;
+    }
+
+    // Same DOM and classes as B 站's current homepage card (.feed-card > .bili-feed-card > .bili-video-card).
+    function card(c) {
+      const h = nativeHints();
+      const outer = el('div', 'feed-card'); for (const a of h.feedAttrs) outer.setAttribute(a, '');
+      const inner = el('div', 'bili-feed-card'); for (const a of h.innerAttrs) inner.setAttribute(a, '');
+      const v = el('div', 'bili-video-card is-rcmd'); v.style.setProperty('--cover-radio', h.radio);
+      v.dataset.bvid = c.bvid; if (c.aid) v.dataset.aid = String(c.aid);
+      const wrap = el('div', 'bili-video-card__wrap');
+
+      const ni = el('div', 'bili-video-card__no-interest'), niIn = el('div', 'bili-video-card__no-interest--inner');
+      const niL = el('div', 'bili-video-card__no-interest--left'), niR = el('div', 'bili-video-card__no-interest--right');
+      niL.append(icon(h, 'sad', 'no-interest-icon', '0 0 36 36'), el('span', 'no-interest-title', '不感兴趣'), el('span', 'no-interest-desc', '仅在本插件隐藏'));
+      const revert = el('div', 'revert-btn'); revert.setAttribute('role', 'button'); revert.tabIndex = 0;
+      revert.append(icon(h, 'undo', 'revert-icon'), document.createTextNode(' 撤销'));
+      niR.append(revert); niIn.append(niL, niR); ni.append(niIn);
+
+      const link = el('a', 'bili-video-card__image--link'); link.href = c.url; link.target = '_blank'; link.rel = 'noopener';
+      const image = el('div', 'bili-video-card__image'), iwrap = el('div', 'bili-video-card__image--wrap');
+      const lw = el('div', 'bili-watch-later--wrap'), later = el('div', 'bili-watch-later bili-watch-later--pip');
+      later.setAttribute('role', 'button'); later.tabIndex = 0; later.setAttribute('aria-label', '添加至稍后再看');
+      const laterLab = el('span', 'bili-watch-later__tip--lab', '添加至稍后再看');
+      later.append(icon(h, 'later', 'bili-watch-later__icon', '0 0 20 20'), laterLab); lw.append(later);
+      iwrap.append(lw, picture(c, c.title), el('div', 'v-inline-player'));
+      const mask = el('div', 'bili-video-card__mask'), stats = el('div', 'bili-video-card__stats'), left = el('div', 'bili-video-card__stats--left');
+      for (const [name, val] of [['play', c.views], ['danmaku', c.danmaku]]) {
+        const item = el('span', 'bili-video-card__stats--item'); item.append(icon(h, name, 'bili-video-card__stats--icon'), el('span', 'bili-video-card__stats--text', val)); left.append(item);
+      }
+      stats.append(left, el('span', 'bili-video-card__stats__duration', c.duration)); mask.append(stats);
+      image.append(iwrap, mask); link.append(image);
+
+      const info = el('div', 'bili-video-card__info'), right = el('div', 'bili-video-card__info--right');
+      const more = el('div', 'bili-video-card__info--no-interest'); more.setAttribute('role', 'button'); more.tabIndex = 0; more.title = '不感兴趣'; more.setAttribute('aria-label', '不感兴趣');
+      more.append(icon(h, 'more', null));
+      const tit = el('h3', 'bili-video-card__info--tit'); tit.title = c.title;
+      const ta = el('a', null, c.title); ta.href = c.url; ta.target = '_blank'; ta.rel = 'noopener'; tit.append(ta);
+      const bottom = el('div', 'bili-video-card__info--bottom');
+      if (c.followed) bottom.append(el('span', 'bili-video-card__info--icon-text', '已关注'));
+      const owner = el('a', 'bili-video-card__info--owner'); owner.target = '_blank'; owner.rel = 'noopener';
+      if (c.mid) owner.href = `https://space.bilibili.com/${c.mid}`;
+      const au = el('span', 'bili-video-card__info--author', c.author); au.title = c.author;
+      owner.append(icon(h, 'up', null), au); if (c.date) owner.append(el('span', 'bili-video-card__info--date', `· ${c.date}`));
+      bottom.append(owner);
+      right.append(more, tit, bottom); info.append(right);
+      wrap.append(ni, link, info); v.append(wrap); inner.append(v); outer.append(inner);
+
+      const act = (n, fn) => { n.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); fn(); }); n.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } }); };
+      act(later, () => watchLater(c, later, laterLab));
+      act(more, () => dislike(c, v, true));
+      act(revert, () => dislike(c, v, false));
+      preview(c, iwrap, link);
+      return outer;
+    }
+
+    /* ---------- watch later (B 站's own API, the page's login and CSRF token) ---------- */
+    async function watchLater(c, btn, lab) {
+      if (btn.classList.contains('btr-busy')) return;
+      const token = csrf();
+      const done = (text, ok) => {
+        lab.textContent = text; btn.classList.add('btr-done'); btn.classList.toggle('btr-ok', !!ok);
+        clearTimeout(btn._t); btn._t = setTimeout(() => { btn.classList.remove('btr-done'); lab.textContent = ok ? '已在稍后再看' : '添加至稍后再看'; }, 1800);
+      };
+      if (!token) { done('请先登录 B 站'); return; }
+      btn.classList.add('btr-busy');
+      try {
+        const body = new URLSearchParams(c.aid ? {aid: String(c.aid), csrf: token} : {bvid: c.bvid, csrf: token});
+        const r = await fetch(TOVIEW, {method: 'POST', credentials: 'include', body});
+        const j = await r.json().catch(() => null);
+        if (j?.code === 0) done('已添加至稍后再看', true);
+        else if (j?.code === -101) done('请先登录 B 站');
+        else if (j?.code === 90001) done('稍后再看列表已满');
+        else done(j?.message ? `没加上：${String(j.message).slice(0, 20)}` : '没加上，请稍后再试');
+      } catch (_) { done('网络异常，请稍后再试'); }
+      finally { btn.classList.remove('btr-busy'); }
+    }
+
+    /* ---------- not interested: local only (the web API for feedback is not public) ---------- */
+    let dislikes = new Set();
+    chrome.storage.local.get(DISLIKE_KEY).then(d => { if (Array.isArray(d[DISLIKE_KEY])) dislikes = new Set(d[DISLIKE_KEY].filter(x => typeof x === 'string')); }).catch(() => {});
+    function dislike(c, v, on) {
+      v.classList.toggle('btr-disliked', on);
+      if (on) dislikes.add(c.bvid); else dislikes.delete(c.bvid);
+      chrome.storage.local.set({[DISLIKE_KEY]: [...dislikes].slice(-MAX_DISLIKES)}).catch(() => {});
+      if (on) v.querySelector('.revert-btn')?.focus({preventScroll: true});
+    }
+
+    /* ---------- hover preview: storyboard frames from B 站's videoshot API ---------- */
+    const shots = new Map();
+    async function storyboard(c) {
+      if (shots.has(c.bvid)) return shots.get(c.bvid);
+      const p = fetch(`${SHOT}?bvid=${c.bvid}&index=1`, {credentials: 'include'}).then(r => r.json()).then(j => {
+        const d = j?.code === 0 ? j.data : null;
+        if (!d || !Array.isArray(d.image) || !d.image.length || !d.img_x_len || !d.img_y_len) return null;
+        const per = d.img_x_len * d.img_y_len, sheets = d.image.map(u => String(u).replace(/^\/\//, 'https://')).filter(u => /^https:\/\/[^/]*hdslb\.com\//.test(u));
+        if (!sheets.length) return null;
+        const total = Math.max(1, Math.min(sheets.length * per, Array.isArray(d.index) && d.index.length > 1 ? d.index.length - 1 : sheets.length * per));
+        return {sheets, x: d.img_x_len, y: d.img_y_len, per, total};
+      }).catch(() => null);
+      shots.set(c.bvid, p);
+      return p;
+    }
+    function preview(c, wrap, link) {
+      let layer = null, bar = null, data = null, dwell = 0, inside = false, frame = -1;
+      const paint = x => {
+        if (!data || !layer) return;
+        const r = wrap.getBoundingClientRect(), f = Math.min(data.total - 1, Math.max(0, Math.floor((x - r.left) / r.width * data.total)));
+        if (f === frame) return; frame = f;
+        const sheet = Math.floor(f / data.per), k = f % data.per, col = k % data.x, row = Math.floor(k / data.x);
+        layer.style.backgroundImage = `url("${data.sheets[sheet]}")`;
+        layer.style.backgroundSize = `${data.x * 100}% ${data.y * 100}%`;
+        layer.style.backgroundPosition = `${data.x > 1 ? col / (data.x - 1) * 100 : 0}% ${data.y > 1 ? row / (data.y - 1) * 100 : 0}%`;
+        bar.style.transform = `scaleX(${(f + 1) / data.total})`;
+      };
+      let lastX = 0;
+      link.addEventListener('pointerenter', e => {
+        if (e.pointerType !== 'mouse') return;
+        inside = true; lastX = e.clientX;
+        clearTimeout(dwell);
+        // Wait a moment like the native card, so sweeping across the grid fires no requests.
+        dwell = setTimeout(async () => {
+          data = await storyboard(c);
+          if (!inside || !data) return;
+          layer = el('div', 'btr-shot'); bar = el('i'); layer.append(bar); wrap.append(layer); frame = -1; paint(lastX);
+          requestAnimationFrame(() => layer?.classList.add('on'));
+        }, 450);
+      });
+      link.addEventListener('pointermove', e => { lastX = e.clientX; if (layer) paint(e.clientX); }, {passive: true});
+      link.addEventListener('pointerleave', () => { inside = false; clearTimeout(dwell); const l = layer; layer = null; if (l) { l.classList.remove('on'); setTimeout(() => l.remove(), 160); } });
+    }
+
+    /* ---------- skeletons while a batch is on its way ---------- */
+    let skel = null;
+    function skeleton(on) {
+      if (!list) return;
+      if (!on) { const s = skel; skel = null; if (s) { if (ui) ui.fadeOut(s, 140); else s.remove(); } return; }
+      if (skel) return;
+      skel = el('div', 'btr-grid btr-skeletons'); skel.setAttribute('aria-hidden', 'true');
+      const cols = host.columns().count || 5;
+      for (let i = 0; i < cols; i++) {
+        const v = el('div', 'bili-video-card btr-skel'), sk = el('div', 'bili-video-card__skeleton'), info = el('div', 'bili-video-card__skeleton--info'), r = el('div', 'bili-video-card__skeleton--right');
+        r.append(el('p', 'bili-video-card__skeleton--text'), el('p', 'bili-video-card__skeleton--text short'), el('p', 'bili-video-card__skeleton--light'));
+        info.append(r); sk.append(el('div', 'bili-video-card__skeleton--cover'), info); v.append(sk);
+        if (i) v.style.animationDelay = `${i * 90}ms`;
+        skel.append(v);
+      }
+      skel.style.marginTop = '24px';
+      list.after(skel);
+    }
+
+    /* ---------- reveal: cards fade up only when they actually scroll into view ---------- */
+    const revealer = typeof IntersectionObserver === 'function' ? new IntersectionObserver(entries => {
+      const shown = entries.filter(e => e.isIntersecting).map(e => e.target);
+      shown.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top || a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+      shown.forEach((n, i) => {
+        revealer.unobserve(n); n.classList.remove('btr-wait');
+        n.animate?.([{opacity: 0, transform: 'translateY(12px)'}, {opacity: 1, transform: 'none'}], {duration: 320, delay: Math.min(i, 11) * 30, easing: EASE, fill: 'backwards'});
+      });
+    }, {rootMargin: '0px 0px -40px 0px'}) : null;
 
     function append(cards) {
       const n = ++batches + 1; // The native grid is batch 1.
-      const sec = el('section', 'batch'); sec.dataset.batch = String(n);
-      const div = el('div', 'divider'), chip = el('span', 'chip', `第 ${n} 批`);
+      const sec = el('section', 'btr-batch'); sec.dataset.batch = String(n);
+      const div = el('div', 'btr-divider'), chip = el('span', 'btr-chip', `第 ${n} 批`);
       const at = new Date();
       chip.append(el('small', null, `${cards.length} 个视频 · ${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`));
       div.append(chip);
-      const grid = el('div', 'grid'); for (const c of cards) grid.append(card(c));
+      const grid = el('div', 'btr-grid'); grid.setAttribute('role', 'list');
+      for (const c of cards) {
+        const node = card(c); node.setAttribute('role', 'listitem');
+        if (revealer && !reduced.matches) { node.classList.add('btr-wait'); revealer.observe(node); }
+        grid.append(node);
+      }
       sec.append(div, grid);
-      if (!reduced.matches) { sec.classList.add('enter'); sec.addEventListener('animationend', () => sec.classList.remove('enter'), {once: true}); }
       list.append(sec); sections.push(sec);
       current?.observe(sec);
       updateSide();
@@ -202,10 +441,11 @@
       if (!side) return;
       if (n != null && n !== shown) {
         shown = n; const b = side.querySelector('b'); b.textContent = String(n);
-        if (!reduced.matches) { b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
+        if (!reduced.matches) b.animate([{transform: 'translateY(5px)', opacity: .3}, {transform: 'none', opacity: 1}], {duration: 220, easing: EASE});
       }
       total = batches + 1;
       side.querySelector('.total').textContent = `共 ${total} 批`;
+      side.setAttribute('aria-label', `当前第 ${shown} 批，共 ${total} 批。按回车回到这一批开头`);
     }
 
     // The batch crossing the middle of the viewport is "current"; above the feed the native grid is batch 1.
@@ -233,9 +473,12 @@
       if (!anchor) return;
       if (!box) {
         box = el('div'); box.id = 'btr-flow-feed'; box.dataset.btrFlowOwned = '';
-        shadow = box.attachShadow({mode: 'open'});
+        const style = el('style', null, LIGHT_CSS);
+        list = el('div', 'btr-feed-list');
+        const uiHost = el('div', 'btr-feed-ui');
+        shadow = uiHost.attachShadow({mode: 'open'});
         shadow.append(el('style', null, CSS));
-        list = el('div', 'list'); foot = el('div', 'foot'); foot.setAttribute('role', 'status'); foot.setAttribute('aria-live', 'polite');
+        foot = el('div', 'foot'); foot.setAttribute('role', 'status'); foot.setAttribute('aria-live', 'polite');
         sentinel = el('div'); sentinel.style.height = '1px';
         side = el('div', 'side off'); side.setAttribute('role', 'button'); side.tabIndex = 0;
         side.title = '当前所在的推荐批次；点击回到这一批的开头';
@@ -243,7 +486,8 @@
         const jump = () => { const s = sections.find(x => Number(x.dataset.batch) === shown); (s || anchor).scrollIntoView({behavior: reduced.matches ? 'auto' : 'smooth', block: 'start'}); };
         side.addEventListener('click', jump);
         side.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); jump(); } });
-        shadow.append(list, foot, sentinel, side);
+        shadow.append(foot, side);
+        box.append(style, list, uiHost, sentinel);
 
         new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) round(); }, {rootMargin: '0px 0px 150% 0px'}).observe(sentinel);
         current = new IntersectionObserver(track, {rootMargin: '-45% 0px -45% 0px'});
@@ -256,9 +500,9 @@
     function theme() {
       if (!box) return;
       const t = host.theme(), cols = host.columns();
-      const v = {'--btr-text': t.dark ? '#e3e5e7' : '#18191c', '--btr-muted': t.dark ? '#9499a0' : '#9499a0', '--btr-line': t.dark ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.08)',
+      const v = {'--btr-text': t.dark ? '#e3e5e7' : '#18191c', '--btr-muted': t.dark ? '#a2a7ae' : '#61666d', '--btr-line': t.dark ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.08)',
         '--btr-placeholder': t.oled ? '#000' : t.dark ? '#222' : '#f1f2f3', '--btr-side': t.oled ? 'rgba(0,0,0,.85)' : t.dark ? 'rgba(36,37,42,.92)' : 'rgba(255,255,255,.92)',
-        '--btr-chip': t.dark ? 'rgba(251,114,153,.16)' : 'rgba(251,114,153,.1)', '--btr-columns': String(cols.count), '--btr-gap': cols.gap};
+        '--btr-chip': t.dark ? 'rgba(251,114,153,.16)' : 'rgba(251,114,153,.1)', '--btr-columns': String(cols.count), '--btr-gap': cols.gap, '--btr-row-gap': cols.rowGap || '20px'};
       for (const [k, val] of Object.entries(v)) box.style.setProperty(k, val);
       box.style.colorScheme = t.dark ? 'dark' : 'light';
     }
@@ -272,7 +516,7 @@
     function stop() {
       clearTimeout(timer);
       if (!box) return;
-      box.remove(); box = shadow = list = foot = side = sentinel = null; current?.disconnect(); current = null;
+      box.remove(); box = shadow = list = foot = side = sentinel = skel = null; current?.disconnect(); current = null;
       sections = []; visible.clear(); seen.clear(); buffer = []; batches = 0; paused = false; fails = 0; loading = false;
     }
 

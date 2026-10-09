@@ -98,7 +98,9 @@
       const title = text(it.title, 180);
       if (!title) continue;
       seen.add(bvid);
-      out.push({bvid, url: `https://www.bilibili.com/video/${bvid}`, title, cover: cover(it.pic), duration: duration(it.duration),
+      const pic = cover(it.pic);
+      out.push({bvid, aid: Math.max(0, Math.trunc(Number(it.id)) || 0), mid: Math.max(0, Math.trunc(Number(it.owner?.mid)) || 0),
+        url: `https://www.bilibili.com/video/${bvid}`, title, cover: pic, coverBase: pic ? pic.split('@')[0] : '', duration: duration(it.duration),
         author: text(it.owner?.name, 60), views: count(it.stat?.view), danmaku: count(it.stat?.danmaku),
         date: date(it.pubdate, now), followed: it.is_followed === 1 || it.is_followed === true});
     }

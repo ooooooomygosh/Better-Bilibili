@@ -7,7 +7,7 @@ from playwright.sync_api import sync_playwright
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 results=[]
 def ok(name):results.append({'test':name,'passed':True});print('PASS',name,flush=True)
-FIXTURE='''<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;font:14px sans-serif}main{width:1400px;margin:0 auto}.container{display:grid;grid-template-columns:repeat(5,1fr);gap:20px}.feed-card{height:180px}.load-more-anchor{height:10px}</style></head><body>
+FIXTURE='''<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;font:14px sans-serif}main{width:1400px;margin:0 auto}.container{display:grid;grid-template-columns:repeat(5,1fr);gap:20px}.container>.feed-card{height:180px}/* minimal stand-in for Bilibili's own card stylesheet, which the light-DOM cards rely on */.bili-video-card__image{position:relative;border-radius:6px;overflow:hidden}.bili-video-card__image--wrap{position:relative;padding-top:56.25%}.bili-video-card__cover{position:absolute;inset:0}.bili-video-card__cover img,.bili-video-card__cover picture{width:100%;height:100%;object-fit:cover;display:block}.bili-video-card__stats{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-between;padding:6px 8px;color:#fff;font-size:12px;background:linear-gradient(transparent,rgba(0,0,0,.6))}.bili-video-card__stats--left{display:flex;gap:10px}.bili-video-card__info{display:flex;gap:8px;margin-top:10px}.bili-video-card__info--tit{margin:0 0 4px;font-size:15px;line-height:22px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.bili-video-card__info--tit a{color:#18191c;text-decoration:none}.bili-video-card__info--bottom,.bili-video-card__info--owner{color:#9499a0;font-size:13px;text-decoration:none}.bili-video-card__info--author{margin-right:6px}.load-more-anchor{height:10px}</style></head><body>
 <main class="bili-feed4-layout"><div class="feed2"><section class="recommended-container_floor-aside"><div class="container is-version8"><div class="feed-roll-btn"><button class="roll-btn"><span>换一换</span></button></div></div></section><div class="load-more-anchor"></div></div></main>
 <script>const g=document.querySelector('.container');for(let i=0;i<10;i++){const h=document.createElement('div');h.className='feed-card';h.innerHTML=`<div class="bili-video-card"><a href="/video/BV1native0${String(i).padStart(2,'0')}"><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""></a><h3 class="bili-video-card__info--tit"><a href="/video/BV1native0${String(i).padStart(2,'0')}">原生 ${i}</a></h3></div>`;g.append(h);}for(let i=0;i<7;i++){const k=document.createElement('div');k.className='feed-card';k.innerHTML='<div class="bili-video-card is-rcmd"><div class="bili-video-card__skeleton"><div class="bili-video-card__skeleton--cover"></div></div></div>';g.append(k);}</script></body></html>'''
 state={'calls':0,'mode':'ok','idx':[],'ps':set()}
@@ -36,57 +36,59 @@ with sync_playwright() as p:
  page.goto('https://www.bilibili.com/')
  # In-page latency + in-flight counter: Playwright's sync route handlers run one at a time.
  page.evaluate("(()=>{const f=window.fetch;window.inflight=0;window.maxInflight=0;window.fetch=async(...a)=>{const rc=String(a[0]).includes('/feed/rcmd');if(rc){inflight++;maxInflight=Math.max(maxInflight,inflight);}try{const r=await f(...a);if(rc)await new Promise(z=>setTimeout(z,350));return r;}finally{if(rc)inflight--;}};})()")
- for f in ['tests/browser-shim.js','src/home-core.js','src/feed-core.js']:page.add_script_tag(content=(ROOT/f).read_text())
+ for f in ['tests/browser-shim.js','src/ui-kit.js','src/home-core.js','src/feed-core.js']:page.add_script_tag(content=(ROOT/f).read_text())
  page.evaluate("chromeMock.storage.sync.set({homeInfinite:true,homeInfiniteSize:24,homeInfiniteThreads:2})")
  page.evaluate("code=>new Function('chrome',code)(window.chromeMock)",(ROOT/'src/home-infinite.js').read_text())
  page.evaluate("code=>new Function('chrome','crypto',code)(window.chromeMock,{randomUUID:()=> 'fixture-tab-infinite-1234'})",(ROOT/'src/home-enhancer.js').read_text())
  feed="document.querySelector('#btr-flow-feed')"
- page.wait_for_function(f"{feed}?.shadowRoot?.querySelectorAll('.batch').length>=2",timeout=15000)
+ ui="document.querySelector('#btr-flow-feed .btr-feed-ui').shadowRoot"
+ page.wait_for_function(f"{feed}?.querySelectorAll('.btr-batch').length>=2",timeout=15000)
  assert page.evaluate("document.querySelector('#btr-flow-feed').previousElementSibling.matches('.recommended-container_floor-aside')")
  assert not page.locator('.load-more-anchor').is_visible()
  ok('feed mounts right after the native recommendation area and replaces the site lazy loader')
- assert page.locator('.feed-card:visible').count()==10,page.locator('.feed-card:visible').count()
+ assert page.locator('.recommended-container_floor-aside .feed-card:visible').count()==10,page.locator('.recommended-container_floor-aside .feed-card:visible').count()
  assert page.evaluate("document.querySelectorAll('[data-btr-empty]').length")==7
  ok('unfilled skeleton slots after the last real card are hidden')
  assert page.evaluate('maxInflight')==2,page.evaluate('maxInflight');assert len(set(state['idx']))==len(state['idx'])
  assert state['ps']=={12},state['ps']
  ok('two lanes request concurrently with distinct page indices, WBI-signed, always ps=12 like the site')
- labels=page.evaluate(f"[...{feed}.shadowRoot.querySelectorAll('.chip')].map(n=>n.firstChild.textContent)")
+ labels=page.evaluate(f"[...{feed}.querySelectorAll('.btr-chip')].map(n=>n.firstChild.textContent)")
  assert labels[:2]==['第 2 批','第 3 批'],labels
- bvids=page.evaluate(f"[...{feed}.shadowRoot.querySelectorAll('a.card')].map(a=>a.href)")
+ bvids=page.evaluate(f"[...{feed}.querySelectorAll('.btr-batch a.bili-video-card__image--link')].map(a=>a.href)")
  assert len(bvids)==len(set(bvids)) and not any('BV1native000' in b for b in bvids) and len(bvids)==48,len(bvids)
- sizes=page.evaluate(f"[...{feed}.shadowRoot.querySelectorAll('.batch')].map(b=>b.querySelectorAll('a.card').length)");assert sizes[:2]==[24,24],sizes
- assert '广告' not in page.evaluate(f"{feed}.shadowRoot.textContent")
+ sizes=page.evaluate(f"[...{feed}.querySelectorAll('.btr-batch')].map(b=>b.querySelectorAll('.feed-card').length)");assert sizes[:2]==[24,24],sizes
+ assert '广告' not in page.evaluate(f"{feed}.textContent")
+ assert page.evaluate(f"{feed}.querySelector('.btr-batch .feed-card > .bili-feed-card > .bili-video-card.is-rcmd .bili-video-card__info--tit a')!==null")
  ok('a 24-card batch merges two 12-card requests; numbered after the native batch; duplicates, ads, live dropped')
- page.evaluate(f"{feed}.shadowRoot.querySelector('.batch').scrollIntoView({{block:'center'}})");page.wait_for_timeout(500)
- side=page.evaluate(f"(()=>{{const s={feed}.shadowRoot.querySelector('.side');return {{n:s.querySelector('b').textContent,off:s.classList.contains('off'),total:s.querySelector('.total').textContent}}}})()")
+ page.evaluate(f"{feed}.querySelector('.btr-batch').scrollIntoView({{block:'center'}})");page.wait_for_timeout(500)
+ side=page.evaluate(f"(()=>{{const s={ui}.querySelector('.side');return {{n:s.querySelector('b').textContent,off:s.classList.contains('off'),total:s.querySelector('.total').textContent}}}})()")
  assert side['n']=='2' and not side['off'],side
  ok('side indicator shows the batch crossing the middle of the viewport')
- before=page.evaluate(f"{feed}.shadowRoot.querySelectorAll('.batch').length")
+ before=page.evaluate(f"{feed}.querySelectorAll('.btr-batch').length")
  for _ in range(4):page.mouse.wheel(0,4000);page.wait_for_timeout(600)
- page.wait_for_function(f"{feed}.shadowRoot.querySelectorAll('.batch').length>={before+2}",timeout=15000)
- after=page.evaluate(f"{feed}.shadowRoot.querySelectorAll('.batch').length")
+ page.wait_for_function(f"{feed}.querySelectorAll('.btr-batch').length>={before+2}",timeout=15000)
+ after=page.evaluate(f"{feed}.querySelectorAll('.btr-batch').length")
  page.wait_for_timeout(300)
- n=int(page.evaluate(f"{feed}.shadowRoot.querySelector('.side b').textContent"));assert n>2,n
+ n=int(page.evaluate(f"{ui}.querySelector('.side b').textContent"));assert n>2,n
  ok(f'scrolling keeps appending batches ({before} -> {after}) and the indicator follows')
  page.screenshot(path=str(ROOT/'docs/infinite-feed-fixture.png'))
  state['mode']='risk'
  for _ in range(6):page.mouse.wheel(0,6000);page.wait_for_timeout(500)
- page.wait_for_function(f"{feed}.shadowRoot.querySelector('.foot button')",timeout=15000)
+ page.wait_for_function(f"{ui}.querySelector('.foot button')",timeout=15000)
  calls=state['calls'];page.mouse.wheel(0,3000);page.wait_for_timeout(1500);assert state['calls']==calls
- assert '限制' in page.evaluate(f"{feed}.shadowRoot.querySelector('.foot').textContent")
- ok('risk-control answer pauses loading with a retry button and no further requests')
- state['mode']='ok';page.evaluate(f"{feed}.shadowRoot.querySelector('.foot button').click()")
- page.wait_for_function(f"{feed}.shadowRoot.querySelectorAll('.batch').length>{after}",timeout=15000)
+ foot_text=page.evaluate(f"{ui}.querySelector('.foot').textContent");assert '歇' in foot_text and '技术详情' in foot_text and '切到「稳」' in foot_text,foot_text
+ ok('risk-control answer pauses loading with plain-language text, retry, one-click stable mode and collapsible details; no further requests')
+ state['mode']='ok';page.evaluate(f"[...{ui}.querySelectorAll('.foot button')].find(b=>b.textContent==='重试').click()")
+ page.wait_for_function(f"{feed}.querySelectorAll('.btr-batch').length>{after}",timeout=15000)
  ok('retry resumes loading')
  for size,threads in ((36,3),(12,1)):
   page.evaluate(f"chromeMock.storage.sync.set({{homeInfiniteSize:{size},homeInfiniteThreads:{threads}}})");page.wait_for_timeout(300)
-  have=page.evaluate(f"{feed}.shadowRoot.querySelectorAll('.batch').length")
+  have=page.evaluate(f"{feed}.querySelectorAll('.btr-batch').length")
   for _ in range(3):page.mouse.wheel(0,5000);page.wait_for_timeout(500)
   for _ in range(8):
-   if page.evaluate(f"[...{feed}.shadowRoot.querySelectorAll('.batch')].at(-1).querySelectorAll('a.card').length")=={size}:break
+   if page.evaluate(f"[...{feed}.querySelectorAll('.btr-batch')].at(-1).querySelectorAll('.feed-card').length")=={size}:break
    page.mouse.wheel(0,5000);page.wait_for_timeout(700)
-  page.wait_for_function(f"[...{feed}.shadowRoot.querySelectorAll('.batch')].at(-1).querySelectorAll('a.card').length==={size}",timeout=15000)
+  page.wait_for_function(f"[...{feed}.querySelectorAll('.btr-batch')].at(-1).querySelectorAll('.feed-card').length==={size}",timeout=15000)
  assert state['ps']=={12},state['ps']
  ok('36 cards × 3 lanes and 12 cards × 1 lane both keep loading, still ps=12')
  page.evaluate("chromeMock.storage.sync.set({homeInfinite:false})");page.wait_for_timeout(400)
