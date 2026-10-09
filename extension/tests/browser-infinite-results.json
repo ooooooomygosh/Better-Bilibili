@@ -26,7 +26,11 @@
    "passed": true
   },
   {
-   "test": "不感兴趣 swaps the card for a plain placeholder: no link inside, no card / link ancestor, links in the card lose href / target",
+   "test": "不感兴趣 shows a B 站-style placeholder (blurred cover, 已减少此类推荐, 撤销, ×, 知道了): no link inside, no card / link ancestor, links in the card lose href / target",
+   "passed": true
+  },
+  {
+   "test": "the placeholder stays put (no early refill): still there 4.5 s later with the pointer away",
    "passed": true
   },
   {
@@ -34,7 +38,11 @@
    "passed": true
   },
   {
-   "test": "不感兴趣 then waiting: the placeholder folds away and a spare card keeps the row full",
+   "test": "hovered: stays past 8 s; after the pointer leaves it is dismissed, following cards glide into place (FLIP) and a spare card refills the row",
+   "passed": true
+  },
+  {
+   "test": "知道了 dismisses at once; scrolling the placeholder out of view dismisses it too",
    "passed": true
   },
   {

@@ -83,14 +83,20 @@
 #btr-flow-feed .btr-menu button{display:flex;align-items:center;gap:8px;width:100%;padding:8px 14px;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;white-space:nowrap}
 #btr-flow-feed .btr-menu button:hover,#btr-flow-feed .btr-menu button:focus-visible{background:var(--btr-menu-hover,#f1f2f3);color:#fb7299;outline:none}
 #btr-flow-feed .btr-menu small{margin-left:auto;padding-left:10px;font-size:12px;color:var(--btr-muted,#9499a0)}
-/* Hidden-by-you state: the card dims and blurs, one short line and 撤销 in the middle, then it folds away. */
-#btr-flow-feed .btr-gone-card{position:relative;min-width:0;overflow:hidden;border-radius:8px;background:var(--btr-placeholder,#f1f2f3);cursor:default;user-select:none}
-#btr-flow-feed .btr-gone-bg{position:absolute;inset:-24px;background:center/cover no-repeat;filter:blur(18px) saturate(.6);opacity:.55}
-#btr-flow-feed .btr-gone{position:absolute;inset:0;z-index:15;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border-radius:8px;background:var(--btr-gone,rgba(255,255,255,.72));backdrop-filter:blur(10px) saturate(.6);-webkit-backdrop-filter:blur(10px) saturate(.6);color:var(--btr-text,#18191c);font-size:14px;text-align:center}
-#btr-flow-feed .btr-gone small{display:block;margin-top:2px;font-size:12px;color:var(--btr-muted,#9499a0)}
-#btr-flow-feed .btr-gone button{padding:5px 16px;border-radius:6px;border:1px solid var(--btr-line,rgba(0,0,0,.12));background:var(--btr-menu-bg,#fff);color:inherit;font:inherit;font-size:13px;cursor:pointer}
-#btr-flow-feed .btr-gone button:hover{color:#fb7299;border-color:#fb7299}
-#btr-flow-feed .btr-gone{cursor:default}
+/* Hidden-by-you state, B 站-style: the cover blurs under a dark veil with 「已减少此类推荐」 and 撤销. It
+   stays until you close it, scroll it away, or ~8 s pass while you are not on it; then the row reflows. */
+#btr-flow-feed .btr-gone-card{position:relative;min-width:0;display:flex;flex-direction:column;cursor:default;user-select:none}
+#btr-flow-feed .btr-gone-cover{position:relative;overflow:hidden;border-radius:var(--btr-radius,6px);background:var(--btr-placeholder,#f1f2f3);aspect-ratio:16/9;flex:none}
+#btr-flow-feed .btr-gone-bg{position:absolute;inset:-20px;background:center/cover no-repeat;filter:blur(16px) saturate(.8);transform:scale(1.05)}
+#btr-flow-feed .btr-gone{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(0,0,0,.45);color:#fff;font-size:14px;line-height:20px;text-align:center}
+#btr-flow-feed .btr-gone .undo{min-width:76px;padding:4px 16px;border-radius:999px;border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.12);color:#fff;font:inherit;font-size:13px;cursor:pointer;transition:background-color .15s ease,border-color .15s ease}
+#btr-flow-feed .btr-gone .undo:hover,#btr-flow-feed .btr-gone .undo:focus-visible{background:rgba(255,255,255,.28);border-color:#fff;outline:none}
+#btr-flow-feed .btr-gone .x{position:absolute;top:6px;right:6px;width:24px;height:24px;display:grid;place-items:center;border:0;border-radius:50%;background:rgba(0,0,0,.25);color:#fff;font:16px/1 sans-serif;cursor:pointer;transition:background-color .15s ease}
+#btr-flow-feed .btr-gone .x:hover,#btr-flow-feed .btr-gone .x:focus-visible{background:rgba(0,0,0,.5);outline:none}
+#btr-flow-feed .btr-gone-info{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px;color:var(--btr-muted,#9499a0)}
+#btr-flow-feed .btr-gone-info span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#btr-flow-feed .btr-gone-info button{flex:none;padding:2px 10px;border:0;border-radius:6px;background:var(--btr-menu-hover,#f1f2f3);color:var(--btr-text,#18191c);font:inherit;font-size:12px;cursor:pointer}
+#btr-flow-feed .btr-gone-info button:hover,#btr-flow-feed .btr-gone-info button:focus-visible{color:#fb7299;outline:none}
 /* Hover preview: Bilibili's own storyboard frames, scrubbed by the pointer. */
 #btr-flow-feed .btr-shot{position:absolute;inset:0;z-index:2;border-radius:inherit;background-repeat:no-repeat;pointer-events:none;opacity:0;transition:opacity .14s ease}
 #btr-flow-feed .btr-shot.on{opacity:1}
@@ -394,12 +400,12 @@
       const item = (text, note, fn) => {
         const b = el('button', null, text); b.type = 'button'; b.setAttribute('role', 'menuitem'); b.tabIndex = -1;
         if (note) b.append(el('small', null, note));
-        bind(b, () => { closeMenu(true); fn(); });
+        bind(b, e => { const key = !e || e.detail === 0; closeMenu(key); fn(key); });
         node.append(b); return b;
       };
       item('添加至稍后再看', null, () => watchLater(c, later, laterLab));
-      item('不感兴趣', '仅本插件', () => gone(c, v, 'video'));
-      if (c.mid && c.author) item(`不想看「${c.author.length > 8 ? c.author.slice(0, 8) + '…' : c.author}」`, '仅本插件', () => gone(c, v, 'up'));
+      item('不感兴趣', '仅本插件', key => gone(c, v, 'video', key));
+      if (c.mid && c.author) item(`不想看「${c.author.length > 8 ? c.author.slice(0, 8) + '…' : c.author}」`, '仅本插件', key => gone(c, v, 'up', key));
       node.addEventListener('keydown', e => {
         const items = [...node.querySelectorAll('button')], i = items.indexOf(document.activeElement);
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus(); }
@@ -439,57 +445,112 @@
         a.style.pointerEvents = '';
       }
     }
-    function gone(c, v, kind) {
+    // Placeholders that are still waiting for the user (undo / dismiss).
+    const AUTO_DISMISS = 8000, AFTER_LEAVE = 2500;
+    function gone(c, v, kind, viaKey) {
       const outer = v.closest('.feed-card');
       if (!outer || !outer.isConnected) return;
       if (kind === 'up') blockedUps.add(String(c.mid)); else dislikes.add(c.bvid);
       persist();
+      const h = Math.round(outer.getBoundingClientRect().height);
       const ph = el('div', 'btr-gone-card'); ph.setAttribute('role', 'listitem');
-      ph.style.height = `${Math.round(outer.getBoundingClientRect().height)}px`;
-      const cover = v.querySelector('img'), src = cover?.currentSrc || cover?.src || '';
+      if (h) ph.style.height = `${h}px`;
+      const cov = el('div', 'btr-gone-cover');
+      const ratio = getComputedStyle(v).getPropertyValue('--cover-radio').trim();
+      if (/^[\d.]+%$/.test(ratio)) cov.style.aspectRatio = String(100 / parseFloat(ratio));
+      const img = v.querySelector('img'), src = img?.currentSrc || img?.src || '';
       const bg = el('div', 'btr-gone-bg');
       if (/^https:\/\/[^/"')\s]*hdslb\.com\/[^"')\s]*$/.test(src)) bg.style.backgroundImage = `url("${src}")`;
       const layer = el('div', 'btr-gone'); layer.setAttribute('role', 'status');
-      const msg = el('div', null, kind === 'up' ? `不再显示「${c.author}」` : '已不再显示这条视频');
-      msg.append(el('small', null, '只在本插件生效，不影响 B 站推荐'));
-      const undo = el('button', null, '撤销'); undo.type = 'button';
-      layer.append(msg, undo); ph.append(bg, layer);
+      const msg = el('div', null, kind === 'up' ? '已减少该 UP 主的推荐' : '已减少此类推荐');
+      const undo = el('button', 'undo', '撤销'); undo.type = 'button';
+      const x = el('button', 'x', '×'); x.type = 'button'; x.setAttribute('aria-label', '关闭提示');
+      layer.append(x, msg, undo); cov.append(bg, layer);
+      const info = el('div', 'btr-gone-info');
+      const note = el('span', null, kind === 'up' ? `不再显示「${c.author}」· 仅本插件` : '仅本插件生效，不影响 B 站推荐');
+      note.title = '只在本插件里隐藏，不会发给 B 站，也不影响 B 站的推荐算法';
+      const okBtn = el('button', null, '知道了'); okBtn.type = 'button';
+      info.append(note, okBtn); ph.append(cov, info);
       bind(ph, () => {}); // Presses anywhere on the placeholder stop here.
       stripLinks(outer);
       outer.replaceWith(ph);
-      if (ui) ui.animate(layer, [{opacity: 0, transform: 'scale(.98)'}, {opacity: 1, transform: 'none'}], {duration: 220});
-      undo.focus({preventScroll: true});
-      let fold = 0;
-      const arm = ms => { clearTimeout(fold); fold = setTimeout(() => {
-        if (!ph.isConnected) return;
+      if (ui) ui.animate(layer, [{opacity: 0}, {opacity: 1}], {duration: 220});
+      if (viaKey) undo.focus({preventScroll: true});
+
+      let done = false, hovered = false, focused = false, seen = false, timer = 0;
+      const since = Date.now();
+      const arm = ms => { clearTimeout(timer); timer = setTimeout(tick, ms); };
+      function tick() {
+        if (done || !ph.isConnected) return;
+        if (hovered || focused) return; // Re-armed when the pointer / focus leaves.
+        const left = AUTO_DISMISS - (Date.now() - since);
+        if (left > 0) arm(left); else dismiss();
+      }
+      arm(AUTO_DISMISS);
+      ph.addEventListener('pointerenter', () => { hovered = true; clearTimeout(timer); });
+      ph.addEventListener('pointerleave', () => { hovered = false; if (!focused) arm(Math.max(AFTER_LEAVE, AUTO_DISMISS - (Date.now() - since))); });
+      ph.addEventListener('focusin', () => { focused = true; clearTimeout(timer); });
+      ph.addEventListener('focusout', e => { if (ph.contains(e.relatedTarget)) return; focused = false; if (!hovered) arm(Math.max(AFTER_LEAVE, AUTO_DISMISS - (Date.now() - since))); });
+      // Scrolled out of view after being seen: fold away quietly (in place, so nothing jumps).
+      const io = typeof IntersectionObserver === 'function' ? new IntersectionObserver(es => {
+        for (const e of es) { if (e.isIntersecting) seen = true; else if (seen) dismiss(true); }
+      }) : null;
+      io?.observe(ph);
+
+      function finish() { done = true; clearTimeout(timer); io?.disconnect(); }
+      function dismiss(offscreen) {
+        if (done) return; finish();
         const others = kind === 'up' ? [...(list?.querySelectorAll(`.bili-video-card[data-mid="${String(c.mid).replace(/[^0-9]/g, "")}"]`) || [])].map(n => n.closest('.feed-card')).filter(Boolean) : [];
-        for (const o of [ph, ...others]) collapse(o);
-      }, ms); };
-      arm(3200);
-      // Reading the message or reaching for 撤销 holds the fold.
-      ph.addEventListener('pointerenter', () => clearTimeout(fold));
-      ph.addEventListener('pointerleave', () => arm(1600));
+        refill([ph, ...others], !offscreen);
+      }
+      bind(x, () => dismiss()); bind(okBtn, () => dismiss());
       bind(undo, () => {
-        clearTimeout(fold);
-        if (!ph.isConnected) return;
+        if (done || !ph.isConnected) return;
+        finish();
         if (kind === 'up') blockedUps.delete(String(c.mid)); else dislikes.delete(c.bvid);
         persist();
-        // Links come back a moment later, after this press (and any trailing mouseup/click) is over.
         ph.replaceWith(outer);
+        // Links come back a moment later, after this press (and any trailing mouseup/click) is over.
         setTimeout(() => restoreLinks(outer), 0);
         if (ui) ui.animate(outer, [{opacity: 0}, {opacity: 1}], {duration: 180});
         outer.querySelector('.bili-video-card__info--no-interest')?.focus({preventScroll: true});
       });
     }
-    function collapse(outer) {
-      const spare = buffer.findIndex(x => !hidden(x));
-      const swap = () => {
-        if (spare >= 0 && buffer[spare]) { const fresh = card(buffer.splice(spare, 1)[0]); fresh.setAttribute('role', 'listitem'); outer.replaceWith(fresh); reveal(fresh, 0); }
-        else outer.remove();
+
+    /** Remove `nodes` and top each grid back up with spare cards at its end. With `animate`, the
+     * removed cells fade, then the following cards glide to their new cells (FLIP). */
+    function refill(nodes, animate) {
+      nodes = nodes.filter(n => n.isConnected);
+      if (!nodes.length) return;
+      const grids = [...new Set(nodes.map(n => n.parentElement).filter(Boolean))];
+      const apply = () => {
+        const cells = grids.flatMap(g => [...g.children]).filter(n => !nodes.includes(n));
+        const before = new Map(animate ? cells.map(n => [n, n.getBoundingClientRect()]) : []);
+        for (const n of nodes) n.remove();
+        const added = [];
+        for (const g of grids) {
+          const missing = nodes.filter(n => n.__grid === g).length;
+          for (let k = 0; k < missing; k++) {
+            const spare = buffer.findIndex(c => !hidden(c));
+            if (spare < 0) break;
+            const fresh = card(buffer.splice(spare, 1)[0]); fresh.setAttribute('role', 'listitem'); g.append(fresh); added.push(fresh);
+          }
+        }
+        if (!animate || reduced.matches) return;
+        for (const [n, r] of before) {
+          const r2 = n.getBoundingClientRect(), dx = r.left - r2.left, dy = r.top - r2.top;
+          if ((dx || dy) && r2.bottom > -200 && r2.top < innerHeight + 200) n.animate([{transform: `translate(${dx}px,${dy}px)`}, {transform: 'none'}], {duration: 320, easing: EASE});
+        }
+        for (const n of added) reveal(n, 0);
       };
-      if (!ui || reduced.matches) { swap(); return; }
-      const a = outer.animate([{opacity: 1, transform: 'none'}, {opacity: 0, transform: 'scale(.94)'}], {duration: 220, easing: EASE, fill: 'forwards'});
-      a.onfinish = swap;
+      for (const n of nodes) n.__grid = n.parentElement;
+      if (!animate || !ui || reduced.matches) { apply(); return; }
+      let left = nodes.length;
+      for (const n of nodes) {
+        const a = n.animate([{opacity: 1, transform: 'none'}, {opacity: 0, transform: 'scale(.94)'}], {duration: 200, easing: EASE, fill: 'forwards'});
+        let fired = false; const next = () => { if (fired) return; fired = true; if (--left === 0) apply(); };
+        a.onfinish = next; setTimeout(next, 320); // Background tabs don't tick animations.
+      }
     }
 
     /* ---------- hover preview: storyboard frames from B 站's videoshot API ---------- */

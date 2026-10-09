@@ -88,10 +88,15 @@ with sync_playwright() as p:
  page.mouse.click(mb['x']+mb['width']/2,mb['y']+mb['height']/2);page.wait_for_timeout(300)
  ph="document.querySelector('#btr-flow-feed .btr-gone-card')"
  gone=page.evaluate(f"(()=>{{const g={ph};return g&&[g.textContent,!firstCard.isConnected,!g.closest('a,.bili-video-card,.feed-card'),g.querySelectorAll('a').length,[...firstCard.querySelectorAll('a')].every(a=>!a.hasAttribute('href')&&!a.hasAttribute('target')&&a.dataset.btrHref)]}})()")
- assert gone and '撤销' in gone[0] and gone[1:]==[True,True,0,True],gone
+ assert gone and '已减少此类推荐' in gone[0] and '撤销' in gone[0] and '知道了' in gone[0] and gone[1:]==[True,True,0,True],gone
+ assert page.evaluate(f"!!{ph}.querySelector('.btr-gone-bg') && getComputedStyle({ph}.querySelector('.btr-gone-bg')).filter.includes('blur')")
  assert page.evaluate("opens.length")==0,page.evaluate("opens")
- ok('不感兴趣 swaps the card for a plain placeholder: no link inside, no card / link ancestor, links in the card lose href / target')
- bb=page.locator('#btr-flow-feed .btr-gone-card button').bounding_box();x,y=bb['x']+bb['width']/2,bb['y']+bb['height']/2
+ ok('不感兴趣 shows a B 站-style placeholder (blurred cover, 已减少此类推荐, 撤销, ×, 知道了): no link inside, no card / link ancestor, links in the card lose href / target')
+ page.mouse.move(5,5);page.wait_for_timeout(4500)
+ assert page.evaluate(f"!!{ph}"),'placeholder must not fold early'
+ assert page.evaluate(f"{feed}.querySelector('.btr-batch .btr-grid').children.length")==25
+ ok('the placeholder stays put (no early refill): still there 4.5 s later with the pointer away')
+ bb=page.locator('#btr-flow-feed .btr-gone-card .undo').bounding_box();x,y=bb['x']+bb['width']/2,bb['y']+bb['height']/2
  # Middle click and a pointer press that is not completed must not open anything either.
  page.mouse.move(x,y);page.mouse.down(button='middle');page.mouse.up(button='middle');page.wait_for_timeout(100)
  page.mouse.click(x,y);page.wait_for_timeout(400)
@@ -100,17 +105,31 @@ with sync_playwright() as p:
  hrefs=page.evaluate("[...firstCard.querySelectorAll('a')].map(a=>[a.getAttribute('href'),a.getAttribute('target'),a.style.pointerEvents])")
  assert all(h[0] and h[1]=='_blank' and h[2]=='' for h in hrefs if h[0]!=None) and hrefs[0][0].endswith(page.evaluate('firstBv')),hrefs
  assert not ctx.pages[1:],[x.url for x in ctx.pages]
- page.wait_for_timeout(3500);assert page.evaluate(f"{c0}.dataset.bvid")==page.evaluate('firstBv')
+ page.wait_for_timeout(1000);assert page.evaluate(f"{c0}.dataset.bvid")==page.evaluate('firstBv')
  ok('撤销 (real mouse, plus a middle click) with B 站-style delegated window.open listeners registered first: nothing opens; the same card and its links come back')
- page.evaluate(f"{c0}.querySelector('.bili-video-card__info--no-interest').click()");page.wait_for_timeout(200)
- page.evaluate(f"[...{menu}.querySelectorAll('button')].find(b=>b.textContent.startsWith('不感兴趣')).click()")
- page.evaluate("window.opens.length=0;0")
- page.mouse.move(5,5)  # hovering the placeholder holds the fold; move away
- page.wait_for_function("!document.querySelector(`#btr-flow-feed .bili-video-card[data-bvid=\"${firstBv}\"]`)&&!document.querySelector('#btr-flow-feed .btr-gone-card')",timeout=6000)
+ def hide_first():
+  page.hover(f"#btr-flow-feed .btr-batch .bili-video-card >> nth=0");page.evaluate(f"{c0}.querySelector('.bili-video-card__info--no-interest').click()");page.wait_for_timeout(250)
+  mb=page.locator('#btr-flow-feed > .btr-menu button',has_text='不感兴趣').bounding_box();page.mouse.click(mb['x']+mb['width']/2,mb['y']+mb['height']/2);page.wait_for_timeout(300)
+  page.evaluate("window.opens.length=0;0")
+ # Hovering holds it past 8 s; leaving lets it go a little later, then the row reflows (FLIP) and refills.
+ page.evaluate(f"window.firstBv={c0}.dataset.bvid;0");hide_first()
+ g=page.locator('#btr-flow-feed .btr-gone-card').bounding_box();page.mouse.move(g['x']+20,g['y']+20)
+ page.wait_for_timeout(9000);assert page.evaluate(f"!!{ph}"),'hovered placeholder must stay'
+ page.evaluate("window.flipSeen=0;const A=Element.prototype.animate;Element.prototype.animate=function(k,o){if(this.matches?.('.feed-card')&&JSON.stringify(k).includes('translate('))flipSeen++;return A.call(this,k,o)};0")
+ page.mouse.move(5,5)
+ page.wait_for_function(f"!{ph}",timeout=5000);page.wait_for_timeout(500)
  assert page.evaluate("fixtureStorage.all.local.flowDislikes.includes(firstBv)")
- assert page.evaluate(f"{feed}.querySelector('.btr-batch').querySelectorAll('.feed-card').length")==25
+ assert page.evaluate(f"{feed}.querySelector('.btr-batch .btr-grid').querySelectorAll(':scope>.feed-card').length")==25
+ assert page.evaluate("flipSeen")>=3,page.evaluate("flipSeen")
  assert page.evaluate("opens.length")==0
- ok('不感兴趣 then waiting: the placeholder folds away and a spare card keeps the row full')
+ ok('hovered: stays past 8 s; after the pointer leaves it is dismissed, following cards glide into place (FLIP) and a spare card refills the row')
+ page.evaluate(f"window.firstBv={c0}.dataset.bvid;0");hide_first()
+ k=page.locator('#btr-flow-feed .btr-gone-card button',has_text='知道了').bounding_box();page.mouse.click(k['x']+k['width']/2,k['y']+k['height']/2)
+ page.wait_for_function(f"!{ph}",timeout=1500);page.wait_for_timeout(500)
+ assert page.evaluate(f"{feed}.querySelector('.btr-batch .btr-grid').querySelectorAll(':scope>.feed-card').length")==25 and page.evaluate("opens.length")==0
+ page.evaluate(f"window.firstBv={c0}.dataset.bvid;0");hide_first()
+ page.evaluate("scrollBy(0,innerHeight*1.5)");page.wait_for_function(f"!{ph}",timeout=2000);page.evaluate("scrollBy(0,-innerHeight*1.5)")
+ ok('知道了 dismisses at once; scrolling the placeholder out of view dismisses it too')
  page.evaluate(f"{feed}.querySelector('.btr-batch').scrollIntoView({{block:'center'}})");page.wait_for_timeout(500)
  side=page.evaluate(f"(()=>{{const s={ui}.querySelector('.side');return {{n:s.querySelector('b').textContent,off:s.classList.contains('off'),total:s.querySelector('.total').textContent}}}})()")
  assert side['n']=='2' and not side['off'],side
