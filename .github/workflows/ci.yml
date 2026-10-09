@@ -16,7 +16,7 @@ jobs:
       - name: Syntax check
         run: for f in extension/src/*.js extension/ui/*.js; do node --check "$f"; done
       - name: Unit tests
-        run: node --test extension/tests/core.test.cjs extension/tests/update.test.cjs extension/tests/focus.test.cjs extension/tests/feed.test.cjs
+        run: node --test extension/tests/core.test.cjs extension/tests/update.test.cjs extension/tests/focus.test.cjs extension/tests/feed.test.cjs extension/tests/lock.test.cjs extension/tests/sw-lock.test.cjs
       - name: Verify checksums
         working-directory: extension
         run: sha256sum -c --quiet SHA256SUMS.txt

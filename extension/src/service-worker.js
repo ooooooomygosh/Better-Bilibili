@@ -1,6 +1,6 @@
 "use strict";
 
-importScripts("focus-core.js");
+importScripts("focus-core.js", "lock-core.js");
 
 const BADGE_COLOR = "#fb7299";
 
@@ -50,37 +50,197 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender) => {
-  if (sender.id === chrome.runtime.id && message?.type === 'flow-open-options') chrome.runtime.openOptionsPage();
+  if (sender.id === chrome.runtime.id && message?.type === 'flow-open-options') {
+    const hash = typeof message.hash === "string" && /^[a-z-]{1,20}$/.test(message.hash) ? message.hash : "";
+    if (hash) chrome.tabs.create({url: chrome.runtime.getURL(`ui/options.html#${hash}`)}).catch(() => {});
+    else chrome.runtime.openOptionsPage();
+  }
   if (sender.id === chrome.runtime.id && message?.type === 'flow-open-welcome') chrome.tabs.create({url: chrome.runtime.getURL("ui/welcome.html")}).catch(() => {});
   return false;
 });
 
 // Focus mode: the service worker is the only writer of today's usage, so several B 站 tabs
 // cannot overwrite each other's counts. Requests are applied strictly one after another.
+// The same queue also owns the self-discipline lock, so a settings change, a guard revert and a
+// usage tick can never interleave.
 const focus = self.__BTR_FOCUS_CORE__;
+const lockCore = self.__BTR_LOCK_CORE__;
 let focusChain = Promise.resolve();
-function focusRun(change, id) {
-  const run = focusChain.then(async () => {
-    const now = Date.now();
-    const s = focus.settings(await chrome.storage.sync.get(focus.defaults));
-    const {focusUsage} = await chrome.storage.local.get("focusUsage");
-    const next = change ? change(focusUsage, now, s) : focus.usage(focusUsage, now, s);
-    if (change) await chrome.storage.local.set({focusUsage: next});
-    return {...focus.evaluate(next, now, s, id), enabled: s.focusEnabled, strict: s.focusStrict};
-  });
+function serial(job) {
+  const run = focusChain.then(job);
   focusChain = run.catch(() => {});
   return run;
 }
 
+async function readLock() {
+  const {focusLock} = await chrome.storage.local.get("focusLock");
+  return lockCore.normalize(focusLock);
+}
+// Lock first, then sync: the guard below compares sync with lock.approved, so the order keeps
+// our own writes from looking like a bypass.
+async function writeLock(lock, syncChanges) {
+  if (lock) await chrome.storage.local.set({focusLock: lock});
+  else await chrome.storage.local.remove("focusLock");
+  if (syncChanges && Object.keys(syncChanges).length) await chrome.storage.sync.set(syncChanges);
+}
+// Apply pending changes whose cool-down has passed. Runs on every tick/check, so no alarms permission is needed.
+async function settleLock(now) {
+  const lock = await readLock();
+  if (!lock) return null;
+  const r = lockCore.settle(lock, now);
+  if (!r.changed) return lock;
+  await writeLock(r.lock, r.lock ? r.applied : null);
+  return r.lock;
+}
+// While locked, the approved values are what counts, whatever sync storage says.
+async function effectiveSettings(lock) {
+  const sync = await chrome.storage.sync.get(focus.defaults);
+  return focus.settings(lock ? {...sync, ...lock.approved} : sync);
+}
+
+function focusRun(change, id) {
+  return serial(async () => {
+    const now = Date.now();
+    const lock = await settleLock(now);
+    const s = await effectiveSettings(lock);
+    const {focusUsage} = await chrome.storage.local.get("focusUsage");
+    const next = change ? change(focusUsage, now, s) : focus.usage(focusUsage, now, s);
+    if (change) await chrome.storage.local.set({focusUsage: next});
+    return {...focus.evaluate(next, now, s, id), enabled: s.focusEnabled, strict: s.focusStrict,
+      locked: !!lock, lockHasPassword: lockCore.hasPassword(lock)};
+  });
+}
+
+// Settings requests from the popup, options page, welcome page and quick panel.
+async function focusSet(changes, password) {
+  const now = Date.now();
+  const clean = {};
+  const norm = focus.settings({...focus.defaults, ...changes});
+  for (const k of lockCore.KEYS) if (changes && k in changes) clean[k] = norm[k];
+  let lock = await settleLock(now);
+  if (!lock) { await chrome.storage.sync.set(clean); return {applied: clean, deferred: {}, lock: lockCore.view(null)}; }
+  let authorized = false;
+  if (password) {
+    const v = await lockCore.verify(lock, password, now);
+    lock = v.lock;
+    if (!v.ok) { await writeLock(lock); return {error: v.error, lock: lockCore.view(lock, now)}; }
+    authorized = true;
+  }
+  const r = lockCore.request(lock, clean, now, authorized);
+  await writeLock(r.lock, {...r.lock.approved});
+  return {applied: r.applied, deferred: r.deferred, lock: lockCore.view(r.lock, now)};
+}
+
+async function lockAction(message) {
+  const now = Date.now();
+  let lock = await settleLock(now);
+  const auth = async () => {
+    if (!message.password) return false;
+    const v = await lockCore.verify(lock, message.password, now);
+    lock = v.lock;
+    if (!v.ok) { await writeLock(lock); throw new Error(v.error); }
+    return true;
+  };
+  switch (message.type) {
+    case "lock-state": return lockCore.view(lock, now);
+    case "lock-create": {
+      if (lock) throw new Error("自律锁已经开启。");
+      const pw = typeof message.newPassword === "string" ? message.newPassword : "";
+      if (pw && pw.length < 4) throw new Error("密码至少 4 位。");
+      const current = await effectiveSettings(null);
+      const approved = {...current, focusEnabled: true};
+      lock = await lockCore.create(approved, {password: pw, cooldownHours: message.cooldownHours}, now);
+      await writeLock(lock, {focusEnabled: true});
+      return lockCore.view(lock, now);
+    }
+    case "lock-cooldown": {
+      if (!lock) throw new Error("自律锁未开启。");
+      const authorized = await auth();
+      const r = lockCore.setCooldown(lock, message.cooldownHours, now, authorized);
+      await writeLock(r.lock);
+      return {...lockCore.view(r.lock, now), deferredAt: r.deferredAt};
+    }
+    case "lock-password": {
+      if (!lock) throw new Error("自律锁未开启。");
+      const pw = typeof message.newPassword === "string" ? message.newPassword : "";
+      if (pw && pw.length < 4) throw new Error("密码至少 4 位。");
+      // Adding a password where there was none only makes the lock stricter.
+      if (lockCore.hasPassword(lock) && !(await auth())) throw new Error("修改密码需要输入当前密码；忘记密码时只能等冷却期解除自律锁。");
+      if (!pw && lockCore.hasPassword(lock)) throw new Error("不能直接删除密码；可以解除自律锁后重新开启。");
+      lock = await lockCore.setPassword(lock, pw);
+      await writeLock(lock);
+      return lockCore.view(lock, now);
+    }
+    case "lock-remove": {
+      if (!lock) return lockCore.view(null);
+      const authorized = await auth();
+      const r = lockCore.remove(lock, now, authorized);
+      await writeLock(r.lock);
+      return {...lockCore.view(r.lock, now), deferredAt: r.deferredAt};
+    }
+    case "lock-cancel": {
+      if (!lock) return lockCore.view(null);
+      lock = lockCore.cancel(lock, typeof message.key === "string" ? message.key : null);
+      await writeLock(lock);
+      return lockCore.view(lock, now);
+    }
+  }
+  throw new Error("unknown");
+}
+
+// Guard: any write that loosens limits while locked (an old UI, a stale tab, another device's sync,
+// a hand-edited storage call from an extension page) is reverted and queued behind the cool-down.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "sync" || !lockCore.KEYS.some((k) => changes[k])) return;
+  serial(async () => {
+    const now = Date.now();
+    const lock = await settleLock(now);
+    if (!lock) return;
+    const sync = focus.settings(await chrome.storage.sync.get(focus.defaults));
+    const candidate = {};
+    for (const k of lockCore.KEYS) if (sync[k] !== lock.approved[k]) candidate[k] = sync[k];
+    if (!Object.keys(candidate).length) return;
+    const r = lockCore.request(lock, candidate, now, false);
+    await writeLock(r.lock, {...r.lock.approved});
+  }).catch((e) => console.error("自律锁校验失败", e));
+});
+
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
-  if (sender.id !== chrome.runtime.id || typeof message?.type !== "string" || !message.type.startsWith("focus-")) return false;
+  if (sender.id !== chrome.runtime.id || typeof message?.type !== "string") return false;
+  if (message.type.startsWith("lock-")) {
+    serial(() => lockAction(message)).then(reply, (error) => reply({error: String(error?.message || error)}));
+    return true;
+  }
+  if (message.type === "focus-set") {
+    const changes = message.changes && typeof message.changes === "object" ? message.changes : {};
+    serial(() => focusSet(changes, typeof message.password === "string" ? message.password : "")).then(reply, (error) => reply({error: String(error?.message || error)}));
+    return true;
+  }
+  if (!message.type.startsWith("focus-")) return false;
   const id = typeof message.id === "string" ? message.id.slice(0, 120) : null;
   let job;
   if (message.type === "focus-tick") job = focusRun((u, now, s) => focus.tick(u, now, s, message.seconds, id), id);
   else if (message.type === "focus-check") job = focusRun(null, id);
-  else if (message.type === "focus-snooze") job = focusRun((u, now, s) => focus.snooze(u, now, s, message.kind), id);
+  else if (message.type === "focus-snooze") job = snooze(message, id);
   else if (message.type === "focus-close-tab" && Number.isInteger(sender.tab?.id)) { chrome.tabs.remove(sender.tab.id).catch(() => {}); return false; }
   else return false;
   job.then(reply, (error) => reply({error: String(error?.message || error)}));
   return true;
 });
+
+// "Watch 5 more minutes" loosens the limit, so a lock asks for the password (no cool-down makes
+// sense for a snooze). Without a password on the lock, snoozing is off while locked.
+async function snooze(message, id) {
+  const gate = await serial(async () => {
+    const now = Date.now(), lock = await settleLock(now);
+    if (!lock) return null;
+    if (!lockCore.hasPassword(lock)) return "自律锁开启中，不能再看。";
+    const v = await lockCore.verify(lock, message.password, now);
+    await writeLock(v.lock);
+    return v.ok ? null : v.error;
+  });
+  if (gate) return {error: gate};
+  return focusRun((u, now, s) => focus.snooze(u, now, s, message.kind), id);
+}
+
+chrome.runtime.onStartup.addListener(() => { serial(() => settleLock(Date.now())).catch(() => {}); });
