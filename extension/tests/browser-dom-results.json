@@ -107,7 +107,11 @@
       "passed": true
     },
     {
-      "test": "save bar and section navigation are sticky",
+      "test": "save bar is fixed to the window bottom; section navigation is sticky",
+      "passed": true
+    },
+    {
+      "test": "extension page theme: 跟随 B 站 (default, live from the recorded B 站 theme) / 跟随系统 / 浅色 / 深色, switching live",
       "passed": true
     },
     {
@@ -131,7 +135,11 @@
       "passed": true
     },
     {
-      "test": "save bar stays pinned to the window bottom on any section; section nav follows the scroll exactly",
+      "test": "save bar is truly fixed at bottom:0 everywhere, and the page end (footer) stays clear of it",
+      "passed": true
+    },
+    {
+      "test": "section nav: the section whose top is closest above the 35% line (7 sections, heights 161–632px), or one owning >60% of the screen",
       "passed": true
     },
     {

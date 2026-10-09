@@ -18,7 +18,7 @@ main.w-wrap{padding-top:18px;padding-bottom:40px}
 main section{margin-top:44px}
 main h2{font-size:24px;margin-bottom:16px}
 .w-steps{list-style:none;counter-reset:s;display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:0;margin:0}
-.w-steps li{counter-increment:s;position:relative;padding:20px 20px 18px 62px;background:#fff;border-radius:16px;border:1px solid var(--btr-line)}
+.w-steps li{counter-increment:s;position:relative;padding:20px 20px 18px 62px;background:var(--btr-bg);border-radius:16px;border:1px solid var(--btr-line)}
 .w-steps li::before{content:counter(s);position:absolute;left:18px;top:18px;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--btr-brand);color:#fff;font-weight:700}
 .w-steps b{display:block;margin-bottom:4px}
 .w-steps span{color:var(--btr-text2);font-size:13px}
@@ -58,5 +58,5 @@ kbd{padding:1px 6px;border-radius:5px;border:1px solid var(--btr-line);backgroun
 .w-footer{padding:20px 28px 40px;color:var(--btr-text2);font-size:12px;text-align:center}
 @keyframes w-float{50%{transform:translateY(-6px)}}
 @media (max-width:760px){.w-steps,.w-setup,.w-features,.w-more{grid-template-columns:1fr}.w-hero h1{font-size:32px}.w-presets{grid-template-columns:1fr 1fr}}
-@media (prefers-color-scheme:dark){.w-hero{background:radial-gradient(120% 140% at 50% -20%,#b4527a 0%,#8a3d68 40%,#4a2c5c 75%,#1d1a2c 100%)}}
+:root[data-theme=dark] .w-hero{background:radial-gradient(120% 140% at 50% -20%,#a24a72 0%,#7a3660 40%,#3e2752 75%,#17151f 100%)}:root[data-theme=dark] .w-btn.primary{background:#fff;color:#c94d86}@media (prefers-color-scheme:dark){:root:not([data-theme]) .w-hero{background:radial-gradient(120% 140% at 50% -20%,#a24a72 0%,#7a3660 40%,#3e2752 75%,#17151f 100%)}:root:not([data-theme]) .w-btn.primary{background:#fff;color:#c94d86}}
 @media (prefers-reduced-motion:reduce){.w-icon{animation:none}}

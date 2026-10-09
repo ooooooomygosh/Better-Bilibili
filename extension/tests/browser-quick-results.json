@@ -34,6 +34,18 @@
    "passed": true
   },
   {
+   "test": "the detected B 站 theme is recorded in storage.local (biliTheme) for the extension pages to follow",
+   "passed": true
+  },
+  {
+   "test": "完整设置 works on the first click: waits for the service worker answer and retries once when it is dropped",
+   "passed": true
+  },
+  {
+   "test": "a B 站 header popover over the panel fades the panel out smoothly, and it comes back when the popover closes",
+   "passed": true
+  },
+  {
    "test": "油门 tab: switch and segmented control write settings and re-render live",
    "passed": true
   },

@@ -138,7 +138,8 @@ with sync_playwright() as p:
  option=ctx.new_page();option.on('pageerror',lambda e:errors.append(str(e)));option.on('dialog',lambda d:d.accept())
  markup=(ROOT/'ui/options.html').read_text();markup=re.sub(r'<script[^>]*>.*?</script>','',markup,flags=re.S);markup=re.sub(r'<link[^>]*>','',markup)
  option.set_content(markup);option.add_style_tag(content=(ROOT/'ui/common.css').read_text())
- for f in ['tests/browser-shim.js','src/ui-kit.js','src/home-core.js','src/focus-core.js','src/proxy-core.js','src/lock-core.js']:script(option,f)
+ script(option,'tests/browser-shim.js');option.evaluate("window.chrome=window.chromeMock;0")  # extension page: ui-kit reads chrome.storage for the theme
+ for f in ['src/ui-kit.js','src/home-core.js','src/focus-core.js','src/proxy-core.js','src/lock-core.js']:script(option,f)
  # The service worker owns watch-limit writes (self-discipline lock); mock it as "no lock".
  option.evaluate("chromeMock.runtime.sendMessage=async m=>{if(m.type==='lock-state')return {locked:false};if(m.type==='focus-set'){await chromeMock.storage.sync.set(m.changes);return {applied:m.changes,deferred:{}};}return {};};0")
  option.evaluate("code=>new Function('chrome',code)(window.chromeMock)",(ROOT/'ui/options.js').read_text())
@@ -150,8 +151,22 @@ with sync_playwright() as p:
  option.locator('#focusEnabled').check(force=True);option.locator('#focusWindowMinutes').fill('45');option.locator('#focusWindowMinutes').press('Tab');option.locator('#focusWeeklyHours').fill('6');option.locator('#focusWeeklyHours').press('Tab')
  option.wait_for_function('fixtureStorage.all.sync.focusWindowMinutes===45&&fixtureStorage.all.sync.focusWeeklyHours===6',timeout=3000);assert option.evaluate('fixtureStorage.all.sync.focusEnabled===true')
  ok('options save 5-hour window and weekly limits as numbers (on change, via the service worker)')
- assert option.evaluate("getComputedStyle(document.querySelector('.savebar')).position")=='sticky'
- ok('save bar and section navigation are sticky')
+ assert option.evaluate("getComputedStyle(document.querySelector('.savebar')).position")=='fixed'
+ assert option.evaluate("getComputedStyle(document.querySelector('.toc')).position")=='sticky'
+ ok('save bar is fixed to the window bottom; section navigation is sticky')
+ TH="document.documentElement.dataset.theme||''";TOK="getComputedStyle(document.documentElement).getPropertyValue('--btr-bg').trim()"
+ assert option.evaluate("document.querySelector('#uiTheme').value")=='bili' and option.evaluate(TH)=='light'
+ option.evaluate("chromeMock.storage.local.set({biliTheme:{dark:true,at:Date.now()}})");option.wait_for_function(f"({TH})==='dark'",timeout=2000)
+ assert option.evaluate(TOK)=='#1f2026',option.evaluate(TOK)
+ option.evaluate("chromeMock.storage.local.set({biliTheme:{dark:false,at:Date.now()}})");option.wait_for_function(f"({TH})==='light'",timeout=2000)
+ option.select_option('#uiTheme','dark');option.wait_for_function(f"fixtureStorage.all.sync.uiTheme==='dark'&&({TH})==='dark'",timeout=3000)
+ option.emulate_media(color_scheme='dark');option.select_option('#uiTheme','system');option.wait_for_function(f"({TH})==='dark'",timeout=3000)
+ option.emulate_media(color_scheme='light');option.wait_for_function(f"({TH})==='light'",timeout=3000)
+ option.select_option('#uiTheme','light');option.evaluate("chromeMock.storage.local.set({biliTheme:{dark:true,at:Date.now()}})");option.wait_for_timeout(300);assert option.evaluate(TH)=='light'
+ option.select_option('#uiTheme','bili');option.wait_for_function(f"({TH})==='dark'",timeout=3000)
+ option.wait_for_timeout(500);option.screenshot(path=str(ROOT/'docs/options-dark-preview.png'))
+ option.evaluate("chromeMock.storage.local.set({biliTheme:{dark:false,at:Date.now()}})");option.wait_for_function(f"({TH})==='light'",timeout=2000)
+ ok('extension page theme: 跟随 B 站 (default, live from the recorded B 站 theme) / 跟随系统 / 浅色 / 深色, switching live')
  assert option.evaluate('permissionRequests')==0;option.locator('#enableProxy').click();assert '勾选' in option.locator('#proxyStatus').inner_text()
  option.locator('#proxyConsent').check();option.locator('#proxyUrl').fill('https://user:pass@example.com/');option.locator('#enableProxy').click();assert '账号密码' in option.locator('#proxyStatus').inner_text();assert option.evaluate('permissionRequests')==0
  ok('proxy stays opt-in; consent and credential rejection precede mock permission requests')
@@ -170,15 +185,39 @@ with sync_playwright() as p:
  ok('controls outside the form (快捷面板) auto-save too')
  option.set_viewport_size({'width':1100,'height':700})
  option.evaluate("document.querySelector('#proxy').scrollIntoView({block:'start'})");option.wait_for_timeout(300)
- bar=option.evaluate("(()=>{const r=document.querySelector('#savebar').getBoundingClientRect();return [r.bottom,innerHeight]})()")
- assert abs(bar[1]-14-bar[0])<2,bar
- assert option.evaluate("document.querySelector('.toc a[aria-current=true]').getAttribute('href')")=='#proxy'
- option.evaluate("document.querySelector('#lock').scrollIntoView({block:'start'})");option.wait_for_timeout(300)
- assert option.evaluate("document.querySelector('.toc a[aria-current=true]').getAttribute('href')")=='#lock'
+ BAR="(()=>{const r=document.querySelector('#savebar').getBoundingClientRect();return [r.bottom,innerHeight,r.top]})()"
+ bar=option.evaluate(BAR);assert abs(bar[1]-bar[0])<1,bar
+ CUR="document.querySelector('.toc a[aria-current=true]').getAttribute('href')"
+ assert option.evaluate(CUR)=='#proxy'
  option.evaluate("scrollTo(0,document.documentElement.scrollHeight)");option.wait_for_timeout(300)
- assert option.evaluate("document.querySelector('.toc a[aria-current=true]').getAttribute('href')")=='#help'
+ bar=option.evaluate(BAR);assert abs(bar[1]-bar[0])<1,bar
+ last=option.evaluate("(()=>{const m=document.querySelector('main.wrap');const kids=[...m.children].filter(n=>n.id!=='savebar');return Math.max(...kids.map(n=>n.getBoundingClientRect().bottom))})()")
+ assert last<=bar[2]+1,(last,bar)  # page end (footer) clears the fixed bar
+ assert option.evaluate(CUR)=='#help'
+ ok('save bar is truly fixed at bottom:0 everywhere, and the page end (footer) stays clear of it')
+ # Sections of very different heights: put each section's top just above the 35% line → it is current.
+ ids=option.evaluate("[...document.querySelectorAll('.toc a')].map(a=>a.getAttribute('href').slice(1))")
+ hs=option.evaluate("[...document.querySelectorAll('.toc a')].map(a=>Math.round(document.querySelector(a.getAttribute('href')).getBoundingClientRect().height))")
+ assert max(hs)>2*min(hs),hs
+ checked=0
+ for i,sid in enumerate(ids):
+  option.evaluate(f"(()=>{{const t=document.getElementById('{sid}');scrollTo(0,scrollY+t.getBoundingClientRect().top-innerHeight*.3)}})()");option.wait_for_timeout(120)
+  at_bottom=option.evaluate("innerHeight+scrollY>=document.documentElement.scrollHeight-4")
+  if at_bottom and i<len(ids)-1:continue
+  assert option.evaluate(CUR)=='#'+sid,(sid,option.evaluate(CUR));checked+=1
+  if i>0 and not at_bottom:
+   # top just BELOW the 35% line and not owning the screen → the previous section stays current
+   option.evaluate(f"(()=>{{const t=document.getElementById('{sid}');scrollTo(0,scrollY+t.getBoundingClientRect().top-innerHeight*.4)}})()");option.wait_for_timeout(120)
+   prev_area=option.evaluate(f"(()=>{{const t=document.getElementById('{sid}'),r=t.getBoundingClientRect(),top=document.querySelector('.toc').getBoundingClientRect().bottom,bot=innerHeight-document.querySelector('#savebar').offsetHeight;return (Math.min(r.bottom,bot)-Math.max(r.top,top))/(bot-top)}})()")
+   want='#'+sid if prev_area>.6 else '#'+ids[i-1]
+   assert option.evaluate(CUR)==want,(sid,want,option.evaluate(CUR))
+ assert checked>=len(ids)-2,(checked,len(ids))
+ # A tall section filling the screen wins even if its top is below the 35% line.
+ option.evaluate("(()=>{const t=document.getElementById('lock');scrollTo(0,scrollY+t.getBoundingClientRect().top-innerHeight*.38)})()");option.wait_for_timeout(120)
+ own=option.evaluate("(()=>{const r=document.getElementById('lock').getBoundingClientRect(),top=document.querySelector('.toc').getBoundingClientRect().bottom,bot=innerHeight-document.querySelector('#savebar').offsetHeight;return (Math.min(r.bottom,bot)-Math.max(r.top,top))/(bot-top)})()")
+ assert own>.6,own;assert option.evaluate(CUR)=='#lock',option.evaluate(CUR)
  option.set_viewport_size({'width':1704,'height':864})
- ok('save bar stays pinned to the window bottom on any section; section nav follows the scroll exactly')
+ ok(f'section nav: the section whose top is closest above the 35% line ({checked} sections, heights {min(hs)}–{max(hs)}px), or one owning >60% of the screen')
  option.locator('#proxyConsent').uncheck();option.locator('#proxyUrl').fill('');option.evaluate('scrollTo(0,0)');option.screenshot(path=str(ROOT/'docs/options-preview.png'),full_page=True)
  assert not errors,errors;ok('no uncaught errors across homepage and options regression scenarios')
  (ROOT/'tests/browser-dom-results.json').write_text(json.dumps({'browser':browser.version,'environment':'Local fixture DOM only, mocked Chrome APIs; NOT installed extension or live Bilibili; proxy never enabled','tests':results,'uncaught_errors':errors},ensure_ascii=False,indent=2))

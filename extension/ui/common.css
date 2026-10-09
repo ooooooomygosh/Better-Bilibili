@@ -119,7 +119,7 @@ body.popup{width:380px;padding:20px;background:var(--btr-bg)}
 @keyframes btr-fade-in{from{opacity:0;transform:translateY(-2px)}to{opacity:1;transform:none}}
 @media(max-width:640px){.grid{grid-template-columns:1fr}.hero{padding:28px 24px}.wrap{padding:20px 14px}.card{padding:18px}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
-@media (prefers-color-scheme:dark){.hero{background:radial-gradient(120% 160% at 50% -30%,#b4527a 0%,#7e3a63 45%,#2b2140 100%)}.status.dirty{color:#f0b35a}}
+:root[data-theme=dark] .hero{background:radial-gradient(120% 160% at 50% -30%,#a24a72 0%,#6e335a 45%,#221c33 100%)}:root[data-theme=dark] .status.dirty{color:#f0b35a}:root[data-theme=dark] .card:hover{box-shadow:0 6px 22px rgba(0,0,0,.35)}:root[data-theme=dark] .modal-back{background:rgba(0,0,0,.55)}:root[data-theme=dark] .modal{box-shadow:0 24px 60px rgba(0,0,0,.6)}:root[data-theme=dark] .savebar{box-shadow:0 -8px 28px rgba(0,0,0,.45)}@media (prefers-color-scheme:dark){:root:not([data-theme]) .hero{background:radial-gradient(120% 160% at 50% -30%,#a24a72 0%,#6e335a 45%,#221c33 100%)}:root:not([data-theme]) .status.dirty{color:#f0b35a}:root:not([data-theme]) .card:hover{box-shadow:0 6px 22px rgba(0,0,0,.35)}:root:not([data-theme]) .modal-back{background:rgba(0,0,0,.55)}:root:not([data-theme]) .modal{box-shadow:0 24px 60px rgba(0,0,0,.6)}:root:not([data-theme]) .savebar{box-shadow:0 -8px 28px rgba(0,0,0,.45)}}
 
 /* ---------- inline field errors ---------- */
 .field-error{display:flex;align-items:center;gap:6px;margin:0;font-size:12.5px;line-height:1.5;color:var(--btr-danger)}
@@ -141,7 +141,8 @@ button.danger-fill{background:var(--btr-danger);border-color:var(--btr-danger);c
 button.danger-fill:hover{background:color-mix(in srgb,var(--btr-danger) 88%,#000);border-color:transparent}
 
 /* ---------- save bar: pinned to the bottom of the window for the whole page ---------- */
-.wrap>.savebar{position:sticky;bottom:14px;margin:8px 0 0;backdrop-filter:blur(12px) saturate(1.2);-webkit-backdrop-filter:blur(12px) saturate(1.2);background:color-mix(in srgb,var(--btr-bg) 88%,transparent);box-shadow:0 10px 30px rgba(0,0,0,.10),0 1px 0 rgba(255,255,255,.04) inset}
+.wrap>.savebar{position:fixed;left:0;right:0;bottom:0;z-index:20;width:auto;max-width:1020px;margin:0 auto;border-radius:14px 14px 0 0;border-bottom:0;padding:11px 26px calc(11px + env(safe-area-inset-bottom));backdrop-filter:blur(12px) saturate(1.2);-webkit-backdrop-filter:blur(12px) saturate(1.2);background:color-mix(in srgb,var(--btr-bg) 90%,transparent);box-shadow:0 -6px 24px rgba(0,0,0,.08)}
+body:has(.wrap>.savebar){padding-bottom:48px}
 
 /* ---------- small refinements ---------- */
 .card{transition:border-color var(--btr-mid) ease,box-shadow var(--btr-mid) ease}

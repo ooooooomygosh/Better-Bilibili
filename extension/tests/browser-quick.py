@@ -11,7 +11,9 @@ with sync_playwright() as p:
  ctx.route('https://s1.hdslb.com/bfs/seed/jinkela/short/bili-theme/**',lambda r:r.fulfill(status=200,content_type='text/css',body=':root{--bg1:#17181A}body{background:#17181a}' if '/dark' in r.request.url else ':root{--bg1:#FFFFFF}body{background:#fff}'))
  page=ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
  page.goto('https://www.bilibili.com/video/BV1xx411c7mD/')
- for f in ['tests/browser-shim.js','src/ui-kit.js','src/home-core.js','src/focus-core.js']:page.add_script_tag(content=(ROOT/f).read_text())
+ page.add_script_tag(content=(ROOT/'tests/browser-shim.js').read_text())
+ page.evaluate("window.chrome=window.chromeMock;0")  # as in the isolated world: ui-kit sees chrome.storage
+ for f in ['src/ui-kit.js','src/home-core.js','src/focus-core.js']:page.add_script_tag(content=(ROOT/f).read_text())
  page.evaluate("chromeMock.runtime.getManifest=()=>({version:'test'});window.sent=[];chromeMock.runtime.sendMessage=async m=>{sent.push(m.type);if(m.type==='focus-check')return {enabled:true,window:{seconds:2700,limit:5400,percent:50,resetAt:Date.now()+3600000,remaining:2700},week:{seconds:7200,limit:36000,percent:20,resetAt:Date.now()+86400000,remaining:28800},videos:3,videoLimit:0,snoozes:0};if(m.type==='lock-state')return window.lockView;if(m.type==='focus-set'){if(window.lockView.locked){const d={};for(const k of Object.keys(m.changes))d[k]=Date.now()+86400000;window.lockView.pending=Object.fromEntries(Object.entries(m.changes).map(([k,v])=>[k,{value:v,requestedAt:Date.now(),effectiveAt:d[k]}]));return {applied:{},deferred:d,lock:window.lockView};}await chromeMock.storage.sync.set(m.changes);return {applied:m.changes,deferred:{}};}if(m.type==='lock-cancel'){delete window.lockView.pending[m.key];return {ok:true};}};window.lockView={locked:false};0")
  page.evaluate("chromeMock.storage.sync.set({focusEnabled:true})")
  page.evaluate("code=>new Function('chrome',code)(window.chromeMock)",(ROOT/'src/quick-panel.js').read_text())
@@ -58,6 +60,28 @@ with sync_playwright() as p:
  page.evaluate("document.getElementById('th').href='https://s1.hdslb.com/bfs/seed/jinkela/short/bili-theme/light.css'");page.wait_for_function(f"!{R}",timeout=2500)
  page.evaluate("document.getElementById('th').remove()")
  ok('video-page-style switch (bili-theme stylesheet href swap) flips the open panel live, both ways')
+ page.evaluate("document.documentElement.classList.add('bili_dark')");page.wait_for_function("fixtureStorage.all.local.biliTheme?.dark===true",timeout=2500)
+ page.evaluate("document.documentElement.classList.remove('bili_dark')");page.wait_for_function("fixtureStorage.all.local.biliTheme?.dark===false",timeout=2500)
+ ok('the detected B 站 theme is recorded in storage.local (biliTheme) for the extension pages to follow')
+ # 完整设置: a just-woken service worker may drop the first request; one real click must still get through.
+ page.evaluate("window.optSent=0;const o2=chromeMock.runtime.sendMessage;chromeMock.runtime.sendMessage=async m=>{if(m.type==='flow-open-options'){optSent++;return optSent===1?undefined:{ok:true};}return o2(m);};0")
+ fb=page.evaluate(f"(()=>{{const r=[...{q}.querySelectorAll('.foot button')].find(b=>b.textContent==='完整设置').getBoundingClientRect();return [r.x+r.width/2,r.y+r.height/2]}})()")
+ page.mouse.click(*fb);page.wait_for_function("optSent===2",timeout=4000);page.wait_for_timeout(200)
+ assert page.evaluate("optSent")==2 and page.evaluate(f"!{q}.querySelector('.toast')||!{q}.querySelector('.toast').textContent.includes('没能打开')")
+ ok('完整设置 works on the first click: waits for the service worker answer and retries once when it is dropped')
+ # A translucent B 站 header popover over the panel: the panel fades out, and back when it closes.
+ page.evaluate("""(()=>{const h=document.createElement('div');h.className='bili-header__bar';h.style.cssText='position:fixed;top:0;left:0;right:0;height:64px;z-index:1002;background:#fff';
+  const a=document.createElement('div');a.id='av';a.style.cssText='position:absolute;right:20px;top:10px;width:40px;height:40px';
+  const pop=document.createElement('div');pop.className='v-popover';pop.style.cssText='position:fixed;right:10px;top:64px;width:360px;height:800px;display:none;background:rgba(255,255,255,.6);backdrop-filter:blur(10px)';
+  h.append(a,pop);document.body.append(h);})();0""")
+ panelOp=f"getComputedStyle({q}.querySelector('.panel')).opacity"
+ page.mouse.move(*fb);page.wait_for_timeout(100)
+ page.hover('#av');page.evaluate("document.querySelector('.v-popover').style.display='block'");page.wait_for_function(f"{q}.querySelector('.panel').classList.contains('veiled')",timeout=2000);page.wait_for_timeout(350)
+ assert float(page.evaluate(panelOp))<.05,page.evaluate(panelOp)
+ page.evaluate("document.querySelector('.v-popover').style.display='none'");page.mouse.move(200,500);page.wait_for_function(f"!{q}.querySelector('.panel').classList.contains('veiled')",timeout=2000);page.wait_for_timeout(350)
+ assert page.evaluate(panelOp)=='1'
+ page.evaluate("document.querySelector('.bili-header__bar').remove()")
+ ok('a B 站 header popover over the panel fades the panel out smoothly, and it comes back when the popover closes')
  assert page.evaluate(f"[...{q}.querySelectorAll('.wide')].some(b=>b.textContent.includes('高级播放设置'))")
  page.evaluate(f"{q}.querySelector('#q-enabled').click()");page.wait_for_timeout(200)
  assert page.evaluate("fixtureStorage.all.sync.enabled")==False

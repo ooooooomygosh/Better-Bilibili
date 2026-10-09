@@ -1,7 +1,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const ui=globalThis.__BTR_UI__,focusCore=globalThis.__BTR_FOCUS_CORE__,homeCore=globalThis.__BTR_HOME_CORE__,lockCore=globalThis.__BTR_LOCK_CORE__;
-const defaults={enabled:true,liveEnabled:true,autoConcurrency:true,smartPolicy:true,strategy:'auto',mode:'auto',maxAutoThreads:32,memoryBudgetMB:64,takeover:'full',...homeCore.defaults,...focusCore.defaults,quickFab:true};
+const defaults={enabled:true,liveEnabled:true,autoConcurrency:true,smartPolicy:true,strategy:'auto',mode:'auto',maxAutoThreads:32,memoryBudgetMB:64,takeover:'full',...homeCore.defaults,...focusCore.defaults,quickFab:true,uiTheme:'bili'};
 const FOCUS=new Set(Object.keys(focusCore.defaults));
 const RELOAD=new Set(['takeover','enabled','liveEnabled']);
 
@@ -220,18 +220,36 @@ async function focusUsage(){try{const r=await chrome.runtime.sendMessage({type:'
 /* ---------- sticky section nav: the section under a reading line just below the nav is current ---------- */
 const links=[...document.querySelectorAll('.toc a')],targets=links.map(a=>document.querySelector(a.getAttribute('href'))).filter(Boolean);
 let navFrame=0,navCurrent=null;
+let navPin=null;
 function navUpdate(){
  navFrame=0;
- const line=($('toc')?.getBoundingClientRect().bottom||0)+Math.min(160,innerHeight*.25);
- let cur=targets[0];
- for(const t of targets){if(t.getBoundingClientRect().top<=line)cur=t;else break;}
+ if(navPin&&performance.now()<navPin.until){setNav(navPin.target);return;}navPin=null;
+ // The section whose top is closest above the 35% line of the viewport (below the sticky nav)…
+ const top=$('toc')?.getBoundingClientRect().bottom||0,bottom=innerHeight-($('savebar')?.offsetHeight||0);
+ const line=Math.max(top+8,innerHeight*.35);
+ let cur=targets[0],best=null,bestArea=0;
+ for(const t of targets){
+  const r=t.getBoundingClientRect();
+  if(r.top<=line)cur=t;
+  const area=Math.max(0,Math.min(r.bottom,bottom)-Math.max(r.top,top));
+  if(area>bestArea){bestArea=area;best=t;}
+ }
+ // …unless another section clearly owns the screen (more than 60% of the visible area).
+ if(best&&best!==cur&&bestArea>.6*(bottom-top))cur=best;
  if(innerHeight+scrollY>=document.documentElement.scrollHeight-4)cur=targets.at(-1); // Bottom of the page: the last section, even if short.
+ setNav(cur);
+}
+function setNav(cur){
  if(cur===navCurrent)return;navCurrent=cur;
  for(const a of links){const on=a.getAttribute('href')==='#'+cur?.id;a.setAttribute('aria-current',String(on));if(on)a.scrollIntoView({block:'nearest',inline:'nearest'});}
 }
 addEventListener('scroll',()=>{if(!navFrame)navFrame=requestAnimationFrame(navUpdate);},{passive:true});
 addEventListener('resize',()=>{if(!navFrame)navFrame=requestAnimationFrame(navUpdate);},{passive:true});
-for(const a of links)a.addEventListener('click',e=>{const t=document.querySelector(a.getAttribute('href'));if(!t)return;e.preventDefault();t.scrollIntoView({behavior:ui.reduced.matches?'auto':'smooth',block:'start'});history.replaceState(null,'',a.getAttribute('href'));});
+addEventListener('scrollend',()=>{navPin=null;});
+['wheel','touchstart','keydown'].forEach(t=>addEventListener(t,()=>{navPin=null;},{passive:true}));
+// The save bar is fixed to the bottom edge; keep the page end clear of it.
+const bar=$('savebar');if(bar&&typeof ResizeObserver==='function')new ResizeObserver(()=>{document.body.style.paddingBottom=bar.offsetHeight+'px';}).observe(bar);
+for(const a of links)a.addEventListener('click',e=>{const t=document.querySelector(a.getAttribute('href'));if(!t)return;e.preventDefault();navPin={target:t,until:performance.now()+1000};setNav(t);t.scrollIntoView({behavior:ui.reduced.matches?'auto':'smooth',block:'start'});history.replaceState(null,'',a.getAttribute('href'));});
 navUpdate();
 
 load().catch(e=>status(e.message,'error'));refreshLock();focusUsage();setInterval(focusUsage,5000);setInterval(()=>{if(lock.locked)refreshLock();},30000);

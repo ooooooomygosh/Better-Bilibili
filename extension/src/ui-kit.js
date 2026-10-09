@@ -32,8 +32,8 @@
   const base = `--btr-ease:${EASE};--btr-ease-in:${EASE_IN};--btr-fast:${MOTION.fast}ms;--btr-mid:${MOTION.mid}ms;--btr-slow:${MOTION.slow}ms;--btr-font:${FONT}`;
   /** Token CSS for a shadow root: light on `sel`, dark on `sel.dark`. */
   const scoped = (sel = '.root') => `${sel}{${base};${decl(LIGHT)}}${sel}.dark{${decl(DARK)}}`;
-  /** Token CSS for an extension page: follows the OS theme. */
-  const page = () => `:root{${base};${decl(LIGHT)};color-scheme:light}@media (prefers-color-scheme:dark){:root{${decl(DARK)};color-scheme:dark}}`;
+  /** Token CSS for an extension page: <html data-theme="dark|light"> decides; without it, the OS theme. */
+  const page = () => `:root{${base};${decl(LIGHT)};color-scheme:light}:root[data-theme=dark]{${decl(DARK)};color-scheme:dark}@media (prefers-color-scheme:dark){:root:not([data-theme]){${decl(DARK)};color-scheme:dark}}`;
 
   const reduced = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : {matches: false};
   const darkOS = typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: dark)') : {matches: false, addEventListener() {}};
@@ -118,7 +118,17 @@
     const d = isDark();
     if (d === last) return;
     last = d;
+    record(d);
     for (const f of listeners) { try { f(d); } catch (_) {} }
+  }
+  // Content scripts remember B 站's last theme so the popup / options / welcome pages can match it.
+  let recorded = null;
+  function record(d) {
+    try {
+      if (!/^https?:$/.test(location.protocol) || recorded === d || !root.chrome?.storage?.local) return;
+      recorded = d;
+      chrome.storage.local.get('biliTheme').then(v => { if (v.biliTheme?.dark !== d) return chrome.storage.local.set({biliTheme: {dark: d, at: Date.now()}}); }).catch(() => {});
+    } catch (_) {}
   }
   // Check now, and again once a swapped stylesheet has had time to load / a CSS fade to settle.
   function schedule() {
@@ -148,17 +158,38 @@
   /** Subscribe to Bilibili theme changes. Calls back immediately with the current value. */
   function onTheme(fn) {
     listeners.add(fn); startObserver();
-    if (last == null) last = isDark();
+    if (last == null) { last = isDark(); record(last); }
     fn(last);
     return () => listeners.delete(fn);
   }
 
   const api = Object.freeze({LIGHT, DARK, MOTION, EASE, EASE_IN, FONT, scoped, page, reduced, animate, fadeOut, flash, isDark, onTheme});
   root.__BTR_UI__ = api;
-  // Extension pages get the tokens as :root custom properties before first paint.
+  // Extension pages get the tokens as :root custom properties before first paint, and a theme:
+  // 跟随 B 站 (default: the last theme the content scripts saw on B 站, else the OS) / 跟随系统 / 浅色 / 深色.
   try {
     if (typeof document !== 'undefined' && typeof location !== 'undefined' && !/^https?:$/.test(location.protocol) && document.head) {
       const st = document.createElement('style'); st.id = 'btr-tokens'; st.textContent = page(); document.head.prepend(st);
+      const html = document.documentElement, CACHE = 'btr-ui-theme';
+      const set = mode => {
+        if (mode === 'dark' || mode === 'light') html.dataset.theme = mode; else delete html.dataset.theme;
+        try { localStorage.setItem(CACHE, mode || ''); } catch (_) {}
+      };
+      // Synchronous first guess from the last visit avoids a light flash on a dark setup.
+      try { const c = localStorage.getItem(CACHE); if (c === 'dark' || c === 'light') html.dataset.theme = c; } catch (_) {}
+      const store = root.chrome?.storage;
+      const resolve = async () => {
+        if (!store) return;
+        try {
+          const [{uiTheme = 'bili'}, {biliTheme}] = await Promise.all([store.sync.get({uiTheme: 'bili'}), store.local.get('biliTheme')]);
+          if (uiTheme === 'dark' || uiTheme === 'light') set(uiTheme);
+          else if (uiTheme === 'bili' && typeof biliTheme?.dark === 'boolean') set(biliTheme.dark ? 'dark' : 'light');
+          else set(darkOS.matches ? 'dark' : 'light');
+        } catch (_) {}
+      };
+      resolve();
+      store?.onChanged?.addListener((c, area) => { if ((area === 'sync' && c.uiTheme) || (area === 'local' && c.biliTheme)) resolve(); });
+      darkOS.addEventListener?.('change', resolve);
     }
   } catch (_) {}
   if (typeof module === 'object') module.exports = api;
