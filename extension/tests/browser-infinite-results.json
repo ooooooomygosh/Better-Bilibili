@@ -14,7 +14,19 @@
    "passed": true
   },
   {
-   "test": "a 24-card batch merges two 12-card requests; numbered after the native batch; duplicates, ads, live dropped",
+   "test": "a 24-card setting becomes 25 in a 5-column grid (whole rows, leftovers carried); 12-card requests merged; duplicates, ads, live dropped",
+   "passed": true
+  },
+  {
+   "test": "cards on screen are fully visible shortly after landing; nothing waits hidden for an observer",
+   "passed": true
+  },
+  {
+   "test": "⋮ opens a small menu (稍后再看 / 不感兴趣 / 不想看此 UP 主) instead of hiding at once; Esc closes it",
+   "passed": true
+  },
+  {
+   "test": "不感兴趣: blurred card with a short line and 撤销 (undo works), then it folds away and a spare card keeps the row full",
    "passed": true
   },
   {
@@ -34,7 +46,7 @@
    "passed": true
   },
   {
-   "test": "36 cards × 3 lanes and 12 cards × 1 lane both keep loading, still ps=12",
+   "test": "36 → 35 cards × 3 lanes and 12 → 10 cards × 1 lane (whole 5-column rows) keep loading, still ps=12",
    "passed": true
   },
   {

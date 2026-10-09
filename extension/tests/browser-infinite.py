@@ -20,7 +20,7 @@ def rcmd(route):
  if state['mode']=='risk':return route.fulfill(status=200,headers=CORS,body=json.dumps({'code':-352,'message':'风控校验失败'}))
  assert 'w_rid' in q and 'wts' in q
  i=int(q['fresh_idx'][0]);ps=int(q['ps'][0]);items=[]
- for k in range(ps):items.append({'goto':'av','bvid':bv(i*100+k),'title':f'第 {i} 次请求 · 视频 {k}','pic':'http://i0.hdslb.com/bfs/archive/x.jpg','duration':600+k,'pubdate':int(time.time())-3600,'owner':{'name':f'UP {k}'},'stat':{'view':12345*k,'danmaku':k}})
+ for k in range(ps):items.append({'goto':'av','bvid':bv(i*100+k),'title':f'第 {i} 次请求 · 视频 {k}','pic':'http://i0.hdslb.com/bfs/archive/x.jpg','duration':600+k,'pubdate':int(time.time())-3600,'owner':{'name':f'UP {k}','mid':1000+k},'stat':{'view':12345*k,'danmaku':k}})
  items.append({'goto':'av','bvid':'BV1native000','title':'重复的原生视频','owner':{},'stat':{}})
  items.append({'goto':'ad','bvid':bv(999999),'title':'广告','owner':{},'stat':{}})
  items.append({'goto':'live','title':'直播','owner':{},'stat':{}})
@@ -55,11 +55,38 @@ with sync_playwright() as p:
  labels=page.evaluate(f"[...{feed}.querySelectorAll('.btr-chip')].map(n=>n.firstChild.textContent)")
  assert labels[:2]==['第 2 批','第 3 批'],labels
  bvids=page.evaluate(f"[...{feed}.querySelectorAll('.btr-batch a.bili-video-card__image--link')].map(a=>a.href)")
- assert len(bvids)==len(set(bvids)) and not any('BV1native000' in b for b in bvids) and len(bvids)==48,len(bvids)
- sizes=page.evaluate(f"[...{feed}.querySelectorAll('.btr-batch')].map(b=>b.querySelectorAll('.feed-card').length)");assert sizes[:2]==[24,24],sizes
+ assert len(bvids)==len(set(bvids)) and not any('BV1native000' in b for b in bvids) and len(bvids)==50,len(bvids)
+ sizes=page.evaluate(f"[...{feed}.querySelectorAll('.btr-batch')].map(b=>b.querySelectorAll('.feed-card').length)");assert sizes[:2]==[25,25],sizes
  assert '广告' not in page.evaluate(f"{feed}.textContent")
  assert page.evaluate(f"{feed}.querySelector('.btr-batch .feed-card > .bili-feed-card > .bili-video-card.is-rcmd .bili-video-card__info--tit a')!==null")
- ok('a 24-card batch merges two 12-card requests; numbered after the native batch; duplicates, ads, live dropped')
+ ok('a 24-card setting becomes 25 in a 5-column grid (whole rows, leftovers carried); 12-card requests merged; duplicates, ads, live dropped')
+ vis=page.evaluate(f"[...{feed}.querySelectorAll('.btr-batch .feed-card')].filter(n=>{{const r=n.getBoundingClientRect();return r.top<innerHeight&&r.bottom>0}}).length")
+ page.evaluate(f"{feed}.querySelector('.btr-batch').scrollIntoView({{block:'start'}})");page.wait_for_timeout(30)
+ # No card ever sits at opacity 0 waiting for an observer: at most the 320ms fade is mid-flight.
+ page.wait_for_timeout(700)
+ op=page.evaluate(f"[...{feed}.querySelectorAll('.btr-batch .feed-card')].filter(n=>{{const r=n.getBoundingClientRect();return r.top<innerHeight&&r.bottom>0}}).map(n=>getComputedStyle(n).opacity)")
+ assert op and all(o=='1' for o in op),op
+ assert page.evaluate(f"{feed}.querySelectorAll('.btr-wait').length")==0
+ ok('cards on screen are fully visible shortly after landing; nothing waits hidden for an observer')
+ c0=f"{feed}.querySelector('.btr-batch .bili-video-card')"
+ page.hover(f"#btr-flow-feed .btr-batch .bili-video-card >> nth=0");page.evaluate(f"{c0}.querySelector('.bili-video-card__info--no-interest').click()");page.wait_for_timeout(250)
+ items=page.evaluate(f"[...{c0}.querySelectorAll('.btr-menu [role=menuitem]')].map(b=>b.textContent)")
+ assert len(items)==3 and items[0].startswith('添加至稍后再看') and items[1].startswith('不感兴趣') and items[2].startswith('不想看'),items
+ assert not page.evaluate(f"!!{c0}.querySelector('.btr-gone')")
+ page.keyboard.press('Escape');page.wait_for_timeout(250);assert not page.evaluate(f"!!{c0}.querySelector('.btr-menu')")
+ ok('⋮ opens a small menu (稍后再看 / 不感兴趣 / 不想看此 UP 主) instead of hiding at once; Esc closes it')
+ page.evaluate(f"window.firstBv={c0}.dataset.bvid;{c0}.querySelector('.bili-video-card__info--no-interest').click()");page.wait_for_timeout(200)
+ page.evaluate(f"[...{c0}.querySelectorAll('.btr-menu button')].find(b=>b.textContent.startsWith('不感兴趣')).click()");page.wait_for_timeout(300)
+ gone=page.evaluate(f"(()=>{{const g={c0}.querySelector('.btr-gone');return g&&[g.textContent,getComputedStyle(g).backdropFilter]}})()")
+ assert gone and '撤销' in gone[0] and 'blur' in gone[1],gone
+ page.evaluate(f"[...{c0}.querySelectorAll('.btr-gone button')].find(b=>b.textContent==='撤销').click()");page.wait_for_timeout(400)
+ assert not page.evaluate(f"!!{c0}.querySelector('.btr-gone')") and not page.evaluate("fixtureStorage.all.local.flowDislikes?.includes(firstBv)")
+ page.evaluate(f"{c0}.querySelector('.bili-video-card__info--no-interest').click()");page.wait_for_timeout(200)
+ page.evaluate(f"[...{c0}.querySelectorAll('.btr-menu button')].find(b=>b.textContent.startsWith('不感兴趣')).click()")
+ page.wait_for_function("!document.querySelector(`#btr-flow-feed .bili-video-card[data-bvid=\"${firstBv}\"]`)",timeout=6000)
+ assert page.evaluate("fixtureStorage.all.local.flowDislikes.includes(firstBv)")
+ assert page.evaluate(f"{feed}.querySelector('.btr-batch').querySelectorAll('.feed-card').length")==25
+ ok('不感兴趣: blurred card with a short line and 撤销 (undo works), then it folds away and a spare card keeps the row full')
  page.evaluate(f"{feed}.querySelector('.btr-batch').scrollIntoView({{block:'center'}})");page.wait_for_timeout(500)
  side=page.evaluate(f"(()=>{{const s={ui}.querySelector('.side');return {{n:s.querySelector('b').textContent,off:s.classList.contains('off'),total:s.querySelector('.total').textContent}}}})()")
  assert side['n']=='2' and not side['off'],side
@@ -81,16 +108,16 @@ with sync_playwright() as p:
  state['mode']='ok';page.evaluate(f"[...{ui}.querySelectorAll('.foot button')].find(b=>b.textContent==='重试').click()")
  page.wait_for_function(f"{feed}.querySelectorAll('.btr-batch').length>{after}",timeout=15000)
  ok('retry resumes loading')
- for size,threads in ((36,3),(12,1)):
+ for size,threads,want in ((36,3,35),(12,1,10)):
   page.evaluate(f"chromeMock.storage.sync.set({{homeInfiniteSize:{size},homeInfiniteThreads:{threads}}})");page.wait_for_timeout(300)
   have=page.evaluate(f"{feed}.querySelectorAll('.btr-batch').length")
   for _ in range(3):page.mouse.wheel(0,5000);page.wait_for_timeout(500)
   for _ in range(8):
-   if page.evaluate(f"[...{feed}.querySelectorAll('.btr-batch')].at(-1).querySelectorAll('.feed-card').length")=={size}:break
+   if page.evaluate(f"[...{feed}.querySelectorAll('.btr-batch')].at(-1).querySelectorAll('.feed-card').length")=={want}:break
    page.mouse.wheel(0,5000);page.wait_for_timeout(700)
-  page.wait_for_function(f"[...{feed}.querySelectorAll('.btr-batch')].at(-1).querySelectorAll('.feed-card').length==={size}",timeout=15000)
+  page.wait_for_function(f"[...{feed}.querySelectorAll('.btr-batch')].at(-1).querySelectorAll('.feed-card').length==={want}",timeout=15000)
  assert state['ps']=={12},state['ps']
- ok('36 cards × 3 lanes and 12 cards × 1 lane both keep loading, still ps=12')
+ ok('36 → 35 cards × 3 lanes and 12 → 10 cards × 1 lane (whole 5-column rows) keep loading, still ps=12')
  page.evaluate("chromeMock.storage.sync.set({homeInfinite:false})");page.wait_for_timeout(400)
  assert page.evaluate(f"!{feed}") and page.locator('.load-more-anchor').count()==1 and not page.evaluate("document.documentElement.hasAttribute('data-btr-infinite')")
  ok('turning the option off removes the feed and restores the native lazy loader')

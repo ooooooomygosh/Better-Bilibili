@@ -436,7 +436,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
   });
   chrome.runtime.onMessage.addListener((m,sender,reply)=>{
     if(sender.id!==chrome.runtime.id)return false;
-    if(m?.type==='flow-get-state'){reply({telemetry,stats,historyCount:snapshots.length,home:isHome()});return false;}
+    if(m?.type==='flow-get-state'){reply({telemetry,stats,historyCount:snapshots.length,home:isHome(),feed:isHome()?(infinite?.state||null):null});return false;}
     if(m?.type==='flow-clear-history'){clearHistory(Date.now());reply({ok:true});}
     return false;
   });

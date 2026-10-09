@@ -15,7 +15,7 @@
   const FONT = ui ? ui.FONT : '-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif';
   const SHOT = 'https://api.bilibili.com/x/player/videoshot';
   const TOVIEW = 'https://api.bilibili.com/x/v2/history/toview/add';
-  const DISLIKE_KEY = 'flowDislikes', MAX_DISLIKES = 500;
+  const DISLIKE_KEY = 'flowDislikes', UP_KEY = 'flowHiddenUps', MAX_DISLIKES = 500;
 
   /* Shadow UI: footer status and the floating "第 N 批" indicator. */
   const CSS = `
@@ -56,15 +56,17 @@
   const LIGHT_CSS = `
 #btr-flow-feed{display:block;margin-top:8px;color:var(--text1,#18191c)}
 #btr-flow-feed [hidden]{display:none!important}
-#btr-flow-feed .btr-batch{content-visibility:auto;contain-intrinsic-size:auto 900px;margin-top:8px}
+#btr-flow-feed .btr-batch{margin-top:8px}
+/* Only batches already scrolled past skip rendering; fresh ones always paint at once. */
+#btr-flow-feed .btr-batch.btr-cv{content-visibility:auto;contain-intrinsic-size:auto 900px}
 #btr-flow-feed .btr-divider{display:flex;align-items:center;gap:12px;margin:18px 0 16px;color:var(--btr-muted,#61666d);font-size:12px}
 #btr-flow-feed .btr-divider::before,#btr-flow-feed .btr-divider::after{content:"";flex:1;height:1px;background:var(--btr-line,rgba(128,128,128,.22))}
 #btr-flow-feed .btr-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 12px;border-radius:999px;background:var(--btr-chip,rgba(251,114,153,.1));color:#fb7299;font-weight:600;font-variant-numeric:tabular-nums}
 #btr-flow-feed .btr-chip small{font-weight:400;font-size:12px;color:var(--btr-muted,#61666d)}
 #btr-flow-feed .btr-grid{display:grid;grid-template-columns:repeat(var(--btr-columns,5),minmax(0,1fr));column-gap:var(--btr-gap,20px);row-gap:var(--btr-row-gap,20px)}
 #btr-flow-feed .btr-grid>.feed-card{min-width:0;margin:0!important;display:block}
-#btr-flow-feed .feed-card.btr-wait{opacity:0}
 #btr-flow-feed .bili-video-card__image--wrap{position:relative}
+#btr-flow-feed .bili-video-card__image--wrap{background:var(--btr-placeholder,#f1f2f3);border-radius:var(--btr-radius,6px)}
 #btr-flow-feed .bili-video-card__cover img{opacity:0;transition:opacity .3s ease}
 #btr-flow-feed .bili-video-card__cover img.btr-loaded{opacity:1}
 /* Watch later & not interested: shown on hover, like the native card. */
@@ -73,10 +75,19 @@
 #btr-flow-feed .bili-watch-later__tip--lab{display:none}
 #btr-flow-feed .bili-watch-later:hover .bili-watch-later__tip--lab,#btr-flow-feed .bili-watch-later.btr-done .bili-watch-later__tip--lab{display:block}
 #btr-flow-feed .bili-video-card__info--no-interest{display:none;cursor:pointer}
-#btr-flow-feed .bili-video-card:hover .bili-video-card__info--no-interest{display:flex}
-#btr-flow-feed .bili-video-card__no-interest{display:none}
-#btr-flow-feed .bili-video-card.btr-disliked .bili-video-card__no-interest{display:flex}
-#btr-flow-feed .bili-video-card__no-interest .revert-btn{cursor:pointer}
+#btr-flow-feed .bili-video-card:hover .bili-video-card__info--no-interest,#btr-flow-feed .bili-video-card.btr-menu-open .bili-video-card__info--no-interest{display:flex}
+#btr-flow-feed .bili-video-card__info{position:relative}
+#btr-flow-feed .bili-video-card__wrap{position:relative}
+/* ⋮ menu, styled like B 站's own card popover. */
+#btr-flow-feed .btr-menu{position:absolute;right:0;top:26px;z-index:20;min-width:150px;padding:6px 0;border-radius:8px;background:var(--btr-menu-bg,#fff);border:1px solid var(--btr-line,rgba(0,0,0,.08));box-shadow:0 6px 20px rgba(0,0,0,.12);font-size:14px;color:var(--btr-text,#18191c);transform-origin:100% 0}
+#btr-flow-feed .btr-menu button{display:flex;align-items:center;gap:8px;width:100%;padding:8px 14px;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;white-space:nowrap}
+#btr-flow-feed .btr-menu button:hover,#btr-flow-feed .btr-menu button:focus-visible{background:var(--btr-menu-hover,#f1f2f3);color:#fb7299;outline:none}
+#btr-flow-feed .btr-menu small{margin-left:auto;padding-left:10px;font-size:12px;color:var(--btr-muted,#9499a0)}
+/* Hidden-by-you state: the card dims and blurs, one short line and 撤销 in the middle, then it folds away. */
+#btr-flow-feed .btr-gone{position:absolute;inset:-4px;z-index:15;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border-radius:8px;background:var(--btr-gone,rgba(255,255,255,.72));backdrop-filter:blur(10px) saturate(.6);-webkit-backdrop-filter:blur(10px) saturate(.6);color:var(--btr-text,#18191c);font-size:14px;text-align:center}
+#btr-flow-feed .btr-gone small{display:block;margin-top:2px;font-size:12px;color:var(--btr-muted,#9499a0)}
+#btr-flow-feed .btr-gone button{padding:5px 16px;border-radius:6px;border:1px solid var(--btr-line,rgba(0,0,0,.12));background:var(--btr-menu-bg,#fff);color:inherit;font:inherit;font-size:13px;cursor:pointer}
+#btr-flow-feed .btr-gone button:hover{color:#fb7299;border-color:#fb7299}
 /* Hover preview: Bilibili's own storyboard frames, scrubbed by the pointer. */
 #btr-flow-feed .btr-shot{position:absolute;inset:0;z-index:2;border-radius:inherit;background-repeat:no-repeat;pointer-events:none;opacity:0;transition:opacity .14s ease}
 #btr-flow-feed .btr-shot.on{opacity:1}
@@ -89,7 +100,7 @@
 #btr-flow-feed .btr-skel{animation:btr-skel 1.4s ease-in-out infinite}
 @keyframes btr-skel{0%,100%{opacity:1}50%{opacity:.55}}
 #btr-flow-feed .btr-flash{position:absolute;left:50%;top:50%;z-index:5;transform:translate(-50%,-50%);padding:6px 12px;border-radius:999px;background:rgba(24,25,28,.86);color:#fff;font-size:12px;white-space:nowrap;pointer-events:none}
-@media(prefers-reduced-motion:reduce){#btr-flow-feed *{animation:none!important;transition:none!important}#btr-flow-feed .bili-video-card__cover img{opacity:1}#btr-flow-feed .feed-card.btr-wait{opacity:1}}
+@media(prefers-reduced-motion:reduce){#btr-flow-feed *{animation:none!important;transition:none!important}#btr-flow-feed .bili-video-card__cover img{opacity:1}}
 `;
 
   function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
@@ -112,6 +123,9 @@
     let box = null, shadow = null, list = null, foot = null, side = null, sentinel = null;
     let current = null, sections = [];
     let batches = 0, idx = 1, loading = false, paused = false, fails = 0, timer = 0, keys = null, buffer = [];
+    // Batches are a whole number of grid rows: 24 in a 5-column grid becomes 25, leftovers wait for the next batch.
+    const cols = () => { const n = Number(host.columns()?.count); return n >= 1 && n <= 10 ? Math.floor(n) : 5; };
+    const target = size => { const c = cols(); return Math.max(c, Math.round(size / c) * c); };
     const seen = new Set();
 
     async function wbiKeys(force) {
@@ -176,25 +190,31 @@
       clearTimeout(timer);
       if (loading || paused || !box?.isConnected || !host.enabled() || !isNear()) return;
       loading = true; status('loading'); side?.classList.add('loading'); skeleton(true);
-      const s = host.settings(), size = s.homeInfiniteSize, lanes = s.homeInfiniteThreads;
+      const s = host.settings(), size = target(s.homeInfiniteSize), lanes = s.homeInfiniteThreads;
       const count = Math.max(lanes, Math.ceil(Math.max(0, size - buffer.length) / PAGE));
       nativeSeen();
       const results = await pool(count, lanes);
-      loading = false; side?.classList.remove('loading'); skeleton(false);
-      if (!box?.isConnected || !host.enabled()) return;
+      loading = false; side?.classList.remove('loading');
+      if (!box?.isConnected || !host.enabled()) { skeleton(false); return; }
       let fresh = 0, risk = null, error = null;
       for (const r of results) {
-        if (r.ok) { const cards = feed.cards(r.items, seen).filter(c => !dislikes.has(c.bvid)); fresh += cards.length; buffer.push(...cards); }
+        if (r.ok) { const cards = feed.cards(r.items, seen).filter(c => !hidden(c)); fresh += cards.length; buffer.push(...cards); }
         else if (r.error?.kind === 'risk') risk = r.error;
         else error = r.error;
       }
-      while (buffer.length >= size) append(buffer.splice(0, size));
+      let added = 0;
+      const want = target(host.settings().homeInfiniteSize); // The window may have been resized meanwhile.
+      while (buffer.length >= want) { append(buffer.splice(0, want)); added++; }
+      // The skeleton row stays under the newest batch as long as more can come, so reaching the
+      // bottom always shows "more is on its way", never a blank hole. It goes only when loading pauses.
+      if (risk || (!fresh && fails + 1 >= MAX_FAILS)) skeleton(false);
       if (risk) { paused = true; status('risk', risk); return; }
       if (!fresh) {
         if (++fails >= MAX_FAILS) { paused = true; status('error', error); return; }
       } else fails = 0;
       status('idle');
-      timer = setTimeout(round, GAP_MS);
+      // Still near the end without a full batch: fetch the rest right away (skeletons stay up meanwhile).
+      timer = setTimeout(round, added || !fresh ? GAP_MS : 120);
     }
 
     function retry() { paused = false; fails = 0; round(); }
@@ -265,15 +285,8 @@
       const outer = el('div', 'feed-card'); for (const a of h.feedAttrs) outer.setAttribute(a, '');
       const inner = el('div', 'bili-feed-card'); for (const a of h.innerAttrs) inner.setAttribute(a, '');
       const v = el('div', 'bili-video-card is-rcmd'); v.style.setProperty('--cover-radio', h.radio);
-      v.dataset.bvid = c.bvid; if (c.aid) v.dataset.aid = String(c.aid);
+      v.dataset.bvid = c.bvid; if (c.aid) v.dataset.aid = String(c.aid); if (c.mid) v.dataset.mid = String(c.mid);
       const wrap = el('div', 'bili-video-card__wrap');
-
-      const ni = el('div', 'bili-video-card__no-interest'), niIn = el('div', 'bili-video-card__no-interest--inner');
-      const niL = el('div', 'bili-video-card__no-interest--left'), niR = el('div', 'bili-video-card__no-interest--right');
-      niL.append(icon(h, 'sad', 'no-interest-icon', '0 0 36 36'), el('span', 'no-interest-title', '不感兴趣'), el('span', 'no-interest-desc', '仅在本插件隐藏'));
-      const revert = el('div', 'revert-btn'); revert.setAttribute('role', 'button'); revert.tabIndex = 0;
-      revert.append(icon(h, 'undo', 'revert-icon'), document.createTextNode(' 撤销'));
-      niR.append(revert); niIn.append(niL, niR); ni.append(niIn);
 
       const link = el('a', 'bili-video-card__image--link'); link.href = c.url; link.target = '_blank'; link.rel = 'noopener';
       const image = el('div', 'bili-video-card__image'), iwrap = el('div', 'bili-video-card__image--wrap');
@@ -290,7 +303,8 @@
       image.append(iwrap, mask); link.append(image);
 
       const info = el('div', 'bili-video-card__info'), right = el('div', 'bili-video-card__info--right');
-      const more = el('div', 'bili-video-card__info--no-interest'); more.setAttribute('role', 'button'); more.tabIndex = 0; more.title = '不感兴趣'; more.setAttribute('aria-label', '不感兴趣');
+      const more = el('div', 'bili-video-card__info--no-interest'); more.setAttribute('role', 'button'); more.tabIndex = 0; more.title = '更多操作';
+      more.setAttribute('aria-label', '更多操作'); more.setAttribute('aria-haspopup', 'menu'); more.setAttribute('aria-expanded', 'false');
       more.append(icon(h, 'more', null));
       const tit = el('h3', 'bili-video-card__info--tit'); tit.title = c.title;
       const ta = el('a', null, c.title); ta.href = c.url; ta.target = '_blank'; ta.rel = 'noopener'; tit.append(ta);
@@ -302,12 +316,11 @@
       owner.append(icon(h, 'up', null), au); if (c.date) owner.append(el('span', 'bili-video-card__info--date', `· ${c.date}`));
       bottom.append(owner);
       right.append(more, tit, bottom); info.append(right);
-      wrap.append(ni, link, info); v.append(wrap); inner.append(v); outer.append(inner);
+      wrap.append(link, info); v.append(wrap); inner.append(v); outer.append(inner);
 
       const act = (n, fn) => { n.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); fn(); }); n.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } }); };
       act(later, () => watchLater(c, later, laterLab));
-      act(more, () => dislike(c, v, true));
-      act(revert, () => dislike(c, v, false));
+      act(more, () => menu(c, v, more, later, laterLab));
       preview(c, iwrap, link);
       return outer;
     }
@@ -334,14 +347,88 @@
       finally { btn.classList.remove('btr-busy'); }
     }
 
-    /* ---------- not interested: local only (the web API for feedback is not public) ---------- */
-    let dislikes = new Set();
-    chrome.storage.local.get(DISLIKE_KEY).then(d => { if (Array.isArray(d[DISLIKE_KEY])) dislikes = new Set(d[DISLIKE_KEY].filter(x => typeof x === 'string')); }).catch(() => {});
-    function dislike(c, v, on) {
-      v.classList.toggle('btr-disliked', on);
-      if (on) dislikes.add(c.bvid); else dislikes.delete(c.bvid);
-      chrome.storage.local.set({[DISLIKE_KEY]: [...dislikes].slice(-MAX_DISLIKES)}).catch(() => {});
-      if (on) v.querySelector('.revert-btn')?.focus({preventScroll: true});
+    /* ---------- ⋮ menu: watch later / not interested / hide this uploader (the last two are local only;
+       B 站's web feedback API is not public, so nothing is sent to its recommender) ---------- */
+    let dislikes = new Set(), blockedUps = new Set();
+    chrome.storage.local.get([DISLIKE_KEY, UP_KEY]).then(d => {
+      if (Array.isArray(d[DISLIKE_KEY])) dislikes = new Set(d[DISLIKE_KEY].filter(x => typeof x === 'string'));
+      if (Array.isArray(d[UP_KEY])) blockedUps = new Set(d[UP_KEY].map(String));
+    }).catch(() => {});
+    const hidden = c => dislikes.has(c.bvid) || (c.mid && blockedUps.has(String(c.mid)));
+    const persist = () => chrome.storage.local.set({[DISLIKE_KEY]: [...dislikes].slice(-MAX_DISLIKES), [UP_KEY]: [...blockedUps].slice(-MAX_DISLIKES)}).catch(() => {});
+
+    let openMenu = null;
+    function closeMenu(focusBack) {
+      if (!openMenu) return;
+      const {node, v, more} = openMenu; openMenu = null;
+      v.classList.remove('btr-menu-open'); more.setAttribute('aria-expanded', 'false');
+      if (ui) ui.fadeOut(node, 120, [{opacity: 1, transform: 'none'}, {opacity: 0, transform: 'scale(.96)'}]); else node.remove();
+      if (focusBack) more.focus({preventScroll: true});
+    }
+    document.addEventListener('pointerdown', e => { if (openMenu && !openMenu.node.contains(e.target) && !openMenu.more.contains(e.target)) closeMenu(); }, true);
+    addEventListener('scroll', () => closeMenu(), {passive: true});
+    function menu(c, v, more, later, laterLab) {
+      const again = openMenu?.v === v; closeMenu();
+      if (again) return;
+      const node = el('div', 'btr-menu'); node.setAttribute('role', 'menu');
+      const item = (text, note, fn) => {
+        const b = el('button', null, text); b.type = 'button'; b.setAttribute('role', 'menuitem'); b.tabIndex = -1;
+        if (note) b.append(el('small', null, note));
+        b.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); closeMenu(); fn(); });
+        node.append(b); return b;
+      };
+      item('添加至稍后再看', null, () => watchLater(c, later, laterLab));
+      item('不感兴趣', '仅本插件', () => gone(c, v, 'video'));
+      if (c.mid && c.author) item(`不想看「${c.author.length > 8 ? c.author.slice(0, 8) + '…' : c.author}」`, '仅本插件', () => gone(c, v, 'up'));
+      node.addEventListener('keydown', e => {
+        const items = [...node.querySelectorAll('button')], i = items.indexOf(document.activeElement);
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus(); }
+        else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeMenu(true); }
+        else if (e.key === 'Tab') closeMenu();
+      });
+      more.after(node);
+      v.classList.add('btr-menu-open'); more.setAttribute('aria-expanded', 'true');
+      openMenu = {node, v, more};
+      if (ui) ui.animate(node, [{opacity: 0, transform: 'scale(.96) translateY(-4px)'}, {opacity: 1, transform: 'none'}], {duration: 140});
+      node.querySelector('button').focus({preventScroll: true});
+    }
+
+    // Dim + blur the card with one short line and 撤销; after a few seconds it folds away
+    // and, when a spare card is waiting, a fresh one takes its place so the row stays full.
+    function gone(c, v, kind) {
+      const outer = v.closest('.feed-card');
+      if (!outer || v.querySelector('.btr-gone')) return;
+      if (kind === 'up') blockedUps.add(String(c.mid)); else dislikes.add(c.bvid);
+      persist();
+      const layer = el('div', 'btr-gone'); layer.setAttribute('role', 'status');
+      const msg = el('div', null, kind === 'up' ? `不再显示「${c.author}」` : '已不再显示这条视频');
+      msg.append(el('small', null, '只在本插件生效，不影响 B 站推荐'));
+      const undo = el('button', null, '撤销'); undo.type = 'button';
+      layer.append(msg, undo);
+      v.querySelector('.bili-video-card__wrap').append(layer);
+      if (ui) ui.animate(layer, [{opacity: 0}, {opacity: 1}], {duration: 220});
+      undo.focus({preventScroll: true});
+      const fold = setTimeout(() => {
+        if (!outer.isConnected) return;
+        const others = kind === 'up' ? [...(list?.querySelectorAll(`.bili-video-card[data-mid="${String(c.mid).replace(/[^0-9]/g, "")}"]`) || [])].map(n => n.closest('.feed-card')).filter(n => n && n !== outer) : [];
+        for (const o of [outer, ...others]) collapse(o);
+      }, 3200);
+      undo.addEventListener('click', e => {
+        e.preventDefault(); e.stopPropagation(); clearTimeout(fold);
+        if (kind === 'up') blockedUps.delete(String(c.mid)); else dislikes.delete(c.bvid);
+        persist();
+        if (ui) ui.fadeOut(layer, 140); else layer.remove();
+      });
+    }
+    function collapse(outer) {
+      const spare = buffer.findIndex(x => !hidden(x));
+      const swap = () => {
+        if (spare >= 0 && buffer[spare]) { const fresh = card(buffer.splice(spare, 1)[0]); fresh.setAttribute('role', 'listitem'); outer.replaceWith(fresh); reveal(fresh, 0); }
+        else outer.remove();
+      };
+      if (!ui || reduced.matches) { swap(); return; }
+      const a = outer.animate([{opacity: 1, transform: 'none'}, {opacity: 0, transform: 'scale(.94)'}], {duration: 220, easing: EASE, fill: 'forwards'});
+      a.onfinish = swap;
     }
 
     /* ---------- hover preview: storyboard frames from B 站's videoshot API ---------- */
@@ -390,32 +477,38 @@
 
     /* ---------- skeletons while a batch is on its way ---------- */
     let skel = null;
-    function skeleton(on) {
+    function skeleton(on, instant) {
       if (!list) return;
-      if (!on) { const s = skel; skel = null; if (s) { if (ui) ui.fadeOut(s, 140); else s.remove(); } return; }
+      if (!on) { const s = skel; skel = null; if (s) { if (ui && !instant) ui.fadeOut(s, 140); else s.remove(); } return; }
       if (skel) return;
       skel = el('div', 'btr-grid btr-skeletons'); skel.setAttribute('aria-hidden', 'true');
-      const cols = host.columns().count || 5;
-      for (let i = 0; i < cols; i++) {
+      const n = cols() * 2; // Two rows: enough to cover the gap below the fold while the batch is on its way.
+      for (let i = 0; i < n; i++) {
         const v = el('div', 'bili-video-card btr-skel'), sk = el('div', 'bili-video-card__skeleton'), info = el('div', 'bili-video-card__skeleton--info'), r = el('div', 'bili-video-card__skeleton--right');
         r.append(el('p', 'bili-video-card__skeleton--text'), el('p', 'bili-video-card__skeleton--text short'), el('p', 'bili-video-card__skeleton--light'));
         info.append(r); sk.append(el('div', 'bili-video-card__skeleton--cover'), info); v.append(sk);
-        if (i) v.style.animationDelay = `${i * 90}ms`;
+        if (i) v.style.animationDelay = `${(i % cols()) * 90}ms`;
         skel.append(v);
       }
       skel.style.marginTop = '24px';
       list.after(skel);
     }
 
-    /* ---------- reveal: cards fade up only when they actually scroll into view ---------- */
+    /* ---------- reveal: cards are always visible; the fade-up plays only for cards on screen ----------
+       Cards already in view animate immediately (staggered); cards below the fold animate the moment
+       they cross into view. Nothing ever waits at opacity 0 for an observer, so there are no blank holes. */
+    const animateIn = (n, i) => n.animate?.([{opacity: 0, transform: 'translateY(12px)'}, {opacity: 1, transform: 'none'}], {duration: 320, delay: Math.min(i, 11) * 30, easing: EASE, fill: 'backwards'});
     const revealer = typeof IntersectionObserver === 'function' ? new IntersectionObserver(entries => {
       const shown = entries.filter(e => e.isIntersecting).map(e => e.target);
       shown.sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top || a.getBoundingClientRect().left - b.getBoundingClientRect().left);
-      shown.forEach((n, i) => {
-        revealer.unobserve(n); n.classList.remove('btr-wait');
-        n.animate?.([{opacity: 0, transform: 'translateY(12px)'}, {opacity: 1, transform: 'none'}], {duration: 320, delay: Math.min(i, 11) * 30, easing: EASE, fill: 'backwards'});
-      });
-    }, {rootMargin: '0px 0px -40px 0px'}) : null;
+      shown.forEach((n, i) => { revealer.unobserve(n); animateIn(n, i); });
+    }) : null;
+    function reveal(node, i) {
+      if (reduced.matches) return;
+      const r = node.getBoundingClientRect();
+      if (r.top < innerHeight && r.bottom > 0) animateIn(node, i);
+      else if (r.top >= innerHeight) revealer?.observe(node);
+    }
 
     function append(cards) {
       const n = ++batches + 1; // The native grid is batch 1.
@@ -425,13 +518,11 @@
       chip.append(el('small', null, `${cards.length} 个视频 · ${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`));
       div.append(chip);
       const grid = el('div', 'btr-grid'); grid.setAttribute('role', 'list');
-      for (const c of cards) {
-        const node = card(c); node.setAttribute('role', 'listitem');
-        if (revealer && !reduced.matches) { node.classList.add('btr-wait'); revealer.observe(node); }
-        grid.append(node);
-      }
+      const nodes = cards.map(c => { const node = card(c); node.setAttribute('role', 'listitem'); return node; });
+      grid.append(...nodes);
       sec.append(div, grid);
       list.append(sec); sections.push(sec);
+      let i = 0; for (const node of nodes) { if (node.getBoundingClientRect().top < innerHeight) reveal(node, i++); else reveal(node, 0); }
       current?.observe(sec);
       updateSide();
     }
@@ -451,10 +542,16 @@
     // The batch crossing the middle of the viewport is "current"; above the feed the native grid is batch 1.
     const visible = new Set();
     function track(entries) {
-      for (const e of entries) { if (e.isIntersecting) visible.add(e.target); else visible.delete(e.target); }
+      for (const e of entries) {
+        if (e.isIntersecting) visible.add(e.target); else visible.delete(e.target);
+        if (!e.isIntersecting && e.boundingClientRect.bottom < 0) e.target.classList.add('btr-cv');
+      }
       const nums = [...visible].map(s => Number(s.dataset.batch)).filter(Boolean);
       const top = box.getBoundingClientRect().top;
-      updateSide(nums.length ? Math.max(...nums) : 1);
+      // Middle of the screen on a divider or the skeleton row: stay on the last batch that started above it.
+      let n = nums.length ? Math.max(...nums) : 1;
+      if (!nums.length) for (const sec of sections) { if (sec.getBoundingClientRect().top < innerHeight / 2) n = Number(sec.dataset.batch); else break; }
+      updateSide(n);
       place();
       side.classList.toggle('off', top > innerHeight * .6 && !nums.length);
     }
@@ -502,7 +599,7 @@
       const t = host.theme(), cols = host.columns();
       const v = {'--btr-text': t.dark ? '#e3e5e7' : '#18191c', '--btr-muted': t.dark ? '#a2a7ae' : '#61666d', '--btr-line': t.dark ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.08)',
         '--btr-placeholder': t.oled ? '#000' : t.dark ? '#222' : '#f1f2f3', '--btr-side': t.oled ? 'rgba(0,0,0,.85)' : t.dark ? 'rgba(36,37,42,.92)' : 'rgba(255,255,255,.92)',
-        '--btr-chip': t.dark ? 'rgba(251,114,153,.16)' : 'rgba(251,114,153,.1)', '--btr-columns': String(cols.count), '--btr-gap': cols.gap, '--btr-row-gap': cols.rowGap || '20px'};
+        '--btr-chip': t.dark ? 'rgba(251,114,153,.16)' : 'rgba(251,114,153,.1)', '--btr-menu-bg': t.oled ? '#111' : t.dark ? '#232527' : '#fff', '--btr-menu-hover': t.dark ? 'rgba(255,255,255,.08)' : '#f1f2f3', '--btr-gone': t.oled ? 'rgba(0,0,0,.72)' : t.dark ? 'rgba(24,25,28,.72)' : 'rgba(255,255,255,.72)', '--btr-columns': String(cols.count), '--btr-gap': cols.gap, '--btr-row-gap': cols.rowGap || '20px'};
       for (const [k, val] of Object.entries(v)) box.style.setProperty(k, val);
       box.style.colorScheme = t.dark ? 'dark' : 'light';
     }
@@ -516,11 +613,11 @@
     function stop() {
       clearTimeout(timer);
       if (!box) return;
-      box.remove(); box = shadow = list = foot = side = sentinel = skel = null; current?.disconnect(); current = null;
+      closeMenu(); box.remove(); box = shadow = list = foot = side = sentinel = skel = null; current?.disconnect(); current = null;
       sections = []; visible.clear(); seen.clear(); buffer = []; batches = 0; paused = false; fails = 0; loading = false;
     }
 
-    return {sync, stop, theme, get batches() { return batches; }};
+    return {sync, stop, theme, get batches() { return batches; }, get state() { return box ? {loaded: batches + 1, current: shown, paused, loading} : null; }};
   }
 
   globalThis.__BTR_HOME_INFINITE__ = {create};

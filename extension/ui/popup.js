@@ -19,6 +19,15 @@ $('reloadBtn').onclick=async()=>{try{await chrome.tabs.reload(tab.id);window.clo
 $('options').onclick=()=>chrome.runtime.openOptionsPage();
 $('quick').onclick=async()=>{try{await chrome.tabs.sendMessage(tab.id,{type:'flow-quick-open'});window.close();}catch(_){say('请先打开或刷新 B 站页面，快捷面板在页面右下角。','error');}};
 let reachable=false;
+// Read live from the tab every second: infinite-feed batches (current / loaded) and 换一批 history are different things.
+function homeLine(d){
+ const f=d.feed,parts=['首页'];
+ if(f&&f.loaded>1)parts.push(`无限下滑：正在看第 ${f.current} 批，已加载 ${f.loaded} 批${f.paused?'（已暂停）':f.loading?'（加载中…）':''}`);
+ else if(f)parts.push('无限下滑已开启，往下滑自动加载');
+ if(d.historyCount>1)parts.push(`换一批记录 ${d.historyCount} 组，可回看`);
+ if(parts.length===1)parts.push('打开视频后这里显示下载速度和缓冲');
+ return parts.join(' · ');
+}
 async function update(){
  try{
   if(!tab?.id)return;const d=await chrome.tabs.sendMessage(tab.id,{type:'flow-get-state'}),s=d.stats,t=d.telemetry;reachable=true;
@@ -26,7 +35,7 @@ async function update(){
   const live=!!s&&(Number(s.totalSpeedBps)>0||Number(s.bufferedAhead)>0||Number(s.activeThreads)>0||!!t?.policy?.name);
   $('metrics').hidden=!live;
   if(live){$('speed').textContent=(Math.max(0,Number(s.totalSpeedBps)||0)/1048576).toFixed(2);$('buffer').textContent=Math.max(0,Number(s.bufferedAhead)||0).toFixed(1);$('threads').textContent=String(Math.max(0,Number(s.activeThreads)||0));}
-  $('profile').textContent=t?.policy?.name?`${t.policy.name} · 自动并发上限 ${t.policy.cap} · 缓冲目标 ${t.policy.ahead}s`:(d.home?`首页 · 本标签页已保存 ${d.historyCount} 批推荐`:'这个页面没有正在播放的视频；打开视频后这里显示下载速度和缓冲。');
+  $('profile').textContent=t?.policy?.name?`${t.policy.name} · 自动并发上限 ${t.policy.cap} · 缓冲目标 ${t.policy.ahead}s`:(d.home?homeLine(d):'这个页面没有正在播放的视频；打开视频后这里显示下载速度和缓冲。');
   $('warning').textContent=t?.policy?.decodeWarning?'缓冲充足但掉帧偏多：更可能是解码问题。可在播放器播放策略中试 HEVC / AVC。':s?.lastError||'';
  }catch(_){reachable=false;$('metrics').hidden=true;$('profile').textContent='在 B 站页面打开这里能看到实时状态；刚安装后需要刷新页面。';}
 }
