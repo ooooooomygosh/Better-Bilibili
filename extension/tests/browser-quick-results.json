@@ -18,6 +18,10 @@
    "passed": true
   },
   {
+   "test": "Alt+T is a toggle (focus on the panel, inside the shadow root, quick double press, page key handlers); the open panel does not move on scroll",
+   "passed": true
+  },
+  {
    "test": "tabs are keyboard-navigable (arrows, roving tabindex, aria-controls)",
    "passed": true
   },
@@ -39,6 +43,10 @@
   },
   {
    "test": "完整设置 works on the first click: waits for the service worker answer and retries once when it is dropped",
+   "passed": true
+  },
+  {
+   "test": "panel top is clamped below the B 站 header (≥64px) with max-height and internal scroll",
    "passed": true
   },
   {

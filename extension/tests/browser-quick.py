@@ -35,6 +35,22 @@ with sync_playwright() as p:
  sel=page.evaluate(f"{q}.querySelector('.tabs [aria-selected=true]').textContent")
  assert sel=='油门',sel
  ok('Alt+T opens the panel on the tab that fits the page (油门 on a video page)')
+ P=f"{q}.querySelector('.panel')"
+ RECT=f"(()=>{{const r={P}.getBoundingClientRect();return [Math.round(r.top),Math.round(r.bottom),Math.round(r.right)]}})()"
+ page.wait_for_timeout(500);r0=page.evaluate(RECT);page.evaluate("document.body.style.height='3000px'");page.mouse.wheel(0,400);page.wait_for_timeout(500);r1=page.evaluate(RECT);page.mouse.wheel(0,-400);page.wait_for_timeout(300)
+ assert r0==r1,(r0,r1)
+ # Alt+T again closes it, with focus on the panel itself and on a control inside the shadow root.
+ assert page.evaluate(f"{q}.activeElement==={P}")
+ page.keyboard.press('Alt+t');page.wait_for_function(f"!{P}",timeout=2000)
+ page.keyboard.press('Alt+t');page.wait_for_function(P,timeout=3000)
+ page.evaluate(f"{q}.querySelector('.tabs [aria-selected=true]').focus()");page.keyboard.press('Alt+t');page.wait_for_function(f"!{P}",timeout=2000)
+ # Pressed twice quickly (the second one lands while it is still opening): ends up closed.
+ page.keyboard.press('Alt+t');page.keyboard.press('Alt+t');page.wait_for_timeout(700);assert not page.evaluate(f"!!{P}")
+ # A page handler that swallows keydown on document (like a video player) doesn't break the toggle.
+ page.evaluate("document.addEventListener('keydown',e=>{if(e.code==='KeyT')e.stopImmediatePropagation()},true);0")
+ page.keyboard.press('Alt+t');page.wait_for_function(P,timeout=3000);page.keyboard.press('Alt+t');page.wait_for_function(f"!{P}",timeout=2000)
+ page.keyboard.press('Alt+t');page.wait_for_function(P,timeout=3000)
+ ok('Alt+T is a toggle (focus on the panel, inside the shadow root, quick double press, page key handlers); the open panel does not move on scroll')
  page.evaluate(f"{q}.querySelector('.tabs [aria-selected=true]').focus()");page.keyboard.press('ArrowLeft');page.wait_for_timeout(150)
  assert page.evaluate(f"{q}.querySelector('.tabs [aria-selected=true]').textContent")=='首页'
  assert page.evaluate(f"{q}.activeElement?.textContent")=='首页'
@@ -80,6 +96,14 @@ with sync_playwright() as p:
  assert float(page.evaluate(panelOp))<.05,page.evaluate(panelOp)
  page.evaluate("document.querySelector('.v-popover').style.display='none'");page.mouse.move(200,500);page.wait_for_function(f"!{q}.querySelector('.panel').classList.contains('veiled')",timeout=2000);page.wait_for_timeout(350)
  assert page.evaluate(panelOp)=='1'
+ # Short window with a fixed header: the panel's top stays below the header and the body scrolls inside.
+ page.keyboard.press('Escape');page.wait_for_timeout(400);page.set_viewport_size({'width':1400,'height':520})
+ page.evaluate("__BTR_QUICK__.open('brake')");page.wait_for_function(f"{q}.querySelector('.panel')",timeout=3000);page.wait_for_timeout(500)
+ geo=page.evaluate(f"(()=>{{const p={q}.querySelector('.panel'),b={q}.querySelector('.body'),r=p.getBoundingClientRect();return [r.top,document.querySelector('.bili-header__bar').getBoundingClientRect().bottom,b.scrollHeight>b.clientHeight,getComputedStyle(b).overflowY]}})()")
+ assert geo[0]>=geo[1]+8-0.5 and geo[0]>=64 and geo[2] and geo[3]=='auto',geo
+ page.keyboard.press('Escape');page.wait_for_timeout(400);page.set_viewport_size({'width':1400,'height':900})
+ page.evaluate("__BTR_QUICK__.open('play')");page.wait_for_function(f"{q}.querySelector('.panel')",timeout=3000);page.wait_for_timeout(400)
+ ok('panel top is clamped below the B 站 header (≥64px) with max-height and internal scroll')
  page.evaluate("document.querySelector('.bili-header__bar').remove()")
  ok('a B 站 header popover over the panel fades the panel out smoothly, and it comes back when the popover closes')
  assert page.evaluate(f"[...{q}.querySelectorAll('.wide')].some(b=>b.textContent.includes('高级播放设置'))")

@@ -72,7 +72,7 @@ ${ui.scoped('.root')}
 .tabs button[aria-selected=true]{color:var(--fg)}
 .tabs button:focus-visible{outline:2px solid var(--pink);outline-offset:-2px}
 .tabs .slider{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px)/3);border-radius:9px;background:var(--btr-bg);box-shadow:0 1px 4px rgba(0,0,0,.12);transition:transform var(--btr-mid) var(--btr-ease)}
-.body{overflow:auto;padding:4px 14px 6px;overscroll-behavior:contain}
+.body{overflow:auto;padding:4px 14px 6px;overscroll-behavior:contain;flex:1 1 auto;min-height:0}
 .page{animation:page var(--btr-mid) var(--btr-ease)}
 @keyframes page{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .lead{color:var(--muted);font-size:12px;margin:6px 2px 10px}
@@ -385,6 +385,7 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
     document.documentElement.append(host);
     document.documentElement.toggleAttribute('data-btr-quick', true);
     ui.onTheme(dark => r.classList.toggle('dark', dark)); // Follows B 站's own theme live, not the OS.
+    shadow.addEventListener('keydown', onKey, true);
   }
   const root = () => shadow.querySelector('.root');
 
@@ -450,23 +451,37 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
   }
 
   // Above the button when there is room; otherwise beside it. Every branch sets all three offsets.
+  // Bottom edge of B 站's header bar when it is on screen (fixed or scrolled to the top), else 0.
+  function headerBottom() {
+    let b = 0;
+    for (const h of document.querySelectorAll('.bili-header__bar,#biliMainHeader,.bili-header.fixed-header,.mini-header,#bili-header-container')) {
+      const r = h.getBoundingClientRect();
+      if (r.height && r.bottom > 0 && r.top < 120 && r.height < 240) b = Math.max(b, r.bottom);
+    }
+    return b;
+  }
+  const isFull = () => !!document.fullscreenElement || !!document.querySelector('.bpx-player-container[data-screen="web"],.bpx-player-container[data-screen="full"]') || !!document.body?.classList.contains('player-fullscreen-fix');
+  /** Place the panel. Called once before it shows (and on resize / fullscreen changes) — never from
+   * scroll or content changes, so an open panel doesn't move under the pointer. */
   function positionPanel() {
     if (!panel) return;
-    const bottom = fab ? fabY() + 60 : 24;
-    const room = innerHeight - bottom - 16;
-    const low = room >= 360;
-    if (low) { panel.style.bottom = `${bottom}px`; panel.style.right = '22px'; }
-    else { panel.style.bottom = '16px'; panel.style.right = fab ? '84px' : '22px'; }
-    panel.style.top = '';
     // Sit just under B 站's header (z-index 1002) so its avatar / message popovers open above the panel,
-    // and never extend underneath the header. In web-fullscreen / fullscreen video, go topmost instead.
-    const full = !!document.fullscreenElement || !!document.querySelector('.bpx-player-container[data-screen="web"],.bpx-player-container[data-screen="full"]') || document.body?.classList.contains('player-fullscreen-fix');
+    // and never reach under the header: the top is clamped below it (at least 64px from the top).
+    // In web-fullscreen / fullscreen video, go topmost instead.
+    const full = isFull();
     panel.style.setProperty('--btr-panel-z', full ? '2147483001' : '1001');
-    let top = 12;
-    if (!full) for (const h of document.querySelectorAll('.bili-header__bar,#biliMainHeader,.bili-header.fixed-header')) {
-      const r = h.getBoundingClientRect(); if (r.height && r.bottom > 0 && r.top <= 0) top = Math.max(top, r.bottom + 10);
-    }
-    panel.style.maxHeight = `${Math.max(240, Math.min(640, innerHeight - (low ? bottom : 16) - top))}px`;
+    const top = full ? 12 : Math.max(64, Math.ceil(headerBottom()) + 8);
+    let bottom = fab ? fabY() + 60 : 24, right = 22;
+    if (innerHeight - bottom - top < 360) { bottom = 16; right = fab ? 84 : 22; }
+    panel.style.top = ''; panel.style.bottom = `${bottom}px`; panel.style.right = `${right}px`;
+    panel.style.maxHeight = `${Math.max(160, Math.min(640, innerHeight - bottom - top))}px`;
+  }
+
+  /** While open, the panel never moves; it only gets shorter if a header slides in over its top. */
+  function keepClearOfHeader() {
+    if (!panel || isFull()) return;
+    const need = Math.max(64, Math.ceil(headerBottom()) + 8), r = panel.getBoundingClientRect();
+    if (r.top < need) panel.style.maxHeight = `${Math.max(160, Math.round(r.bottom - need))}px`;
   }
 
   // B 站's header popovers (avatar, messages, history…) are translucent with a backdrop blur; the panel
@@ -579,18 +594,30 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
     try { const r = await chrome.runtime.sendMessage({type: 'lock-state'}); if (r && !r.error) lock = r; } catch (_) {}
   }
 
+  let opening = false, cancelOpen = false;
   async function openPanel(which) {
     ensureHost();
+    if (opening) return;
+    opening = true; cancelOpen = false;
+    try { await openNow(which); } finally { opening = false; }
+  }
+  async function openNow(which) {
     // Don't let a sleeping service worker delay the panel: wait briefly, then fill in when data arrives.
     const fresh = Promise.all([refreshUsage(), refreshLock()]);
     const inTime = await Promise.race([fresh.then(() => true), new Promise(r => setTimeout(r, 180, false))]);
+    if (cancelOpen) { cancelOpen = false; return; } // Alt+T pressed again while it was opening.
     if (!inTime) fresh.then(() => rebuildOrPatch());
     if (which === 'focus') which = 'brake';
     if (which && TABS.some(([id]) => id === which)) tab = which;
     if (!panel) build();
     const wasOpen = open;
-    open = true; positionPanel(); render();
-    if (!wasOpen) ui.animate(panel, [{opacity: 0, transform: 'translateY(10px) scale(.96)'}, {opacity: 1, transform: 'none'}], {duration: MOTION.slow});
+    open = true;
+    if (!wasOpen) { panel.style.visibility = 'hidden'; positionPanel(); }
+    render();
+    if (!wasOpen) positionPanel(); // Final placement with the real content height, before the first paint.
+    panel.style.visibility = '';
+    // Grow out of the corner it is anchored to: no slide, so it never looks like it jumps into place.
+    if (!wasOpen) { panel.style.transformOrigin = 'bottom right'; ui.animate(panel, [{opacity: 0, transform: 'scale(.97)'}, {opacity: 1, transform: 'none'}], {duration: MOTION.mid}); }
     panel.focus({preventScroll: true}); // Focus the dialog itself; Tab then walks into the controls.
     renderFab();
     dismissTip();
@@ -639,11 +666,17 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
     const t = e.composedPath()[0];
     return !!(t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)));
   }
-  document.addEventListener('keydown', e => {
+  // Alt+T toggles. Listened for on window (earliest), document and inside our shadow root, so it works
+  // whatever has focus (the panel itself, the player) and even if a page handler stops the event later.
+  const seenKeys = new WeakSet();
+  function onKey(e) {
+    if (seenKeys.has(e)) return; seenKeys.add(e);
     if (e.altKey && !e.ctrlKey && !e.metaKey && (e.key === 't' || e.key === 'T' || e.code === 'KeyT')) {
       const inPanel = host && e.composedPath().includes(host);
       if (editable(e) && !inPanel) return;
-      e.preventDefault(); toggle();
+      e.preventDefault(); e.stopPropagation();
+      if (e.repeat) return;
+      if (opening) cancelOpen = true; else toggle();
     } else if (e.key === 'Escape' && open) { e.stopPropagation(); close(); }
     else if (e.key === 'Tab' && open && panel && e.composedPath().includes(host)) {
       // Keep keyboard focus inside the panel while it is open.
@@ -653,14 +686,16 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
       const to = e.shiftKey ? (i <= 0 ? items.length - 1 : i - 1) : (i === -1 || i === items.length - 1 ? 0 : i + 1);
       e.preventDefault(); items[to].focus();
     }
-  }, true);
+  }
+  addEventListener('keydown', onKey, true);
+  document.addEventListener('keydown', onKey, true);
   document.addEventListener('pointerdown', e => { if (open && host && !e.composedPath().includes(host)) close(); }, true);
   addEventListener('resize', () => { placeFab(); if (open) positionPanel(); }, {passive: true});
   // The native dock appears lazily (e.g. after the first scroll); follow it until the user drags the button.
   let dockFrame = 0;
   addEventListener('scroll', () => {
-    if (dockFrame || (!fab && !open) || (posY != null && !open)) return;
-    dockFrame = requestAnimationFrame(() => { dockFrame = 0; if (posY == null && fab) placeFab(); if (open) positionPanel(); });
+    if (dockFrame || ((!fab || posY != null) && !open)) return;
+    dockFrame = requestAnimationFrame(() => { dockFrame = 0; if (fab && posY == null && !open) placeFab(); if (open) keepClearOfHeader(); });
   }, {passive: true});
   document.addEventListener('fullscreenchange', () => { if (open) positionPanel(); });
 
