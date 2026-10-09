@@ -1,7 +1,7 @@
 {
   "name": "BiliThrottle (哔哩节流阀)",
-  "version": "2.2.0",
-  "build_date": "2026-10-08",
+  "version": "2.3.0",
+  "build_date": "2026-10-09",
   "distribution": "Unofficial Chrome/Edge MV3 fork; not an upstream extension release",
   "input": "BTR-Flow-1.0.0(1).zip",
   "input_sha256": "f211255fce9a3c0f06147da1a401884a90a7293c5e6a34c0336e7a608e0c4ba2",
@@ -26,23 +26,24 @@
   "proxy_enabled_by_default": false,
   "automatic_updates": false,
   "testing": {
-    "node_core_passed": 90,
-    "renderer_home_options_fixture_passed": 30,
+    "node_core_passed": 105,
+    "renderer_home_options_fixture_passed": 31,
     "renderer_branch_diagnostics_fixture_passed": 9,
     "real_mse_synthetic_media_passed": "not re-run for 1.2.0 (open-source Chromium lacks H.264); 7 passed on 1.1.0",
-    "total_passed": 153,
+    "total_passed": 173,
     "real_bilibili_e2e_verified": false,
     "real_HDR_HiRes_hardware_verified": false,
     "firefox_safari_verified": false,
     "performance_improvement_measured": false,
     "reason_for_install_e2e_gap": "Managed Chromium blocked extension management and live Bilibili pages; not bypassed",
-    "browser": "Chromium 141 (Playwright chromium-1194)",
+    "browser": "Google Chrome (system /usr/bin/google-chrome) via Playwright",
     "node": "22.22.0",
     "installed_extension_focus_e2e_passed": "loaded unpacked in Chromium (Playwright chromium-1194) on a routed fixture page: 5-hour window block + reset countdown, play() re-block, snooze, weekly block, automatic lift at window reset, Pomodoro countdown, in-page panel opens",
     "renderer_native_refresh_wrapper_passed": 4,
     "renderer_infinite_feed_passed": 11,
     "installed_extension_infinite_e2e": "loaded unpacked; content-script fetch to api.bilibili.com with page cookies and CORS on a routed homepage: 8 batches over 8 signed requests, no errors; launcher hidden on home, opens on video page",
-    "renderer_quick_panel_passed": 9
+    "renderer_quick_panel_passed": 13,
+    "ui_polish_2_3_0_live_bilibili": "Card markup/CSS parity, hover preview and FAB dock avoidance checked by injecting scripts into the live (logged-out) bilibili.com homepage; not verified as an installed extension or while logged in (watch-later write not exercised live)"
   },
-  "previous_version": "2.1.0"
+  "previous_version": "2.2.0"
 }
