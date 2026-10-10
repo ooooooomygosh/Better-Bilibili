@@ -1,0 +1,38 @@
+[
+ {
+  "test": "toolbar waits for hydration, then mounts as a custom element Vue cannot adopt",
+  "passed": true
+ },
+ {
+  "test": "blank homepage watchdog removes our styles and shows a reload toast",
+  "passed": true
+ },
+ {
+  "test": "healthy homepage keeps the enhancements (no false fallback)",
+  "passed": true
+ },
+ {
+  "test": "412: circuit opens after 2 request(s), stays silent, persists the cooldown; 现在重试 probes and recovers",
+  "passed": true
+ },
+ {
+  "test": "352: circuit opens after 2 request(s), stays silent, persists the cooldown; 现在重试 probes and recovers",
+  "passed": true
+ },
+ {
+  "test": "a cooldown saved before reload is honoured (no request)",
+  "passed": true
+ },
+ {
+  "test": "connection reset and empty answers are retried transparently; feed loads, no toast",
+  "passed": true
+ },
+ {
+  "test": "video mode: hover plays the clip inline (muted, progress bar, mute toggle that does not open the video), stops on leave",
+  "passed": true
+ },
+ {
+  "test": "frames mode: storyboard prefetched in view, first frame 233 ms after hover (was 450 ms dwell + 2 requests), gone on leave",
+  "passed": true
+ }
+]

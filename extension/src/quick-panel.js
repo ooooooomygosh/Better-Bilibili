@@ -424,7 +424,8 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
     p.append(s.homeInfinite
       ? group('', () => s.homeEnabled, '开启「首页净化与操作栏」后生效',
         seg('homeInfiniteSize', '每批视频数', '每次请求 12 个，与 B 站相同', [[12, '12'], [24, '24'], [36, '36']]),
-        seg('homeInfiniteThreads', '加载速度', '同时请求数；越快越容易被限流', [[1, '稳'], [2, '标准'], [3, '快']]))
+        seg('homeInfiniteThreads', '加载速度', '同时请求数；越快越容易被限流', [[1, '稳'], [2, '标准'], [3, '快']]),
+        seg('homePreview', '悬停预览', '鼠标停在封面上时：像 B 站一样静音播放，或逐帧拖动预览', [['video', '视频播放'], ['frames', '逐帧预览']]))
       : group('', () => s.homeEnabled, '开启「首页净化与操作栏」后生效',
         sw('homeHistory', '可回看上一批', '本地保存每一批，手滑了能翻回去'),
         sw('filterDedupe', '去掉重复推荐', '前几批出现过的视频，换一批后不再显示')));

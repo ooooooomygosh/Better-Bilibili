@@ -5,10 +5,10 @@
  */
 (function () {
   'use strict';
-  const feed = globalThis.__BTR_FEED_CORE__, filt = globalThis.__BTR_FILTER_CORE__;
-  if (!feed || !filt || globalThis.__BTR_HOME_INFINITE__) return;
+  const feed = globalThis.__BTR_FEED_CORE__, filt = globalThis.__BTR_FILTER_CORE__, adaptive = globalThis.__BTR_ADAPTIVE__;
+  if (!feed || !filt || !adaptive || globalThis.__BTR_HOME_INFINITE__) return;
 
-  const GAP_MS = 700, TIMEOUT_MS = 10000, KEY_TTL = 12 * 3600000, MAX_FAILS = 3, PAGE = 12, STAGGER_MS = 250;
+  const TIMEOUT_MS = 10000, KEY_TTL = 12 * 3600000, PAGE = 12, STAGGER_MS = 250, ADAPT_KEY = 'flowAdaptive';
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const ui = globalThis.__BTR_UI__;
   const EASE = 'cubic-bezier(.2,.75,.25,1)';
@@ -102,6 +102,12 @@
 :is(#btr-flow-feed,[data-btr-fill]) .btr-shot{position:absolute;inset:0;z-index:2;border-radius:inherit;background-repeat:no-repeat;pointer-events:none;opacity:0;transition:opacity .14s ease}
 :is(#btr-flow-feed,[data-btr-fill]) .btr-shot.on{opacity:1}
 :is(#btr-flow-feed,[data-btr-fill]) .btr-shot i{position:absolute;left:0;bottom:0;height:3px;width:100%;background:#fb7299;transform-origin:0 50%;transform:scaleX(0)}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-inline{position:absolute;inset:0;z-index:3;border-radius:inherit;overflow:hidden;background:#000;opacity:0;transition:opacity .2s ease}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-inline.on{opacity:1}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-inline video{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-inline-bar{position:absolute;left:0;bottom:0;height:3px;width:100%;background:#fb7299;transform-origin:0 50%;transform:scaleX(0)}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-inline-mute{position:absolute;right:8px;bottom:10px;width:28px;height:28px;display:grid;place-items:center;border:0;border-radius:50%;background:rgba(0,0,0,.45);color:#fff;font-size:14px;line-height:1;cursor:pointer;transition:background-color .15s ease}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-inline-mute:hover,:is(#btr-flow-feed,[data-btr-fill]) .btr-inline-mute:focus-visible{background:rgba(251,114,153,.9);outline:none}
 /* Skeletons reuse B 站's own skeleton classes; the fallback below only applies if they are unstyled. */
 :is(#btr-flow-feed,[data-btr-fill]) .btr-skel .bili-video-card__skeleton--cover{aspect-ratio:16/9;border-radius:6px;background:var(--graph_bg_regular,rgba(128,128,128,.12))}
 :is(#btr-flow-feed,[data-btr-fill]) .btr-skel .bili-video-card__skeleton--text{height:16px;margin:10px 0 0;border-radius:4px;background:var(--graph_bg_regular,rgba(128,128,128,.12))}
@@ -158,6 +164,10 @@
     const cols = () => { const n = Number(host.columns()?.count); return n >= 1 && n <= 10 ? Math.floor(n) : 5; };
     const target = size => { const c = cols(); return Math.max(c, Math.round(size / c) * c); };
     const seen = new Set();
+    /* ---------- adaptive request control (see adaptive-core.js), persisted across page loads ---------- */
+    let ctl = adaptive.create(null, {maxLanes: 3, maxBatch: 3}), saveT = 0, cooldownT = 0, tickT = 0;
+    const adaptReady = chrome.storage.local.get(ADAPT_KEY).then(d => { ctl = adaptive.create(d?.[ADAPT_KEY], {maxLanes: 3, maxBatch: 3}); }).catch(() => {});
+    const saveAdapt = () => { clearTimeout(saveT); saveT = setTimeout(() => chrome.storage.local.set({[ADAPT_KEY]: ctl.snapshot()}).catch(() => {}), 300); };
 
     async function wbiKeys(force) {
       if (keys && !force) return keys;
@@ -165,9 +175,8 @@
         const {flowWbiKeys: c} = await chrome.storage.local.get('flowWbiKeys');
         if (!force && c && Date.now() - c.at < KEY_TTL && /^[0-9a-f]{32}$/.test(c.img) && /^[0-9a-f]{32}$/.test(c.sub)) return (keys = {img: c.img, sub: c.sub});
       } catch (_) {}
-      const res = await fetch(feed.NAV, {credentials: 'include'});
-      const k = feed.keysFromNav(await res.json());
-      if (!k) throw new Error('nav');
+      const k = feed.keysFromNav(await getJSON(feed.NAV));
+      if (!k) { const e = new Error('WBI 密钥没取到'); e.kind = 'transient'; throw e; }
       keys = k;
       chrome.storage.local.set({flowWbiKeys: {...k, at: Date.now()}}).catch(() => {});
       return k;
@@ -177,14 +186,22 @@
       const ctrl = new AbortController(), t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
       try {
         const r = await fetch(url, {credentials: 'include', signal: ctrl.signal});
-        if (!r.ok) { const e = new Error(`HTTP ${r.status}`); e.kind = r.status === 412 || r.status === 429 ? 'risk' : 'error'; e.code = r.status; throw e; }
-        return await r.json();
+        if (!r.ok) {
+          const e = new Error(`HTTP ${r.status}`); e.status = r.status; e.code = r.status; e.kind = adaptive.classify(e);
+          e.wait = adaptive.retryAfter(r.headers.get('retry-after')); throw e;
+        }
+        try { return await r.json(); } catch (_) { const e = new Error('B 站返回的不是 JSON'); e.kind = 'transient'; throw e; }
+      } catch (e) {
+        if (e.name === 'AbortError') { const x = new Error('请求超时'); x.kind = 'transient'; x.code = 'timeout'; throw x; }
+        if (!e.kind) { e.kind = 'transient'; e.code = e.code || 'network'; }
+        throw e;
       } finally { clearTimeout(t); }
     }
 
     // One request asks for exactly what B 站's own homepage asks for (12 cards); bigger batches are
     // several such requests merged, never a larger page size the server would reject.
-    async function request(n) {
+    async function request(n) { return adaptive.withRetry(ctl, () => requestOnce(n)); }
+    async function requestOnce(n) {
       const params = feed.rcmdParams(n, PAGE, innerWidth, innerHeight);
       let json = await getJSON(`${feed.RCMD}?${feed.signWbi(params, await wbiKeys(false))}`);
       if (feed.classify(json) === 'error') {
@@ -192,8 +209,11 @@
         if (feed.classify(json) === 'error') json = await getJSON(`${feed.RCMD_LEGACY}?fresh_type=3&version=1&ps=${PAGE}&fresh_idx=${n}&fresh_idx_1h=${n}`);
       }
       const kind = feed.classify(json);
-      if (kind !== 'ok') { const e = new Error(String(json?.message || kind)); e.kind = kind; e.code = json?.code; throw e; }
-      return json.data?.item || json.data?.items || [];
+      if (kind !== 'ok') { const e = new Error(String(json?.message || kind)); e.code = json?.code; e.kind = kind === 'risk' ? 'risk' : 'transient'; throw e; }
+      const items = json.data?.item || json.data?.items || [];
+      // An empty page with code 0 is how B 站 sometimes answers a throttled client: retry it like a hiccup.
+      if (!Array.isArray(items) || !items.length) { const e = new Error('B 站返回了空列表'); e.code = 'empty'; e.kind = 'transient'; throw e; }
+      return items;
     }
 
     function nativeSeen() {
@@ -258,11 +278,18 @@
     async function round() {
       clearTimeout(timer);
       if (loading || paused || !box?.isConnected || !host.enabled() || !isNear()) return;
+      await adaptReady;
+      const s = host.settings(), size = target(s.homeInfiniteSize);
+      const need = Math.max(1, Math.ceil(Math.max(0, size + holes() - buffer.length) / PAGE));
+      const plan = ctl.plan(s.homeInfiniteThreads, Math.max(need, s.homeInfiniteThreads));
+      if (!plan.allowed) { cooling(plan.wait); return; }
+      if (loading) return;
       loading = true; status('loading'); side?.classList.add('loading'); skeleton(true);
-      const s = host.settings(), size = target(s.homeInfiniteSize), lanes = s.homeInfiniteThreads;
-      const count = Math.max(lanes, Math.ceil(Math.max(0, size + holes() - buffer.length) / PAGE));
+      const lanes = plan.lanes, count = plan.probe ? 1 : Math.max(1, Math.min(plan.requests, Math.max(need, lanes)));
       nativeSeen();
       const results = await pool(count, lanes);
+      for (const r of results) { if (r.ok) ctl.success(); else ctl.failure(r.error?.kind || 'transient', Date.now(), r.error?.wait); }
+      saveAdapt();
       loading = false; side?.classList.remove('loading');
       if (!box?.isConnected || !host.enabled()) { skeleton(false); return; }
       let fresh = 0, risk = null, error = null;
@@ -287,18 +314,37 @@
       while (buffer.length >= want) { append(buffer.splice(0, want)); added++; }
       // The skeleton row stays under the newest batch as long as more can come, so reaching the
       // bottom always shows "more is on its way", never a blank hole. It goes only when loading pauses.
-      if (risk || (!fresh && fails + 1 >= MAX_FAILS)) skeleton(false);
-      if (risk) { paused = true; status('risk', risk); return; }
-      if (!fresh) {
-        if (++fails >= MAX_FAILS) { paused = true; status('error', error); return; }
-      } else fails = 0;
+      const open = ctl.state() === 'open';
+      if (open) { skeleton(false); lastError = risk || error; cooling(ctl.remaining(), risk ? 'risk' : 'error'); return; }
+      if (!fresh) fails++; else fails = 0;
       status('idle');
-      // Still near the end without a full batch: fetch the rest right away (skeletons stay up meanwhile).
-      timer = setTimeout(round, added || !fresh ? GAP_MS : 120);
+      // Still near the end without a full batch: fetch the rest after the controller's gap (skeletons stay up).
+      timer = setTimeout(round, added || !fresh ? ctl.plan().gap || 700 : 120);
     }
 
-    function retry() { paused = false; fails = 0; round(); }
-    function status(kind, err) {
+    let lastError = null, toast = null;
+    /* Circuit open: no requests until the cooldown ends; a live countdown in the footer plus a toast in our
+       style, both with 重试 (one probe request). When the cooldown is over, loading resumes by itself. */
+    function cooling(ms, why) {
+      clearTimeout(cooldownT); clearInterval(tickT);
+      const kind = why || (lastError?.kind === 'risk' ? 'risk' : 'error');
+      const until = Date.now() + ms;
+      const paint = () => status(kind, lastError, Math.max(0, Math.ceil((until - Date.now()) / 1000)));
+      paint(); tickT = setInterval(() => { if (!foot) { clearInterval(tickT); return; } paint(); }, 1000);
+      cooldownT = setTimeout(() => { clearInterval(tickT); hideToast(); status('idle'); round(); }, ms + 50);
+      showToast(kind, Math.ceil(ms / 1000));
+    }
+    function showToast(kind, secs) {
+      if (!ui?.toast) return;
+      hideToast();
+      toast = ui.toast({kind: kind === 'risk' ? 'warn' : 'error', key: 'btr-feed',
+        title: kind === 'risk' ? '刷得有点快，B 站让我们歇一会儿' : '推荐暂时没加载出来',
+        text: `已自动放慢加载速度，${secs > 60 ? Math.round(secs / 60) + ' 分钟' : secs + ' 秒'}后自动继续。`,
+        actions: [{label: '现在重试', primary: true, fn: retry}], timeout: 8000});
+    }
+    function hideToast() { toast?.close?.(); toast = null; }
+    function retry() { clearTimeout(cooldownT); clearInterval(tickT); hideToast(); paused = false; fails = 0; ctl.force(); saveAdapt(); round(); }
+    function status(kind, err, secs) {
       if (!foot) return;
       foot.replaceChildren();
       if (kind === 'loading') {
@@ -307,7 +353,8 @@
       } else if (kind === 'risk' || kind === 'error') {
         // Plain words first; B 站's raw answer is one click away for bug reports.
         const msg = el('div', 'msg'), b = el('b', null, kind === 'risk' ? '刷得有点快，B 站让我们先歇一会儿' : '暂时没取到新的推荐');
-        msg.append(b, el('span', null, kind === 'risk' ? '已暂停自动加载，不会继续请求。过几分钟再试，或者换成更稳的加载速度。' : '已暂停自动加载。可能是网络波动，稍后点「重试」即可。'));
+        const wait = secs > 0 ? `${secs >= 60 ? `${Math.floor(secs / 60)} 分 ${secs % 60} 秒` : `${secs} 秒`}后自动继续` : '马上自动继续';
+        msg.append(b, el('span', null, kind === 'risk' ? `已自动放慢请求，${wait}。也可以换成更稳的加载速度。` : `已重试过几次，${wait}。可能是网络波动。`));
         foot.append(msg);
         const again = el('button', null, '重试'); again.type = 'button'; again.onclick = retry;
         const threads = host.settings().homeInfiniteThreads;
@@ -699,7 +746,89 @@
       shots.set(c.bvid, p);
       return p;
     }
+    const preloadImg = u => new Promise(r => { const i = new Image(); i.onload = i.onerror = () => r(); i.src = u; });
+    // Storyboard data and its first sprite sheet are fetched ahead (card scrolls into view, or the pointer
+    // arrives), so a hover shows a frame at once instead of waiting for two network round trips.
+    function prefetchShots(c) {
+      if (!c.bvid) return;
+      storyboard(c).then(d => { if (d && !d.ready) d.ready = preloadImg(d.sheets[0]); }).catch(() => {});
+    }
+    const prefetcher = typeof IntersectionObserver === 'function' ? new IntersectionObserver(es => {
+      for (const e of es) {
+        if (!e.isIntersecting) { clearTimeout(e.target.__btrPf); continue; }
+        // Only cards that stay on screen a moment; fast scrolling past does not fire requests.
+        e.target.__btrPf = setTimeout(() => { prefetcher.unobserve(e.target); if (previewMode() === 'frames') prefetchShots(e.target.__btrCardData); }, 300);
+      }
+    }, {rootMargin: '200px 0px'}) : null;
+    const previewMode = () => host.settings()?.homePreview === 'frames' ? 'frames' : 'video';
+
+    /* ---------- inline video preview, like B 站's own homepage cards ----------
+       B 站's card plays a muted low-quality copy of the video in its .v-inline-player after a short dwell, with a
+       thin progress bar and a mute toggle; it stops and unloads as soon as the pointer leaves. Our cards are not
+       Vue components, so the same behaviour is reproduced with the same public playurl API (html5 mp4, 360P). */
+    const PLAY = 'https://api.bilibili.com/x/player/wbi/playurl';
+    const clips = new Map(); let muted = true;
+    async function clip(c) {
+      const hit = clips.get(c.bvid);
+      if (hit && Date.now() - hit.at < 20 * 60000) return hit.p;
+      const p = (async () => {
+        const params = {bvid: c.bvid, qn: 16, platform: 'html5', high_quality: 1, fnval: 1, fourk: 0};
+        if (c.cid) params.cid = c.cid;
+        else {
+          const v = await getJSON(`https://api.bilibili.com/x/player/pagelist?bvid=${c.bvid}`);
+          params.cid = v?.data?.[0]?.cid; if (!params.cid) return null;
+        }
+        const j = await getJSON(`${PLAY}?${feed.signWbi(params, await wbiKeys(false))}`);
+        const u = j?.code === 0 ? (j.data?.durl?.[0]?.url || j.data?.durl?.[0]?.backup_url?.[0]) : '';
+        return /^https:\/\/[^/]+\.(?:bilivideo\.(?:com|cn)|akamaized\.net|hdslb\.com)\//.test(String(u).replace(/^http:/, 'https:')) ? String(u).replace(/^http:/, 'https:') : null;
+      })().catch(() => null);
+      clips.set(c.bvid, {at: Date.now(), p});
+      return p;
+    }
+    function videoPreview(c, wrap, link) {
+      let layer = null, dwell = 0, inside = false, raf = 0;
+      const stop = () => {
+        inside = false; clearTimeout(dwell); cancelAnimationFrame(raf);
+        const l = layer; layer = null; if (!l) return;
+        const v = l.querySelector('video'); l.classList.remove('on');
+        setTimeout(() => { try { v.pause(); v.removeAttribute('src'); v.load(); } catch (_) {} l.remove(); }, 160);
+      };
+      link.addEventListener('pointerenter', e => {
+        if (e.pointerType !== 'mouse') return;
+        inside = true; clearTimeout(dwell);
+        clip(c); // Ask for the address right away; playback starts after the dwell, like the native card.
+        dwell = setTimeout(async () => {
+          const src = await clip(c);
+          if (!inside || !src || layer) return;
+          layer = el('div', 'btr-inline'); layer.dataset.bvid = c.bvid;
+          const v = el('video'); v.muted = muted; v.playsInline = true; v.loop = true; v.preload = 'auto'; v.disablePictureInPicture = true;
+          v.setAttribute('muted', ''); v.src = src;
+          const bar = el('i', 'btr-inline-bar'), mute = el('button', 'btr-inline-mute'); mute.type = 'button';
+          const label = () => { mute.textContent = v.muted ? '🔇' : '🔊'; mute.setAttribute('aria-label', v.muted ? '打开声音' : '静音'); mute.title = v.muted ? '打开声音' : '静音'; };
+          label(); bind(mute, () => { v.muted = muted = !v.muted; label(); });
+          layer.append(v, bar, mute); wrap.append(layer);
+          v.addEventListener('playing', () => layer?.classList.add('on'), {once: true});
+          const tick = () => { if (!layer) return; if (v.duration) bar.style.transform = `scaleX(${v.currentTime / v.duration})`; raf = requestAnimationFrame(tick); };
+          raf = requestAnimationFrame(tick);
+          v.play().catch(() => { if (!v.muted) { v.muted = muted = true; label(); v.play().catch(() => {}); } });
+        }, 500);
+      });
+      link.addEventListener('pointerleave', stop);
+      link.addEventListener('click', stop);
+    }
+
     function preview(c, wrap, link) {
+      const card = link.closest('.feed-card') || link; card.__btrCardData = c; prefetcher?.observe(card);
+      // Both behaviours are attached; each one checks the current setting, so switching needs no reload.
+      const vp = {link: new EventTarget()}, fp = {link: new EventTarget()};
+      for (const t of ['pointerenter', 'pointerleave', 'pointermove', 'click']) link.addEventListener(t, e => {
+        const target = previewMode() === 'video' ? vp.link : fp.link;
+        target.dispatchEvent(new PointerEvent(t, e));
+      });
+      videoPreview(c, wrap, vp.link);
+      framePreview(c, wrap, fp.link);
+    }
+    function framePreview(c, wrap, link) {
       let layer = null, bar = null, data = null, dwell = 0, inside = false, frame = -1;
       const paint = x => {
         if (!data || !layer) return;
@@ -716,15 +845,18 @@
         if (e.pointerType !== 'mouse') return;
         inside = true; lastX = e.clientX;
         clearTimeout(dwell);
-        // Wait a moment like the native card, so sweeping across the grid fires no requests.
+        prefetchShots(c);
+        // A short dwell (was 450 ms) so sweeping across the grid shows nothing; data is usually cached by now.
         dwell = setTimeout(async () => {
           data = await storyboard(c);
-          if (!inside || !data) return;
+          if (!inside || !data || layer) return;
+          await Promise.race([data.ready || preloadImg(data.sheets[0]), new Promise(r => setTimeout(r, 400))]);
+          if (!inside) return;
           layer = el('div', 'btr-shot'); bar = el('i'); layer.append(bar); wrap.append(layer); frame = -1; paint(lastX);
-          requestAnimationFrame(() => layer?.classList.add('on'));
-        }, 450);
+          layer.classList.add('on');
+        }, 150);
       });
-      link.addEventListener('pointermove', e => { lastX = e.clientX; if (layer) paint(e.clientX); }, {passive: true});
+      link.addEventListener('pointermove', e => { lastX = e.clientX; if (layer) paint(e.clientX); });
       link.addEventListener('pointerleave', () => { inside = false; clearTimeout(dwell); const l = layer; layer = null; if (l) { l.classList.remove('on'); setTimeout(() => l.remove(), 160); } });
     }
 
@@ -826,7 +958,7 @@
       const anchor = host.anchor();
       if (!anchor) return;
       if (!box) {
-        box = el('div'); box.id = 'btr-flow-feed'; box.dataset.btrFlowOwned = '';
+        box = el('btr-feed'); box.id = 'btr-flow-feed'; box.dataset.btrFlowOwned = '';
         const style = el('style', null, LIGHT_CSS);
         list = el('div', 'btr-feed-list');
         const uiHost = el('div', 'btr-feed-ui');
@@ -873,9 +1005,10 @@
       if (!box) return;
       closeMenu(); for (const n of document.querySelectorAll('[data-btr-fill]')) n.remove(); box.remove(); box = shadow = list = foot = side = sentinel = skel = null; current?.disconnect(); current = null;
       sections = []; visible.clear(); seen.clear(); buffer = []; batches = 0; paused = false; fails = 0; loading = false;
+      clearTimeout(cooldownT); clearInterval(tickT); hideToast();
     }
 
-    return {sync, stop, theme, refilter: () => { refilter().catch(() => {}); }, fill: () => { try { fillNative(); } catch (_) {} }, get batches() { return batches; }, get state() { return box ? {loaded: batches + 1, current: shown, paused, loading} : null; }};
+    return {sync, stop, theme, refilter: () => { refilter().catch(() => {}); }, fill: () => { try { fillNative(); } catch (_) {} }, get batches() { return batches; }, get state() { return box ? {loaded: batches + 1, current: shown, paused, loading, adaptive: {...ctl.snapshot(), state: ctl.state()}} : null; }, get adaptive() { return ctl; }};
   }
 
   globalThis.__BTR_HOME_INFINITE__ = {create};

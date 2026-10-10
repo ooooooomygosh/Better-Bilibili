@@ -45,6 +45,7 @@
         "https://m.bilibili.com/*"
       ],
       "js": [
+        "src/hydration-signal.js",
         "src/range-core.js",
         "src/flow-policy.js",
         "src/cdn-resolver.js",
@@ -131,6 +132,7 @@
         "src/filter-core.js",
         "src/feed-core.js",
         "src/tag-source.js",
+        "src/adaptive-core.js",
         "src/home-infinite.js",
         "src/home-enhancer.js"
       ],
