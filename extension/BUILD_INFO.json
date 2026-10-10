@@ -1,6 +1,6 @@
 {
   "name": "BiliThrottle (哔哩节流阀)",
-  "version": "2.5.1",
+  "version": "2.5.2",
   "build_date": "2026-10-10",
   "distribution": "Unofficial Chrome/Edge MV3 fork; not an upstream extension release",
   "input": "BTR-Flow-1.0.0(1).zip",

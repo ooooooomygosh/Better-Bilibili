@@ -216,7 +216,7 @@
     const safely = (f) => { try { return f(); } catch (_) { return "不可读取"; } };
     const parse = (s) => { try { return JSON.parse(s); } catch (_) { return String(s); } };
     const sections = [
-      ["环境", {BiliThrottle:"2.5.1",upstream:"2026.10.4.1",package:"BiliThrottle / MV3 extension",browser:navigator.userAgent,page:location.origin+location.pathname,at:new Date().toISOString()}],
+      ["环境", {BiliThrottle:"2.5.2",upstream:"2026.10.4.1",package:"BiliThrottle / MV3 extension",browser:navigator.userAgent,page:location.origin+location.pathname,at:new Date().toISOString()}],
       ["设置",latestSettings || "未加载"]
     ];
     if (root.__biliThreadRipperDebug?.report) sections.push(["视频接管",safely(()=>parse(root.__biliThreadRipperDebug.report()))]);
