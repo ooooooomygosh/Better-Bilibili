@@ -6,12 +6,13 @@ const PRESETS = [
   {focusEnabled: true, focusWindowMinutes: 90, focusWeeklyHours: 10, focusWindowVideos: 0, focusSessionMinutes: 25, focusBreakMinutes: 5},
   {focusEnabled: true, focusWindowMinutes: 180, focusWeeklyHours: 20, focusWindowVideos: 0, focusSessionMinutes: 50, focusBreakMinutes: 10}
 ];
-const keys = {...globalThis.__BTR_HOME_CORE__.defaults, ...globalThis.__BTR_FOCUS_CORE__.defaults};
+const keys = {sbEnabled: true, sbChosen: false, ...globalThis.__BTR_HOME_CORE__.defaults, ...globalThis.__BTR_FOCUS_CORE__.defaults};
 
 const ui = globalThis.__BTR_UI__;
 function said(text, kind) { ui.flash($('saved'), text, kind); }
 function show(s) {
   for (const b of document.querySelectorAll('#modes button')) b.setAttribute('aria-checked', String(s.homeModeChosen && (b.dataset.mode === 'infinite') === (s.homeInfinite === true)));
+  for (const b of document.querySelectorAll('#sbChoice button')) b.setAttribute('aria-checked', String(!!s.sbChosen && (b.dataset.sb === '1') === s.sbEnabled));
   const active = PRESETS.findIndex(p => Object.entries(p).every(([k, v]) => s[k] === v));
   document.querySelectorAll('#presets button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.p) === (s.focusEnabled ? active : 0))));
 }
@@ -32,6 +33,12 @@ document.querySelectorAll('#presets button').forEach(b => b.addEventListener('cl
     if (later.length) said(`🔒 自律锁开启中：放宽的部分将在 ${globalThis.__BTR_FOCUS_CORE__.fmtReset(Math.max(...later))} 生效。`);
     else said(b.dataset.p === '0' ? '已关闭观看额度。之前设的时长都还在，随时可以在快捷面板里重新打开。' : `已设为「${b.querySelector('b').textContent}」，从下一次观看开始计量。`, 'ok');
   } catch (e) { said(e.message, 'error'); }
+  load();
+}));
+document.querySelectorAll('#sbChoice button').forEach(b => b.addEventListener('click', async () => {
+  const on = b.dataset.sb === '1';
+  await chrome.storage.sync.set({sbEnabled: on, sbChosen: true});
+  said(on ? '已开启空降助手：打开任意视频即可，弹窗里有一键开关。' : '好的，空降助手先关着。想用时在弹窗里打开就行。', 'ok');
   load();
 }));
 load().catch(e => said(e.message));

@@ -4,8 +4,9 @@
 <p id="profile" class="state-line" aria-live="polite">打开 B 站视频后，这里显示下载速度和缓冲。</p>
 <p id="lockline" class="lockline" hidden></p>
 <div id="focusUsage" class="usage" aria-live="polite"></div><hr class="divider">
+<label class="row between sb-row" for="sbEnabled"><span><b class="sb-title">空降助手</b><span class="fine sb-hint" id="sbHint">自动跳过恰饭、片头等片段</span></span><span class="switch"><input id="sbEnabled" type="checkbox" role="switch" aria-describedby="sbHint"><span></span></span></label>
 <div class="stack"><div class="field"><label for="strategy">观看策略</label><select id="strategy"><option value="auto">自动 · 按视频和播放状态调整</option><option value="smooth">稳播优先 · 更充分地预缓冲</option><option value="fast">起播优先 · 减少初始等待</option><option value="economy">省流 · 限制预取和自动并发</option></select></div>
 <div class="field"><label for="mode">CDN 路线</label><select id="mode"><option value="auto">自动 · 原始地址 + 大陆 + 海外</option><option value="mainland">大陆优先</option><option value="overseas">海外优先</option><option value="custom">自定义 · 在原版设置里选节点</option></select></div></div>
 <div class="reload" id="reload" hidden><span>播放加速开关要刷新页面后才对当前视频生效。</span><button type="button" class="small primary" id="reloadBtn">刷新当前页</button></div>
 <p id="warning" class="fine"></p><div class="actions"><button id="quick">页面快捷面板</button><button id="options" class="primary">完整设置</button></div>
-<p id="message" class="fine" role="status"></p><p class="fine">2.4.0 · 基于线程撕裂者的非官方衍生版 · <a href="welcome.html" target="_blank">使用指南</a></p><script src="../src/focus-core.js"></script><script src="popup.js"></script></body></html>
+<p id="message" class="fine" role="status"></p><p class="fine">2.5.0 · 基于线程撕裂者的非官方衍生版 · <a href="welcome.html" target="_blank">使用指南</a></p><script src="../src/focus-core.js"></script><script src="popup.js"></script></body></html>

@@ -13,7 +13,7 @@ with sync_playwright() as p:
  page.goto('https://www.bilibili.com/video/BV1xx411c7mD/')
  page.add_script_tag(content=(ROOT/'tests/browser-shim.js').read_text())
  page.evaluate("window.chrome=window.chromeMock;0")  # as in the isolated world: ui-kit sees chrome.storage
- for f in ['src/ui-kit.js','src/home-core.js','src/focus-core.js','src/filter-core.js','src/clean-core.js']:page.add_script_tag(content=(ROOT/f).read_text())
+ for f in ['src/ui-kit.js','src/home-core.js','src/focus-core.js','src/filter-core.js','src/clean-core.js','src/sb-core.js']:page.add_script_tag(content=(ROOT/f).read_text())
  page.evaluate("chromeMock.runtime.getManifest=()=>({version:'test'});window.sent=[];chromeMock.runtime.sendMessage=async m=>{sent.push(m.type);if(m.type==='focus-check')return {enabled:true,window:{seconds:2700,limit:5400,percent:50,resetAt:Date.now()+3600000,remaining:2700},week:{seconds:7200,limit:36000,percent:20,resetAt:Date.now()+86400000,remaining:28800},videos:3,videoLimit:0,snoozes:0};if(m.type==='lock-state')return window.lockView;if(m.type==='focus-set'){if(window.lockView.locked){const d={};for(const k of Object.keys(m.changes))d[k]=Date.now()+86400000;window.lockView.pending=Object.fromEntries(Object.entries(m.changes).map(([k,v])=>[k,{value:v,requestedAt:Date.now(),effectiveAt:d[k]}]));return {applied:{},deferred:d,lock:window.lockView};}await chromeMock.storage.sync.set(m.changes);return {applied:m.changes,deferred:{}};}if(m.type==='lock-cancel'){delete window.lockView.pending[m.key];return {ok:true};}};window.lockView={locked:false};0")
  page.evaluate("chromeMock.storage.sync.set({focusEnabled:true})")
  page.evaluate("code=>new Function('chrome',code)(window.chromeMock)",(ROOT/'src/quick-panel.js').read_text())

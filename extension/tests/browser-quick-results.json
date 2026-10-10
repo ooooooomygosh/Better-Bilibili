@@ -26,7 +26,7 @@
    "passed": true
   },
   {
-   "test": "switching tabs glides the panel height with the top edge fixed (top 64px, heights 460–614px); the panel sits under B 站 header popovers (z-index 1001)",
+   "test": "switching tabs glides the panel height with the top edge fixed (top 64px, heights 592–614px); the panel sits under B 站 header popovers (z-index 1001)",
    "passed": true
   },
   {

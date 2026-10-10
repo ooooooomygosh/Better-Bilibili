@@ -1,4 +1,4 @@
-/* BiliThrottle 2.4.0 — isolated world. Native Vue cards stay mounted and retain their handlers.
+/* BiliThrottle 2.5.0 — isolated world. Native Vue cards stay mounted and retain their handlers.
  * Native refresh is the only source of fresh recommendations: no private API, prefetch loop,
  * synthetic scroll, raw-HTML snapshots or automatic document reload.
  */

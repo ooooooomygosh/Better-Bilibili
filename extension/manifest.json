@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "哔哩节流阀 · BiliThrottle",
   "short_name": "BiliThrottle",
-  "version": "2.4.0",
-  "description": "B 站的油门和刹车：多 CDN 加速、首页净化、无限下滑推荐，再加上像 Claude Code 一样的 5 小时与每周观看额度。",
+  "version": "2.5.0",
+  "description": "B 站的油门和刹车：多 CDN 加速、首页净化、无限下滑推荐，再加上像 Claude Code 一样的 5 小时与每周观看额度，内置空降助手跳过恰饭片段。",
   "minimum_chrome_version": "114",
   "permissions": [
     "storage"
@@ -161,12 +161,25 @@
         "src/focus-core.js",
         "src/filter-core.js",
         "src/clean-core.js",
+        "src/sb-core.js",
         "src/quick-panel.js"
+      ],
+      "run_at": "document_idle",
+      "world": "ISOLATED"
+    },
+    {
+      "matches": [
+        "https://www.bilibili.com/*"
+      ],
+      "js": [
+        "src/ui-kit.js",
+        "src/sb-core.js",
+        "src/sponsorblock.js"
       ],
       "run_at": "document_idle",
       "world": "ISOLATED"
     }
   ],
-  "version_name": "2.4.0 · 油门帮你踩，刹车也帮你踩",
+  "version_name": "2.5.0 · 空降助手上线",
   "options_page": "ui/options.html"
 }

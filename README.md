@@ -14,7 +14,7 @@
 <img src="https://img.shields.io/badge/Chrome%20%2F%20Edge-114%2B-4285f4?labelColor=1a1b20" alt="Chrome / Edge 114+">
 <img src="https://img.shields.io/badge/Manifest-V3-00aeec?labelColor=1a1b20" alt="Manifest V3">
 <img src="https://img.shields.io/badge/%E6%9D%83%E9%99%90-%E5%8F%AA%E8%A6%81%20storage-43a047?labelColor=1a1b20" alt="权限只要 storage">
-<a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-lightgrey?labelColor=1a1b20" alt="MIT"></a>
+<a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-lightgrey?labelColor=1a1b20" alt="GPL-3.0"></a>
 </p>
 
 <p>
@@ -154,6 +154,17 @@ B 站的「换一换」**每次只换两行**，点一下，上一批就没了�
 默认只打开明确的广告类；直播、楼层、登录提示这些「看个人喜好」的默认关闭。
 
 <a id="quick"></a>
+
+## 🪂 空降助手：恰饭片段，自动跳过
+
+整合自 [BilibiliSponsorBlock](https://github.com/hanydd/BilibiliSponsorBlock)（B 站版 SponsorBlock），只装哔哩节流阀一个扩展就能用：
+
+- 赞助/恰饭、自我推广、三连提醒、片头、片尾、回顾、离题闲聊、非音乐部分等 11 个分类，每类可设 **自动跳过 / 手动跳过 / 仅标记 / 关闭**。
+- 进度条上按分类颜色标出片段；自动跳过后弹出提示，**一键撤销**回到片段开头；手动跳过的片段出现时点「跳过」或按 <kbd>Enter</kbd>。
+- 精彩时刻提示「跳过去」；“静音”类片段播放时自动静音。
+- 按 <kbd>;</kbd> 标记开始和结束，选分类后提交给社区。
+- 弹窗和快捷面板「油门」页都有一键开关，11 个分类在设置页调整，立即生效不用刷新；首次安装的欢迎页会问你要不要开。
+- 提示、标记和对话框都用本扩展自己的界面样式，跟随 B 站深浅色。
 
 ## 🎛️ 快捷面板：常用开关，一个按钮全搞定
 
@@ -354,6 +365,7 @@ B 站每个页面的右下角都有一个粉色的油门按钮，点开（或按
 - 必需权限只有 `storage`。推荐历史、观看用量、「不感兴趣」和自律锁都只存在本机；屏蔽列表存在浏览器自带的同步存储里（跟随你登录的浏览器账号）。不上传任何数据，没有统计上报。
 - 只有在你添加了「标签」屏蔽规则时，扩展才会请求 B 站公开的视频标签接口，结果缓存在本机。
 - 开启「无限下滑」后，扩展会以你的登录状态请求 B 站**自己的**首页推荐接口，和 B 站网页用的是同一组接口；扩展不保存 Cookie。只有你点「稍后再看」时，才会读取 `bili_jct` 这一个值作为 B 站要求的防跨站令牌（和 B 站网页的做法一样）。
+- 空降助手查询片段时，只向 BilibiliSponsorBlock 服务器（bsbsb.top）发送 BV 号 SHA-256 哈希的**前 4 位**，服务器无法确定你在看哪个视频，也不发送 Cookie。首次提交片段时才在本机生成匿名 ID（不同步），只随提交发送。可在弹窗里一键关闭。
 - 详见[隐私说明](extension/docs/PRIVACY.zh-CN.md)。
 
 ## 🛠️ 开发
@@ -401,11 +413,20 @@ CHROMIUM_PATH=/path/to/chrome python3 extension/tests/browser-quick.py   # 任�
 
 **Install:** download `BiliThrottle-x.y.z.zip` from [Releases](https://github.com/ooooooomygosh/Better-Bilibili/releases/latest), unzip, open `chrome://extensions` (or `edge://extensions`), enable *Developer mode*, click *Load unpacked* and pick the folder. Chrome / Edge 114+.
 
-**Privacy:** the only required permission is `storage`. Everything (feed history, usage, lock) stays local; no analytics. The infinite feed calls Bilibili's own recommendation API with your existing session; the extension never stores cookies.
+**Privacy:** the only required permission is `storage`. Everything (feed history, usage, lock) stays local; no analytics. The segment-skip feature (from BilibiliSponsorBlock) sends only a 4-char SHA-256 prefix of the video id to bsbsb.top. The infinite feed calls Bilibili's own recommendation API with your existing session; the extension never stores cookies.
 
 ## 🙏 致谢与许可 · Credits & License
 
-基于 [MrTangLuyao/Bilibili-thread-ripper](https://github.com/MrTangLuyao/Bilibili-thread-ripper)（线程撕裂者）的非官方 MV3 衍生版，原名 BTR Flow。MIT 许可，保留原作者版权声明。
+基于 [MrTangLuyao/Bilibili-thread-ripper](https://github.com/MrTangLuyao/Bilibili-thread-ripper)（线程撕裂者）的非官方 MV3 衍生版，原名 BTR Flow，保留原作者 MIT 版权声明。
+
+### 致谢
+
+- **[hanydd/BilibiliSponsorBlock](https://github.com/hanydd/BilibiliSponsorBlock)**（空降助手）：本扩展的空降助手移植自该项目，片段数据来自它的社区和服务器。感谢 hanydd 和所有贡献、标注片段的朋友！
+- **[ajayyy/SponsorBlock](https://github.com/ajayyy/SponsorBlock)**：BilibiliSponsorBlock 的原型，由 Ajay Ramachandran 创建。
+
+### 许可
+
+自 **2.5.0** 起本项目以 [GPL-3.0-or-later](LICENSE) 发布（因整合了 GPL-3.0 的 BilibiliSponsorBlock 代码）；**2.4.0 及以前的版本为 MIT**，已发布版本的授权不变。第三方版权与许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 本项目与哔哩哔哩官方无关；与 Anthropic、OpenAI 也无关，只是借用了 Claude Code / Codex 的计量思路。
 Not affiliated with Bilibili, Anthropic or OpenAI.

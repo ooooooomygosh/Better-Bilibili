@@ -97,7 +97,7 @@ B 站每个页面右下角的粉色油门按钮（或 `Alt+T`）：刹车 / 首�
 
 ## 源码与归属
 
-上游：[MrTangLuyao/Bilibili-thread-ripper](https://github.com/MrTangLuyao/Bilibili-thread-ripper)，采用 MIT 许可证，原声明见 `LICENSE`。本次核对固定提交 `bbf4d3dee502a16e424232ae6a51705f52b0e60d`。
+上游：[MrTangLuyao/Bilibili-thread-ripper](https://github.com/MrTangLuyao/Bilibili-thread-ripper)，采用 MIT 许可证，原声明见 `THIRD_PARTY_NOTICES.md`。自 2.5.0 起整合 GPL-3.0 的 [BilibiliSponsorBlock](https://github.com/hanydd/BilibiliSponsorBlock)（移植自 [SponsorBlock](https://github.com/ajayyy/SponsorBlock)），本扩展整体改以 GPL-3.0-or-later 发布，见 `LICENSE`。本次核对固定提交 `bbf4d3dee502a16e424232ae6a51705f52b0e60d`。
 
 首页参考 biliplus 与 bilibili-cleaner 的保留原生布局、移除轮播占位思路，相关选择器与来源列于 `docs/UPSTREAM_MERGE.md`。未打包或要求同时安装这两个项目；首页实现为本分支独立编写。
 

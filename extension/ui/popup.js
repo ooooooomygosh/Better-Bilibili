@@ -15,6 +15,9 @@ for(const k of ['enabled','strategy','mode'])$(k).addEventListener('change',asyn
   if(k==='enabled'&&tab?.id&&reachable)$('reload').hidden=false;
  }catch(e){say(e.message,'error');}
 });
+// 空降助手: the content script listens to storage changes, so this takes effect at once (no reload).
+chrome.storage.sync.get({sbEnabled:true}).then(s=>{$('sbEnabled').checked=s.sbEnabled;});
+$('sbEnabled').addEventListener('change',async()=>{try{const on=$('sbEnabled').checked;await chrome.storage.sync.set({sbEnabled:on,sbChosen:true});say(on?'空降助手已开启，当前视频立即生效。':'空降助手已关闭。','ok');}catch(e){say(e.message,'error');}});
 $('reloadBtn').onclick=async()=>{try{await chrome.tabs.reload(tab.id);window.close();}catch(e){say(e.message,'error');}};
 $('options').onclick=()=>chrome.runtime.openOptionsPage();
 $('quick').onclick=async()=>{try{await chrome.tabs.sendMessage(tab.id,{type:'flow-quick-open'});window.close();}catch(_){say('请先打开或刷新 B 站页面，快捷面板在页面右下角。','error');}};

@@ -1,7 +1,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
-const ui=globalThis.__BTR_UI__,focusCore=globalThis.__BTR_FOCUS_CORE__,homeCore=globalThis.__BTR_HOME_CORE__,lockCore=globalThis.__BTR_LOCK_CORE__,filterCore=globalThis.__BTR_FILTER_CORE__,cleanCore=globalThis.__BTR_CLEAN_CORE__;
-const defaults={enabled:true,liveEnabled:true,autoConcurrency:true,smartPolicy:true,strategy:'auto',mode:'auto',maxAutoThreads:32,memoryBudgetMB:64,takeover:'full',...homeCore.defaults,...focusCore.defaults,filterEnabled:true,filterDedupe:true,...cleanCore.defaults,quickFab:true,uiTheme:'bili'};
+const ui=globalThis.__BTR_UI__,focusCore=globalThis.__BTR_FOCUS_CORE__,homeCore=globalThis.__BTR_HOME_CORE__,lockCore=globalThis.__BTR_LOCK_CORE__,filterCore=globalThis.__BTR_FILTER_CORE__,cleanCore=globalThis.__BTR_CLEAN_CORE__,sbCore=globalThis.__BTR_SB_CORE__;
+const defaults={enabled:true,liveEnabled:true,autoConcurrency:true,smartPolicy:true,strategy:'auto',mode:'auto',maxAutoThreads:32,memoryBudgetMB:64,takeover:'full',...homeCore.defaults,...focusCore.defaults,filterEnabled:true,filterDedupe:true,...cleanCore.defaults,quickFab:true,uiTheme:'bili',...sbCore.defaults};
 const LISTS=['filterKeywords','filterUps','filterTags'];
 const FOCUS=new Set(Object.keys(focusCore.defaults));
 const RELOAD=new Set(['takeover','enabled','liveEnabled']);
@@ -54,7 +54,7 @@ function status(text,kind){
 function read(k){const n=$(k),v=defaults[k];return typeof v==='boolean'?n.checked:typeof v==='number'?Number(n.value):n.value;}
 function write(k,val){const n=$(k);if(!n||n===document.activeElement&&n.type==='number')return;if(typeof defaults[k]==='boolean')n.checked=!!val;else n.value=String(val);}
 function populate(s){for(const k of Object.keys(defaults))write(k,s[k]);}
-async function load(){const s=await chrome.storage.sync.get({...defaults,...filterCore.defaults});const all={...s,...homeCore.settings(s),...focusCore.settings(s),...filterCore.settings(s),...cleanCore.settings(s)};populate(all);showMode(all);showLists(all);}
+async function load(){const s=await chrome.storage.sync.get({...defaults,...filterCore.defaults});const all={...s,...homeCore.settings(s),...focusCore.settings(s),...filterCore.settings(s),...cleanCore.settings(s),...sbCore.settings(s)};populate(all);showMode(all);showLists(all);}
 
 // Watch-limit keys go through the service worker so the self-discipline lock can hold back loosening.
 async function saveFocus(changes,password){
@@ -75,7 +75,14 @@ async function save(changes){
    const reload=Object.keys(changes).some(k=>RELOAD.has(k));
    status(reload?'已自动保存。播放内核与加速开关在刷新视频页后生效。':'已自动保存。','ok');
   }
- }catch(e){status(`没保存上：${e.message}`,'error');await load().catch(()=>{});}
+ }catch(e){status(`没保存上：${e.message}`,'error');await /* ---------- 空降助手分类（由分类表生成） ---------- */
+(function(){const box=$('sbCats');if(!box)return;
+ for(const c of sbCore.CATEGORIES){const f=document.createElement('div');f.className='field';const l=document.createElement('label'),sw=document.createElement('i'),sel=document.createElement('select');
+  sel.id=sbCore.key(c.name);l.htmlFor=sel.id;sw.className='sb-swatch';sw.style.background=c.color;l.append(sw,c.label);
+  for(const o of sbCore.OPTIONS){if(c.name==='poi_highlight'&&o==='auto')continue;const op=document.createElement('option');op.value=o;op.textContent=sbCore.OPTION_LABEL[o];sel.append(op);}
+  sel.setAttribute('form','settings');f.append(l,sel);box.append(f);}
+})();
+load().catch(()=>{});}
  finally{savingCount--;}
 }
 $('settings').addEventListener('submit',e=>e.preventDefault()); // Enter in a field must not reload the page.

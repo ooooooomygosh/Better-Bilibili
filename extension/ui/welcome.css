@@ -66,3 +66,7 @@ kbd{padding:1px 6px;border-radius:5px;border:1px solid var(--btr-line);backgroun
 .w-modes button b{font-size:14px;color:var(--btr-text1)}
 .w-modes button[aria-checked=true]{border-color:var(--btr-brand);background:var(--btr-brand-soft)}
 .w-modes button[aria-checked=true] b{color:var(--btr-brand-hover)}
+/* 空降助手 choice */
+#sbChoice{grid-template-columns:repeat(2,1fr)}
+#sbChoice button[aria-checked=true]{border-color:var(--btr-brand);background:var(--btr-brand-soft);color:var(--btr-brand-hover)}
+#sbChoice button[aria-checked=true] b{color:var(--btr-brand-hover)}

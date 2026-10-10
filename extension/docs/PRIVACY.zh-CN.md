@@ -44,3 +44,10 @@ Debug 面板的“复制诊断信息”仅在用户点击时生成文本并尝�
 - 设置了密码时，只保存随机盐和 PBKDF2-SHA-256（210000 次迭代）的哈希结果，不保存密码本身，也不上传。
 - 首页开关的副本会写入 B 站页面的 `localStorage`（`btr-flow-flags`，只含几个布尔值），用于页面一开始就隐藏轮播，减少闪烁。
 - 扩展页面配色（2.3.0）：页面脚本把最近一次检测到的 B 站深浅色写入 `chrome.storage.local`（`biliTheme`，只有「是否深色」和时间），弹窗 / 设置页 / 欢迎页据此配色；选项「扩展页面配色」保存在 `chrome.storage.sync`（`uiTheme`）。扩展页面还会在自己的 `localStorage` 缓存上次的配色（`btr-ui-theme`），避免打开时闪白。都不会发送到任何地方。
+
+## 空降助手（BilibiliSponsorBlock）
+
+- 打开视频页时，向 `https://www.bsbsb.top/api/skipSegments/<前缀>` 查询片段；`<前缀>` 只是 BV 号 SHA-256 的前 4 位十六进制，同一前缀覆盖大量视频，服务器无法确定你在看哪个视频。请求不带 Cookie。
+- 为了区分分 P，会请求 B 站公开的 `api.bilibili.com/x/player/pagelist`（不带 Cookie）。
+- 只有你主动按 ; 提交片段时，才会在本机生成匿名 ID（存 `chrome.storage.local`，不同步），并与 BV 号、cid、时间点、分类一起发送给 bsbsb.top。
+- 在弹窗关闭空降助手后不再发出任何上述请求。
