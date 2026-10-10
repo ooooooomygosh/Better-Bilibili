@@ -183,6 +183,15 @@ button.primary:hover{box-shadow:0 4px 14px color-mix(in srgb,var(--btr-brand) 32
 @media(max-width:860px){.lists{grid-template-columns:1fr}.modes{grid-template-columns:1fr}}
 /* 空降助手 popup row: one quiet line, same switch as everything else */
 .sb-row{margin:-4px 0 14px;gap:12px;cursor:pointer}
+.pv-row{margin:0 0 14px;gap:12px}
+.pv-row .sb-title{display:block;font-size:13px;color:var(--btr-text1);font-weight:600}
+.pv-row .sb-hint{display:block;margin:0;font-size:12px;color:var(--btr-text3)}
+.pv-seg{display:inline-flex;flex:none;padding:2px;border-radius:999px;background:var(--btr-soft);border:1px solid var(--btr-line)}
+.pv-seg button{font:inherit;font-size:12px;min-height:26px;padding:3px 10px;border:0;border-radius:999px;background:transparent;color:var(--btr-text2);cursor:pointer;transition:background-color var(--btr-fast) ease,color var(--btr-fast) ease}
+.pv-seg button:hover{color:var(--btr-brand)}
+.pv-seg button[aria-checked=true]{background:var(--btr-bg);color:var(--btr-brand);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.pv-seg button:focus-visible{outline:2px solid var(--btr-brand);outline-offset:1px}
+.pv-mute.off{opacity:.45}
 .sb-row .sb-title{display:block;font-size:13px;color:var(--btr-text1);font-weight:600}
 .sb-row .sb-hint{margin:0;font-size:12px;color:var(--btr-text3)}
 /* 空降助手 settings grid */

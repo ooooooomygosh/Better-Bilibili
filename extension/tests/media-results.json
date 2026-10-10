@@ -45,7 +45,7 @@
     ]
   ],
   "debug": {
-    "version": "2.5.0",
+    "version": "2.5.1",
     "architecture": "bilibili-native-ui-progressive-mse-0.8-core",
     "quality": "1080P",
     "qualityId": 80,
@@ -62,7 +62,7 @@
     "audioType": "audio/mp4; codecs=\"mp4a.40.2\"",
     "videoBandwidth": 620000,
     "audioBandwidth": 64000,
-    "currentTime": 22.018365,
+    "currentTime": 22.023273,
     "mediaSourceState": "ended",
     "playbackActivated": true,
     "resumeWanted": true,
@@ -80,61 +80,61 @@
     "stallsAfterSeek": 0,
     "timeline": [
       {
-        "at": 409,
+        "at": 302,
         "time": 0,
         "what": "session",
         "detail": "1080P avc from 0.1"
       },
       {
-        "at": 413,
+        "at": 307,
         "time": 0,
         "what": "headers requested",
         "detail": "video"
       },
       {
-        "at": 415,
+        "at": 308,
         "time": 0,
         "what": "headers requested",
         "detail": "audio"
       },
       {
-        "at": 424,
+        "at": 321,
         "time": 0.1,
         "what": "first segment in",
         "detail": "audio 16 KiB in 1 pieces"
       },
       {
-        "at": 426,
+        "at": 323,
         "time": 0.1,
         "what": "first segment in",
         "detail": "video 191 KiB in 2 pieces"
       },
       {
-        "at": 431,
+        "at": 324,
         "time": 0.1,
         "what": "ready to play",
         "detail": "needed 2.5 s buffered"
       },
       {
-        "at": 434,
+        "at": 326,
         "time": 0.1,
         "what": "waiting",
         "detail": "after start"
       },
       {
-        "at": 474,
+        "at": 352,
         "time": 0.1,
         "what": "playing",
         "detail": ""
       },
       {
-        "at": 1441,
+        "at": 1312,
         "time": 21,
         "what": "waiting",
         "detail": "after start"
       },
       {
-        "at": 1455,
+        "at": 1325,
         "time": 21,
         "what": "playing",
         "detail": ""

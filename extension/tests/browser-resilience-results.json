@@ -28,11 +28,15 @@
   "passed": true
  },
  {
+  "test": "mute is a visible speaker icon on the clip, remembered globally (next card plays with sound; popup change applies to a playing clip); 关闭 disables preview",
+  "passed": true
+ },
+ {
   "test": "video mode: hover plays the clip inline (muted, progress bar, mute toggle that does not open the video), stops on leave",
   "passed": true
  },
  {
-  "test": "frames mode: storyboard prefetched in view, first frame 233 ms after hover (was 450 ms dwell + 2 requests), gone on leave",
+  "test": "frames mode: storyboard prefetched in view, first frame 231 ms after hover (was 450 ms dwell + 2 requests), gone on leave",
   "passed": true
  }
 ]
