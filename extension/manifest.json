@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "哔哩节流阀 · BiliThrottle",
   "short_name": "BiliThrottle",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "description": "B 站的油门和刹车：多 CDN 加速、首页净化、无限下滑推荐，再加上像 Claude Code 一样的 5 小时与每周观看额度，内置空降助手跳过恰饭片段。",
   "minimum_chrome_version": "114",
   "permissions": [
@@ -182,6 +182,6 @@
       "world": "ISOLATED"
     }
   ],
-  "version_name": "2.5.0 · 空降助手上线",
+  "version_name": "2.5.1 · 首页空白修复",
   "options_page": "ui/options.html"
 }
