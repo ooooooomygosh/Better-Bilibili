@@ -1,5 +1,5 @@
 {
-  "browser": "154.0.8037.97",
+  "browser": "141.0.7390.37",
   "environment": "Local fixture DOM only, mocked Chrome APIs; NOT installed extension or live Bilibili",
   "tests": [
     {
@@ -135,7 +135,7 @@
       "passed": true
     },
     {
-      "test": "section nav: the section under the middle of the visible area (9 positions, heights 161–632px); one owning >50% is always current",
+      "test": "section nav: the section under the middle of the visible area (13 positions, heights 161–867px); one owning >50% is always current",
       "passed": true
     },
     {

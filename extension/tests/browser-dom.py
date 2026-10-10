@@ -19,7 +19,7 @@ with sync_playwright() as p:
  ctx.route('https://www.bilibili.com/**',lambda r:r.fulfill(status=200,content_type='text/html',body=(ROOT/'tests/home-fixture.html').read_text()))
  ctx.route('https://i0.hdslb.com/**',fill)
  page=ctx.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)));page.set_content((ROOT/'tests/home-fixture.html').read_text())
- script(page,'tests/browser-shim.js');script(page,'src/home-core.js')
+ script(page,'tests/browser-shim.js');script(page,'src/home-core.js');script(page,'src/filter-core.js')
  page.evaluate("window.fixtureLocation={pathname:'/',origin:'https://www.bilibili.com',href:'https://www.bilibili.com/',reload:()=>{throw Error('unexpected reload')}}")
  page.evaluate("document.querySelectorAll('img').forEach((img,i)=>{img.src='data:image/svg+xml;base64,'+btoa('<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"480\" height=\"270\"><rect width=\"480\" height=\"270\" fill=\"#4e6e80\"/></svg>')})")
  # Simulate 1.0 settings. The new page must use native theme without waiting for a service worker migration.
@@ -139,7 +139,7 @@ with sync_playwright() as p:
  markup=(ROOT/'ui/options.html').read_text();markup=re.sub(r'<script[^>]*>.*?</script>','',markup,flags=re.S);markup=re.sub(r'<link[^>]*>','',markup)
  option.set_content(markup);option.add_style_tag(content=(ROOT/'ui/common.css').read_text())
  script(option,'tests/browser-shim.js');option.evaluate("window.chrome=window.chromeMock;0")  # extension page: ui-kit reads chrome.storage for the theme
- for f in ['src/ui-kit.js','src/home-core.js','src/focus-core.js','src/lock-core.js']:script(option,f)
+ for f in ['src/ui-kit.js','src/home-core.js','src/focus-core.js','src/lock-core.js','src/filter-core.js','src/clean-core.js']:script(option,f)
  # The service worker owns watch-limit writes (self-discipline lock); mock it as "no lock".
  option.evaluate("chromeMock.runtime.sendMessage=async m=>{if(m.type==='lock-state')return {locked:false};if(m.type==='focus-set'){await chromeMock.storage.sync.set(m.changes);return {applied:m.changes,deferred:{}};}return {};};0")
  option.evaluate("code=>new Function('chrome',code)(window.chromeMock)",(ROOT/'ui/options.js').read_text())

@@ -25,6 +25,18 @@ async function prepareExtension() {
     await chrome.storage.sync.set({flowHomeSchema:2,homeTheme:["native","oled"].includes(s.homeTheme)?s.homeTheme:"native",
       homeHideCarousel:s.homeHideCarousel !== false,homeHideBanner:s.homeHideBanner === true,homeHideAds:s.homeHideAds !== false});
   }
+  // 2.4.0: the homepage has two separate modes. Someone already on 无限下滑 has made that choice;
+  // "不想看此 UP 主" from the feed menu (kept locally until now) joins the synced uploader block list.
+  if (s.homeInfinite === true && s.homeModeChosen === undefined) await chrome.storage.sync.set({homeModeChosen: true});
+  try {
+    const {flowHiddenUps} = await chrome.storage.local.get("flowHiddenUps");
+    if (Array.isArray(flowHiddenUps) && flowHiddenUps.length) {
+      const ups = Array.isArray(s.filterUps) ? [...s.filterUps] : [];
+      for (const mid of flowHiddenUps) { const e = `uid:${String(mid).replace(/\D/g, "")}`; if (e !== "uid:" && !ups.some(u => u === e || u.startsWith(e + ":"))) ups.push(e); }
+      await chrome.storage.sync.set({filterUps: ups.slice(-300)});
+      await chrome.storage.local.remove("flowHiddenUps");
+    }
+  } catch (_) {}
   const missing = Object.fromEntries(Object.entries(defaults).filter(([k]) => !(k in s)));
   if (Object.keys(missing).length) await chrome.storage.sync.set(missing);
 }

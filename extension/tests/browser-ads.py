@@ -28,7 +28,7 @@ with sync_playwright() as p:
  page.goto('https://www.bilibili.com/')
  # What the previous visit left in the flag mirror: the skin switches on synchronously at document_start.
  page.evaluate("localStorage.setItem('btr-flow-flags',JSON.stringify({clean:true,carousel:true,banner:false,ads:true,infinite:false}))")
- page.add_script_tag(content=(ROOT/'tests/browser-shim.js').read_text());page.add_script_tag(content=(ROOT/'src/home-core.js').read_text());page.add_script_tag(content=CARD)
+ page.add_script_tag(content=(ROOT/'tests/browser-shim.js').read_text());page.add_script_tag(content=(ROOT/'src/home-core.js').read_text());page.add_script_tag(content=(ROOT/'src/filter-core.js').read_text());page.add_script_tag(content=CARD)
  page.evaluate("chromeMock.storage.sync.set({homeHideAds:true})")
  page.evaluate("code=>new Function('chrome','location','crypto',code)(window.chromeMock,window.location,{randomUUID:()=>'fixture-tab-1234567890'})",(ROOT/'src/home-enhancer.js').read_text())
  assert page.evaluate("document.documentElement.hasAttribute('data-btr-hide-ads')")

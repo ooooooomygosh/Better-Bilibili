@@ -1,7 +1,8 @@
 'use strict';
 const $=id=>document.getElementById(id);
-const ui=globalThis.__BTR_UI__,focusCore=globalThis.__BTR_FOCUS_CORE__,homeCore=globalThis.__BTR_HOME_CORE__,lockCore=globalThis.__BTR_LOCK_CORE__;
-const defaults={enabled:true,liveEnabled:true,autoConcurrency:true,smartPolicy:true,strategy:'auto',mode:'auto',maxAutoThreads:32,memoryBudgetMB:64,takeover:'full',...homeCore.defaults,...focusCore.defaults,quickFab:true,uiTheme:'bili'};
+const ui=globalThis.__BTR_UI__,focusCore=globalThis.__BTR_FOCUS_CORE__,homeCore=globalThis.__BTR_HOME_CORE__,lockCore=globalThis.__BTR_LOCK_CORE__,filterCore=globalThis.__BTR_FILTER_CORE__,cleanCore=globalThis.__BTR_CLEAN_CORE__;
+const defaults={enabled:true,liveEnabled:true,autoConcurrency:true,smartPolicy:true,strategy:'auto',mode:'auto',maxAutoThreads:32,memoryBudgetMB:64,takeover:'full',...homeCore.defaults,...focusCore.defaults,filterEnabled:true,filterDedupe:true,...cleanCore.defaults,quickFab:true,uiTheme:'bili'};
+const LISTS=['filterKeywords','filterUps','filterTags'];
 const FOCUS=new Set(Object.keys(focusCore.defaults));
 const RELOAD=new Set(['takeover','enabled','liveEnabled']);
 
@@ -14,10 +15,10 @@ function dialog({title,text,ok='确定',cancel='取消',danger=false,fields=[]})
   back.className='modal-back';box.className='modal';box.setAttribute('role','dialog');box.setAttribute('aria-modal','true');
   const id='dlg-'+Math.random().toString(36).slice(2);h.id=id+'-t';p.id=id+'-d';box.setAttribute('aria-labelledby',h.id);box.setAttribute('aria-describedby',p.id);
   h.textContent=title;p.textContent=text||'';p.className='muted';err.className='field-error';err.hidden=true;err.setAttribute('role','alert');box.append(h,p);
-  const inputs=fields.map(f=>{const l=document.createElement('label'),i=document.createElement('input');l.className='field';const t=document.createElement('span');t.textContent=f.label;i.type=f.type||'text';i.autocomplete=f.autocomplete||'off';if(f.placeholder)i.placeholder=f.placeholder;l.append(t,i);box.append(l);return i;});
+  const inputs=fields.map(f=>{const l=document.createElement('label'),i=document.createElement('input');l.className='field';const t=document.createElement('span');t.textContent=f.label;i.type=f.type||'text';i.autocomplete=f.autocomplete||'off';if(f.placeholder)i.placeholder=f.placeholder;if(f.value!=null)i.value=f.value;l.append(t,i);box.append(l);return i;});
   box.append(err);
   const no=document.createElement('button'),yes=document.createElement('button');no.type=yes.type='button';no.textContent=cancel;yes.textContent=ok;yes.className=danger?'primary danger-fill':'primary';
-  acts.className='actions';acts.append(no,yes);box.append(acts);back.append(box);document.body.append(back);
+  acts.className='actions';no.hidden=!cancel;acts.append(no,yes);box.append(acts);back.append(box);document.body.append(back);
   const before=document.activeElement;document.querySelector('main')?.setAttribute('inert','');
   ui.animate(back,[{opacity:0},{opacity:1}],{duration:ui.MOTION.fast});ui.animate(box,[{opacity:0,transform:'translateY(8px) scale(.98)'},{opacity:1,transform:'none'}],{duration:ui.MOTION.mid});
   const close=v=>{if(dialogOpen!==api)return;dialogOpen=null;document.querySelector('main')?.removeAttribute('inert');document.removeEventListener('keydown',key,true);ui.fadeOut(back,ui.MOTION.fast);before?.focus?.({preventScroll:true});resolve(v);};
@@ -53,7 +54,7 @@ function status(text,kind){
 function read(k){const n=$(k),v=defaults[k];return typeof v==='boolean'?n.checked:typeof v==='number'?Number(n.value):n.value;}
 function write(k,val){const n=$(k);if(!n||n===document.activeElement&&n.type==='number')return;if(typeof defaults[k]==='boolean')n.checked=!!val;else n.value=String(val);}
 function populate(s){for(const k of Object.keys(defaults))write(k,s[k]);}
-async function load(){const s=await chrome.storage.sync.get(defaults);populate({...s,...homeCore.settings(s),...focusCore.settings(s)});}
+async function load(){const s=await chrome.storage.sync.get({...defaults,...filterCore.defaults});const all={...s,...homeCore.settings(s),...focusCore.settings(s),...filterCore.settings(s),...cleanCore.settings(s)};populate(all);showMode(all);showLists(all);}
 
 // Watch-limit keys go through the service worker so the self-discipline lock can hold back loosening.
 async function saveFocus(changes,password){
@@ -230,3 +231,58 @@ navUpdate();
 
 load().catch(e=>status(e.message,'error'));refreshLock();focusUsage();setInterval(focusUsage,5000);setInterval(()=>{if(lock.locked)refreshLock();},30000);
 if(location.hash)requestAnimationFrame(()=>document.querySelector(location.hash)?.scrollIntoView({block:'start'}));
+
+/* ---------- 首页模式 ---------- */
+function showMode(st){
+ const mode=st.homeInfinite?'infinite':'batch';
+ for(const r of document.querySelectorAll('input[name="homeMode"]'))r.checked=st.homeModeChosen!==false||st.homeInfinite?r.value===mode:false;
+ for(const n of document.querySelectorAll('.mode-opts'))n.hidden=n.dataset.mode!==mode;
+}
+for(const r of document.querySelectorAll('input[name="homeMode"]'))r.addEventListener('change',()=>{if(r.checked)save({homeInfinite:r.value==='infinite',homeModeChosen:true}).then(load);});
+
+/* ---------- 屏蔽列表 ---------- */
+let lists={filterKeywords:[],filterUps:[],filterTags:[]};
+const KIND={filterKeywords:'keywords',filterUps:'ups',filterTags:'tags'};
+function chipLabel(key,e){return key==='filterUps'?(filterCore.parseUp(e).mid?`${filterCore.upLabel(e)}（UID ${filterCore.parseUp(e).mid}）`:e):key==='filterTags'?`#${e}`:e;}
+function showLists(st){
+ lists=Object.fromEntries(LISTS.map(k=>[k,st[k]||[]]));
+ for(const box of document.querySelectorAll('.list-editor')){
+  const key=box.dataset.list,ul=box.querySelector('.chiplist'),items=lists[key];
+  ul.replaceChildren(...items.slice().reverse().map(e=>{const li=document.createElement('li'),t=document.createElement('span'),x=document.createElement('button');
+   t.textContent=chipLabel(key,e);x.type='button';x.textContent='×';x.setAttribute('aria-label',`移除 ${t.textContent}`);
+   x.onclick=()=>saveList(key,filterCore.remove(lists[key],e));li.title=e;li.append(t,x);return li;}));
+  if(!items.length){const li=document.createElement('li');li.className='none';li.textContent='还没有规则';ul.append(li);}
+ }
+ const n=LISTS.reduce((a,k)=>a+lists[k].length,0);$('filterCount').textContent=`${n} 条规则`;
+}
+async function saveList(key,next){lists[key]=next;showLists(lists);await save({[key]:next});}
+for(const box of document.querySelectorAll('.list-editor')){
+ const key=box.dataset.list,input=box.querySelector('.add input'),addBtn=box.querySelector('.add button');
+ // Not a <form>: the whole page is one form already, and nested forms are dropped by the parser.
+ input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();add();}});
+ addBtn.addEventListener('click',()=>add());
+ function add(){
+  const v=input.value.trim();if(!v){input.focus();return;}
+  const entry=key==='filterUps'&&/^\d{3,20}$/.test(v)?filterCore.upEntry(v):v;
+  const next=filterCore.add(lists[key],entry,KIND[key]);
+  if(!next){fieldError(input,'已经在列表里了');return;}
+  input.value='';saveList(key,next);input.focus();}
+}
+$('filterExport').onclick=async()=>{const text=JSON.stringify({bilithrottleFilters:1,...lists},null,1);
+ try{await navigator.clipboard.writeText(text);status('已把全部屏蔽规则复制到剪贴板，可以粘贴保存或分享。','ok');}
+ catch(_){await dialog({title:'导出屏蔽规则',text:'复制下面的内容保存：',fields:[{label:'规则',value:text}],ok:'好',cancel:''});}};
+$('filterImport').onclick=async()=>{const r=await dialog({title:'导入屏蔽规则',text:'粘贴之前导出的内容（会合并到现有规则里，不会删掉已有的）。',fields:[{label:'规则',value:''}],ok:'导入'});
+ if(!r)return;const raw=Array.isArray(r)?r[0]:r?.values?.[0]??r;let data;try{data=JSON.parse(String(raw));}catch(_){status('没认出这段内容，请粘贴导出的完整文字。','error');return;}
+ const changes={};for(const k of LISTS){let cur=lists[k];for(const e of Array.isArray(data[k])?data[k]:[]){const n=filterCore.add(cur,e,KIND[k]);if(n)cur=n;}changes[k]=cur;}
+ await save(changes);await load();status('已导入并合并屏蔽规则。','ok');};
+$('filterClear').onclick=async()=>{if(!await dialog({title:'清空全部屏蔽规则？',text:'关键词、UP 主和标签规则都会删除，此操作无法撤销。',ok:'清空',danger:true}))return;await save({filterKeywords:[],filterUps:[],filterTags:[]});await load();};
+
+/* ---------- 净化开关（由规则表生成） ---------- */
+(function(){const box=$('cleanGroups');if(!box)return;
+ for(const {group,rules} of cleanCore.groups()){if(group==='首页')continue;
+  const h=document.createElement('h3');h.textContent=group;const st=document.createElement('div');st.className='stack';
+  for(const r of rules){const l=document.createElement('label');l.className='row';l.innerHTML='<span class="switch"><input type="checkbox" role="switch"><span></span></span>';
+   const i=l.querySelector('input');i.id=r.key;const t=document.createElement('span');t.className='lbl';const b=document.createElement('b');b.textContent=r.label;const hn=document.createElement('small');hn.textContent=r.hint;t.append(b,hn);l.append(t);st.append(l);}
+  box.append(h,st);}
+})();
+load().catch(()=>{});

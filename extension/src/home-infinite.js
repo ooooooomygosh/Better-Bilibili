@@ -5,8 +5,8 @@
  */
 (function () {
   'use strict';
-  const feed = globalThis.__BTR_FEED_CORE__;
-  if (!feed || globalThis.__BTR_HOME_INFINITE__) return;
+  const feed = globalThis.__BTR_FEED_CORE__, filt = globalThis.__BTR_FILTER_CORE__;
+  if (!feed || !filt || globalThis.__BTR_HOME_INFINITE__) return;
 
   const GAP_MS = 700, TIMEOUT_MS = 10000, KEY_TTL = 12 * 3600000, MAX_FAILS = 3, PAGE = 12, STAGGER_MS = 250;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
@@ -15,7 +15,7 @@
   const FONT = ui ? ui.FONT : '-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif';
   const SHOT = 'https://api.bilibili.com/x/player/videoshot';
   const TOVIEW = 'https://api.bilibili.com/x/v2/history/toview/add';
-  const DISLIKE_KEY = 'flowDislikes', UP_KEY = 'flowHiddenUps', MAX_DISLIKES = 500;
+  const DISLIKE_KEY = 'flowDislikes', MAX_DISLIKES = 500;
 
   /* Shadow UI: footer status and the floating "第 N 批" indicator. */
   const CSS = `
@@ -82,6 +82,7 @@
 :is(#btr-flow-feed,[data-btr-fill]) .btr-menu{position:fixed;z-index:1000;min-width:150px;padding:6px 0;border-radius:8px;background:var(--btr-menu-bg,#fff);border:1px solid var(--btr-line,rgba(0,0,0,.08));box-shadow:0 6px 20px rgba(0,0,0,.12);font-size:14px;color:var(--btr-text,#18191c);transform-origin:100% 0}
 :is(#btr-flow-feed,[data-btr-fill]) .btr-menu button{display:flex;align-items:center;gap:8px;width:100%;padding:8px 14px;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;white-space:nowrap}
 :is(#btr-flow-feed,[data-btr-fill]) .btr-menu button:hover,:is(#btr-flow-feed,[data-btr-fill]) .btr-menu button:focus-visible{background:var(--btr-menu-hover,#f1f2f3);color:#fb7299;outline:none}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-menu-note{padding:6px 14px;font-size:12px;color:var(--btr-muted,#9499a0)}
 :is(#btr-flow-feed,[data-btr-fill]) .btr-menu small{margin-left:auto;padding-left:10px;font-size:12px;color:var(--btr-muted,#9499a0)}
 /* Hidden-by-you state, B 站-style: the cover blurs under a dark veil with 「已减少此类推荐」 and 撤销. It
    stays until you close it, scroll it away, or ~8 s pass while you are not on it; then the row reflows. */
@@ -152,7 +153,7 @@
   function create(host) {
     let box = null, shadow = null, list = null, foot = null, side = null, sentinel = null;
     let current = null, sections = [];
-    let batches = 0, idx = 1, loading = false, paused = false, fails = 0, timer = 0, keys = null, buffer = [];
+    let batches = 0, idx = 1, loading = false, paused = false, fails = 0, timer = 0, keys = null, buffer = [], blockedSince = 0;
     // Batches are a whole number of grid rows: 24 in a 5-column grid becomes 25, leftovers wait for the next batch.
     const cols = () => { const n = Number(host.columns()?.count); return n >= 1 && n <= 10 ? Math.floor(n) : 5; };
     const target = size => { const c = cols(); return Math.max(c, Math.round(size / c) * c); };
@@ -243,7 +244,7 @@
       if (need <= 0) return;
       // A short row made only of our spares (the native grid shrank or columns changed): take them back.
       if (row.every(n => n.matches('.feed-card[data-btr-fill]'))) {
-        for (const n of row.reverse()) { if (n.__btrCard) buffer.unshift(n.__btrCard); n.remove(); }
+        for (const n of row.reverse()) { if (n.__btrCard && !hidden(n.__btrCard)) buffer.unshift(n.__btrCard); n.remove(); }
         return;
       }
       const spare = buffer.filter(c => !hidden(c));
@@ -265,11 +266,21 @@
       loading = false; side?.classList.remove('loading');
       if (!box?.isConnected || !host.enabled()) { skeleton(false); return; }
       let fresh = 0, risk = null, error = null;
+      const got = [];
       for (const r of results) {
-        if (r.ok) { const cards = feed.cards(r.items, seen).filter(c => !hidden(c)); fresh += cards.length; buffer.push(...cards); }
+        if (r.ok) { const cards = feed.cards(r.items, seen).filter(c => !dislikes.has(c.bvid)); fresh += cards.length; got.push(...cards); }
         else if (r.error?.kind === 'risk') risk = r.error;
         else error = r.error;
       }
+      // The user's block lists run before a card is ever shown; tag rules wait for the tags.
+      const f = host.filters?.();
+      if (f?.needsTags && got.length && globalThis.__BTR_TAGS__) {
+        const tags = await globalThis.__BTR_TAGS__.many(got.map(c => c.bvid));
+        for (const c of got) if (Array.isArray(tags[c.bvid])) c.tags = tags[c.bvid];
+        if (!box?.isConnected || !host.enabled()) { skeleton(false); return; }
+      }
+      for (const c of got) { if (hidden(c)) blockedSince++; else buffer.push(c); }
+      buffer = buffer.filter(c => !hidden(c)); // Rules may have changed while this round was out.
       fillNative();
       let added = 0;
       const want = target(host.settings().homeInfiniteSize); // The window may have been resized meanwhile.
@@ -385,7 +396,7 @@
       owner.append(icon(h, 'up', null), au); if (c.date) owner.append(el('span', 'bili-video-card__info--date', `· ${c.date}`));
       bottom.append(owner);
       right.append(more, tit, bottom); info.append(right);
-      wrap.append(link, info); v.append(wrap); inner.append(v); outer.append(inner);
+      wrap.append(link, info); v.append(wrap); inner.append(v); outer.append(inner); outer.__btrCard = c;
 
       const act = (n, fn) => { bind(n, () => { if (openMenu && openMenu.more !== n) closeMenu(); fn(); }); n.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); fn(); } }); };
       act(later, () => watchLater(c, later, laterLab));
@@ -418,13 +429,20 @@
 
     /* ---------- ⋮ menu: watch later / not interested / hide this uploader (the last two are local only;
        B 站's web feedback API is not public, so nothing is sent to its recommender) ---------- */
-    let dislikes = new Set(), blockedUps = new Set();
-    chrome.storage.local.get([DISLIKE_KEY, UP_KEY]).then(d => {
+    let dislikes = new Set();
+    chrome.storage.local.get([DISLIKE_KEY]).then(d => {
       if (Array.isArray(d[DISLIKE_KEY])) dislikes = new Set(d[DISLIKE_KEY].filter(x => typeof x === 'string'));
-      if (Array.isArray(d[UP_KEY])) blockedUps = new Set(d[UP_KEY].map(String));
     }).catch(() => {});
-    const hidden = c => dislikes.has(c.bvid) || (c.mid && blockedUps.has(String(c.mid)));
-    const persist = () => chrome.storage.local.set({[DISLIKE_KEY]: [...dislikes].slice(-MAX_DISLIKES), [UP_KEY]: [...blockedUps].slice(-MAX_DISLIKES)}).catch(() => {});
+    // 不感兴趣 stays local; uploaders and tags go to the synced block lists everyone reads.
+    const hidden = c => dislikes.has(c.bvid) || !!host.filters?.()?.match(c);
+    const persist = () => chrome.storage.local.set({[DISLIKE_KEY]: [...dislikes].slice(-MAX_DISLIKES)}).catch(() => {});
+    async function editList(key, fn) {
+      try { const cur = (await chrome.storage.sync.get({[key]: []}))[key]; const next = fn(cur); if (next) await chrome.storage.sync.set({[key]: next}); } catch (_) {}
+    }
+    const blockUp = c => editList('filterUps', l => filt.add(l, filt.upEntry(c.mid, c.author), 'ups'));
+    const unblockUp = c => editList('filterUps', l => l.filter(e => filt.parseUp(e).mid !== String(c.mid)));
+    const blockTag = t => editList('filterTags', l => filt.add(l, t, 'tags'));
+    const unblockTag = t => editList('filterTags', l => l.filter(e => filt.norm(e) !== filt.norm(t)));
 
     let openMenu = null;
     function closeMenu(focusBack) {
@@ -448,7 +466,13 @@
       };
       item('添加至稍后再看', null, () => watchLater(c, later, laterLab));
       item('不感兴趣', '仅本插件', key => gone(c, v, 'video', key));
-      if (c.mid && c.author) item(`不想看「${c.author.length > 8 ? c.author.slice(0, 8) + '…' : c.author}」`, '仅本插件', key => gone(c, v, 'up', key));
+      if (c.mid && c.author) item(`屏蔽 UP 主「${c.author.length > 8 ? c.author.slice(0, 8) + '…' : c.author}」`, null, key => gone(c, v, 'up', key));
+      if (globalThis.__BTR_TAGS__) {
+        const tb = el('button', null, '按标签屏蔽…'); tb.type = 'button'; tb.setAttribute('role', 'menuitem'); tb.tabIndex = -1; tb.setAttribute('aria-haspopup', 'menu');
+        tb.append(el('small', null, '›'));
+        bind(tb, () => tagMenu(c, v, node));
+        node.append(tb);
+      }
       node.addEventListener('keydown', e => {
         const items = [...node.querySelectorAll('button')], i = items.indexOf(document.activeElement);
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus(); }
@@ -467,6 +491,37 @@
       openMenu = {node, v, more};
       if (ui) ui.animate(node, [{opacity: 0, transform: 'scale(.96) translateY(-4px)'}, {opacity: 1, transform: 'none'}], {duration: 140});
       node.querySelector('button').focus({preventScroll: true});
+    }
+
+    // 按标签屏蔽: the same menu turns into the video's own tags; one click blocks a tag everywhere.
+    async function tagMenu(c, v, node) {
+      node.replaceChildren(el('div', 'btr-menu-note', '正在读取标签…'));
+      const tags = await globalThis.__BTR_TAGS__.get(c.bvid);
+      if (!node.isConnected) return;
+      node.replaceChildren();
+      if (!tags?.length) { node.append(el('div', 'btr-menu-note', tags ? '这个视频没有标签' : '没读到标签，请稍后再试')); return; }
+      node.append(el('div', 'btr-menu-note', '屏蔽带有这个标签的视频：'));
+      for (const t of tags.slice(0, 10)) {
+        const b = el('button', null, `#${t}`); b.type = 'button'; b.setAttribute('role', 'menuitem'); b.tabIndex = -1;
+        bind(b, e => { const key = !e || e.detail === 0; closeMenu(key); c.blockedTag = t; gone(c, v, 'tag', key); });
+        node.append(b);
+      }
+      node.querySelector('button')?.focus({preventScroll: true});
+    }
+    /** Every feed card on the page (our batches and the spares in the native grid), with its data. */
+    const rendered = () => [...document.querySelectorAll('#btr-flow-feed .btr-grid > .feed-card, [data-btr-grid] > .feed-card[data-btr-fill]')].filter(n => n.__btrCard);
+    const undone = new WeakSet(); // Cards the user brought back with 撤销 stay, whatever the lists say.
+    /** Block lists changed: fade out the cards that now match and let the rest close the gap. */
+    async function refilter() {
+      // A new tag rule needs the tags of what is already on screen (fetched a few at a time, then cached).
+      if (host.filters?.()?.needsTags && globalThis.__BTR_TAGS__) {
+        const need = [...rendered().map(n => n.__btrCard), ...buffer].filter(c => c && !c.tags);
+        if (need.length) { const t = await globalThis.__BTR_TAGS__.many(need.map(c => c.bvid)); for (const c of need) if (Array.isArray(t[c.bvid])) c.tags = t[c.bvid]; }
+      }
+      buffer = buffer.filter(c => !hidden(c));
+      if (!box) return;
+      const gone = rendered().filter(n => !undone.has(n) && hidden(n.__btrCard));
+      if (gone.length) refill(gone, true);
     }
 
     // The card steps out and a plain placeholder (one short line + 撤销) takes its cell; after a few
@@ -499,8 +554,7 @@
     function gone(c, v, kind, viaKey) {
       const outer = v.closest('.feed-card');
       if (!outer || !outer.isConnected) return;
-      if (kind === 'up') blockedUps.add(String(c.mid)); else dislikes.add(c.bvid);
-      persist();
+      if (kind === 'up') blockUp(c); else if (kind === 'tag') blockTag(c.blockedTag); else { dislikes.add(c.bvid); persist(); }
       const h = Math.round(outer.getBoundingClientRect().height);
       const ph = el('div', 'btr-gone-card'); ph.setAttribute('role', 'listitem');
       if (h) ph.style.height = `${h}px`;
@@ -511,12 +565,12 @@
       const bg = el('div', 'btr-gone-bg');
       if (/^https:\/\/[^/"')\s]*hdslb\.com\/[^"')\s]*$/.test(src)) bg.style.backgroundImage = `url("${src}")`;
       const layer = el('div', 'btr-gone'); layer.setAttribute('role', 'status');
-      const msg = el('div', null, kind === 'up' ? '已减少该 UP 主的推荐' : '已减少此类推荐');
+      const msg = el('div', null, kind === 'up' ? '已屏蔽该 UP 主' : kind === 'tag' ? `已屏蔽标签「${c.blockedTag}」` : '已减少此类推荐');
       const undo = el('button', 'undo', '撤销'); undo.type = 'button';
       const x = el('button', 'x', '×'); x.type = 'button'; x.setAttribute('aria-label', '关闭提示');
       layer.append(x, msg, undo); cov.append(bg, layer);
       const info = el('div', 'btr-gone-info');
-      const note = el('span', null, kind === 'up' ? `不再显示「${c.author}」· 仅本插件` : '仅本插件生效，不影响 B 站推荐');
+      const note = el('span', null, kind === 'up' ? `不再显示「${c.author}」· 可在屏蔽列表里恢复` : kind === 'tag' ? '带这个标签的视频都不再显示' : '仅本插件生效，不影响 B 站推荐');
       note.title = '只在本插件里隐藏，不会发给 B 站，也不影响 B 站的推荐算法';
       const okBtn = el('button', null, '知道了'); okBtn.type = 'button';
       info.append(note, okBtn); ph.append(cov, info);
@@ -565,7 +619,7 @@
       function finish() { done = true; clearTimeout(timer); io?.disconnect(); removeEventListener('scroll', onScroll); }
       function dismiss(offscreen) {
         if (done) return; finish();
-        const others = kind === 'up' ? [...(list?.querySelectorAll(`.bili-video-card[data-mid="${String(c.mid).replace(/[^0-9]/g, "")}"]`) || [])].map(n => n.closest('.feed-card')).filter(Boolean) : [];
+        const others = kind === 'up' || kind === 'tag' ? rendered().filter(n => n !== outer && hidden(n.__btrCard)) : [];
         refill([ph, ...others], !offscreen);
       }
       bind(x, () => dismiss()); bind(okBtn, () => dismiss());
@@ -574,8 +628,8 @@
       bind(undo, () => {
         if (!ph.isConnected && outer.isConnected) return;
         finish(); ph.getAnimations?.().forEach(a => a.cancel());
-        if (kind === 'up') blockedUps.delete(String(c.mid)); else dislikes.delete(c.bvid);
-        persist();
+        if (kind === 'up') unblockUp(c); else if (kind === 'tag') unblockTag(c.blockedTag); else { dislikes.delete(c.bvid); persist(); }
+        undone.add(outer);
         // Leftover animations (an entrance fade still pending for a card that left before it ran,
         // a fill-forwards fade-out) or inline styles must not keep the card invisible.
         for (const n of [outer, ...outer.querySelectorAll('*')]) n.getAnimations?.().forEach(a => a.cancel());
@@ -710,11 +764,15 @@
     }
 
     function append(cards) {
+      cards = cards.filter(c => !hidden(c)); // Last check against the rules as they are right now.
+      if (!cards.length) return;
       const n = ++batches + 1; // The native grid is batch 1.
       const sec = el('section', 'btr-batch'); sec.dataset.batch = String(n);
       const div = el('div', 'btr-divider'), chip = el('span', 'btr-chip', `第 ${n} 批`);
       const at = new Date();
-      chip.append(el('small', null, `${cards.length} 个视频 · ${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`));
+      chip.append(el('small', null, `${cards.length} 个视频${blockedSince ? ` · 已屏蔽 ${blockedSince} 个` : ''} · ${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`));
+      if (blockedSince) chip.title = '按你的屏蔽词、UP 主、标签过滤掉的视频数；在快捷面板「首页」里管理';
+      blockedSince = 0;
       div.append(chip);
       const grid = el('div', 'btr-grid'); grid.setAttribute('role', 'list');
       const nodes = cards.map(c => { const node = card(c); node.setAttribute('role', 'listitem'); return node; });
@@ -817,7 +875,7 @@
       sections = []; visible.clear(); seen.clear(); buffer = []; batches = 0; paused = false; fails = 0; loading = false;
     }
 
-    return {sync, stop, theme, fill: () => { try { fillNative(); } catch (_) {} }, get batches() { return batches; }, get state() { return box ? {loaded: batches + 1, current: shown, paused, loading} : null; }};
+    return {sync, stop, theme, refilter: () => { refilter().catch(() => {}); }, fill: () => { try { fillNative(); } catch (_) {} }, get batches() { return batches; }, get state() { return box ? {loaded: batches + 1, current: shown, paused, loading} : null; }};
   }
 
   globalThis.__BTR_HOME_INFINITE__ = {create};

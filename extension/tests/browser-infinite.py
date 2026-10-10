@@ -42,8 +42,8 @@ with sync_playwright() as p:
  page.evaluate("""window.opens=[];window.open=(u)=>{opens.push(String(u));return null};
  for(const t of ['pointerdown','mousedown','pointerup','mouseup','click','auxclick'])window.addEventListener(t,e=>{const a=e.target.closest?.('a[href]'),c=e.target.closest?.('.bili-video-card,.feed-card');if(a||c){if(t==='click'||t==='auxclick'||t==='mousedown'&&e.button===1)window.open((a&&a.href)||'card:'+t);}},true);
  document.addEventListener('click',e=>{if(e.target.closest?.('.bili-video-card'))window.open('doc-card');});0""")
- for f in ['tests/browser-shim.js','src/ui-kit.js','src/home-core.js','src/feed-core.js']:page.add_script_tag(content=(ROOT/f).read_text())
- page.evaluate("chromeMock.storage.sync.set({homeInfinite:true,homeInfiniteSize:24,homeInfiniteThreads:2})")
+ for f in ['tests/browser-shim.js','src/ui-kit.js','src/home-core.js','src/filter-core.js','src/feed-core.js']:page.add_script_tag(content=(ROOT/f).read_text())
+ page.evaluate("chromeMock.storage.sync.set({homeInfinite:true,homeModeChosen:true,homeInfiniteSize:24,homeInfiniteThreads:2})")
  page.evaluate("code=>new Function('chrome',code)(window.chromeMock)",(ROOT/'src/home-infinite.js').read_text())
  page.evaluate("code=>new Function('chrome','crypto',code)(window.chromeMock,{randomUUID:()=> 'fixture-tab-infinite-1234'})",(ROOT/'src/home-enhancer.js').read_text())
  feed="document.querySelector('#btr-flow-feed')"
@@ -78,10 +78,10 @@ with sync_playwright() as p:
  menu=f"{feed}.querySelector(':scope>.btr-menu')"
  page.hover(f"#btr-flow-feed .btr-batch .bili-video-card >> nth=0");page.evaluate(f"{c0}.querySelector('.bili-video-card__info--no-interest').click()");page.wait_for_timeout(250)
  items=page.evaluate(f"[...{menu}.querySelectorAll('[role=menuitem]')].map(b=>b.textContent)")
- assert len(items)==3 and items[0].startswith('添加至稍后再看') and items[1].startswith('不感兴趣') and items[2].startswith('不想看'),items
+ assert len(items)==3 and items[0].startswith('添加至稍后再看') and items[1].startswith('不感兴趣') and items[2].startswith('屏蔽 UP 主'),items
  assert page.evaluate(f"!{menu}.closest('.bili-video-card,a') && getComputedStyle({menu}).position==='fixed'")
  page.keyboard.press('Escape');page.wait_for_timeout(250);assert not page.evaluate(f"!!{menu}")
- ok('⋮ opens a small menu (稍后再看 / 不感兴趣 / 不想看此 UP 主) outside the card (fixed, no card / link ancestor); Esc closes it')
+ ok('⋮ opens a small menu (稍后再看 / 不感兴趣 / 屏蔽 UP 主) outside the card (fixed, no card / link ancestor); Esc closes it')
  page.evaluate(f"window.firstBv={c0}.dataset.bvid;window.firstCard={c0}.closest('.feed-card');{c0}.querySelector('.bili-video-card__info--no-interest').click()");page.wait_for_timeout(200)
  page.evaluate("window.opens.length=0;0")  # (the simulated page reacts to ⋮ itself, which is B 站's own card control)
  mb=page.locator('#btr-flow-feed > .btr-menu button',has_text='不感兴趣').bounding_box()

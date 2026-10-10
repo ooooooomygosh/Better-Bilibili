@@ -1,17 +1,18 @@
-/* BiliThrottle 2.3.0 — isolated world. Native Vue cards stay mounted and retain their handlers.
+/* BiliThrottle 2.4.0 — isolated world. Native Vue cards stay mounted and retain their handlers.
  * Native refresh is the only source of fresh recommendations: no private API, prefetch loop,
  * synthetic scroll, raw-HTML snapshots or automatic document reload.
  */
 (function () {
   'use strict';
-  const core = globalThis.__BTR_HOME_CORE__;
-  if (!core || globalThis.__BTR_FLOW_HOME_LOADED__) return;
+  const core = globalThis.__BTR_HOME_CORE__, filt = globalThis.__BTR_FILTER_CORE__;
+  if (!core || !filt || globalThis.__BTR_FLOW_HOME_LOADED__) return;
   globalThis.__BTR_FLOW_HOME_LOADED__ = true;
   const GRID = '.recommended-container_floor-aside .container, .recommended-container .container';
   const CARD = '.bili-video-card, .video-card-reco, .feed-card .video-card';
   const OWN = '[data-btr-flow-owned]';
   const QUIET_MS = 600, REFRESH_TIMEOUT = 10000;
   let settings = {...core.defaults}, ready = false, snapshots = [], index = -1, liveReady = false;
+  let filterRaw = {...filt.defaults}, filters = filt.compile(filterRaw), filtered = [], tagCache = new Map();
   let grid = null, bar = null, shadow = null, view = null, refs = {}, nativeRefresh = null, nativeTarget = null;
   let gridObserver = null, mountObserver = null, resizeObserver = null, themeObserver = null;
   let settleTimer, deadlineTimer, saveTimer, mountTimer, routeTimer, paintTimer;
@@ -61,7 +62,8 @@
 html[data-btr-home-clean][data-btr-hide-carousel] :is(.recommended-container_floor-aside,.recommended-container) .recommended-swipe{display:none!important}
 html[data-btr-home-clean][data-btr-hide-carousel] :is(.recommended-container_floor-aside,.recommended-container) .container{grid-template-areas:none!important;grid-template-rows:none!important;grid-auto-rows:auto!important;grid-auto-flow:row!important}
 html[data-btr-home-clean][data-btr-hide-carousel] :is(.recommended-container_floor-aside,.recommended-container) .container > :is(.feed-card,.bili-video-card,.video-card-reco,.floor-single-card){margin-top:0!important;grid-area:auto!important;align-self:start}
-html[data-btr-home-clean][data-btr-hide-carousel] [data-btr-grid] > .feed-card[data-btr-ready]:not([data-btr-ad]){display:block!important}
+html[data-btr-home-clean][data-btr-hide-carousel] [data-btr-grid] > .feed-card[data-btr-ready]:not([data-btr-ad],[data-btr-filtered],[data-btr-dup]){display:block!important}
+html[data-btr-home-clean] [data-btr-grid] > :is([data-btr-filtered],[data-btr-dup]){display:none!important}
 html[data-btr-home-clean] [data-btr-grid] > [data-btr-empty]{display:none!important}
 html[data-btr-home-clean][data-btr-hide-ads] :is(.recommended-container_floor-aside,.recommended-container) .container > :not(.recommended-swipe,[data-btr-flow-owned]):has(${core.AD_SELECTOR}),html[data-btr-home-clean][data-btr-hide-ads] :is(.recommended-container_floor-aside,.recommended-container) .container > [data-btr-ad][data-btr-ad]{display:none!important}
 html[data-btr-home-clean][data-btr-hide-banner] .bili-header .bili-header__banner{height:64px!important;min-height:64px!important;background:var(--bg1,white)!important}
@@ -86,6 +88,19 @@ button:disabled{opacity:.35;cursor:default}.count{font-size:12px;opacity:.64;min
 .grid{display:grid;grid-template-columns:repeat(var(--btr-columns,5),minmax(0,1fr));column-gap:var(--btr-gap,20px);row-gap:24px;padding-bottom:20px}
 .card{color:inherit;text-decoration:none;display:block;min-width:0}.cover{position:relative;aspect-ratio:16/9;background:var(--btr-placeholder,rgba(128,128,128,.10));border-radius:6px;overflow:hidden}.cover img{width:100%;height:100%;object-fit:cover;display:block}.duration{position:absolute;right:8px;bottom:5px;font-size:12px;color:white;text-shadow:0 1px 3px black;background:#0008;border-radius:3px;padding:0 3px}.title{font-size:15px;line-height:22px;margin-top:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:44px}.card:hover .title{color:var(--brand_blue,#00aeec)}.meta{opacity:.64;font-size:12px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;margin-top:4px}
 button{transition:background-color .16s ease,color .16s ease,border-color .16s ease,opacity .16s ease,transform .12s ease}button:active:not(:disabled){transform:scale(.97)}
+.mode{font-size:12px;opacity:.72;white-space:nowrap}.mode b{color:#fb7299;font-weight:600}
+.blocked{font-size:12px;color:var(--btr-text,#18191c);opacity:.72;border:1px dashed var(--btr-border,rgba(128,128,128,.35));border-radius:999px;padding:2px 10px;min-height:24px}
+.blocked:hover{opacity:1;border-color:#fb7299;color:#fb7299;background:transparent}
+.chooser{margin:0 0 14px;padding:16px;border-radius:14px;background:var(--btr-chooser,rgba(251,114,153,.07));border:1px solid rgba(251,114,153,.25)}
+.chooser h3{margin:0;font-size:15px}.chooser p{margin:4px 0 12px;font-size:12px;opacity:.72}
+.chooser .opts{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.chooser .opt{display:flex;gap:12px;align-items:flex-start;text-align:left;padding:12px;border-radius:12px;border:1px solid var(--btr-border,rgba(128,128,128,.25));background:var(--btr-card,rgba(255,255,255,.6));min-height:auto;white-space:normal;color:inherit}
+.chooser .opt:hover{border-color:#fb7299;background:var(--btr-card,rgba(255,255,255,.6));color:inherit;transform:translateY(-1px)}
+.chooser .opt b{display:block;font-size:14px;margin-bottom:2px}.chooser .opt span{display:block;font-size:12px;opacity:.72;line-height:1.5}
+.chooser .pic{flex:none;width:58px;height:46px;border-radius:8px;background:rgba(128,128,128,.12);position:relative;overflow:hidden}
+.chooser .pic i{position:absolute;left:6px;right:6px;height:8px;border-radius:3px;background:rgba(251,114,153,.55)}
+.chooser .later{margin-top:10px;font-size:12px;opacity:.6;padding:2px 6px;min-height:auto}
+@media(max-width:680px){.chooser .opts{grid-template-columns:1fr}}
 .refresh{border-radius:999px;padding:4px 14px}.refresh[aria-busy=true]{color:var(--brand_blue,#00aeec)}
 .status:not(:empty){animation:btr-in .22s ease-out}
 .card .cover img{opacity:0;transition:opacity .3s ease,transform .3s cubic-bezier(.2,.75,.25,1)}.card .cover img.loaded{opacity:1}.card:hover .cover img{transform:scale(1.04)}.title{transition:color .16s ease}
@@ -96,8 +111,9 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
   function mountSkin() { if(root()&&!skin.isConnected)root().append(skin); }
   function toggle(name,wanted) { const r=root(); if(r&&r.hasAttribute(name)!==!!wanted)r.toggleAttribute(name,!!wanted); }
   function clearMarks() {
-    for(const n of document.querySelectorAll('[data-btr-ready],[data-btr-ad],[data-btr-native-refresh],[data-btr-grid],[data-btr-empty]')) {
-      for(const a of ['data-btr-ready','data-btr-ad','data-btr-native-refresh','data-btr-grid','data-btr-empty'])n.removeAttribute(a);
+    const ATTRS=['data-btr-ready','data-btr-ad','data-btr-native-refresh','data-btr-grid','data-btr-empty','data-btr-filtered','data-btr-dup'];
+    for(const n of document.querySelectorAll(ATTRS.map(a=>`[${a}]`).join(','))) {
+      for(const a of ATTRS)n.removeAttribute(a);
     }
   }
   function detectDark() {
@@ -125,7 +141,8 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     settings:()=>settings,
     hidden:()=>root().hasAttribute('data-btr-history-open'),
     theme:()=>({dark:lastDark,oled:root().hasAttribute('data-btr-oled')}),
-    columns:()=>lastColumns
+    columns:()=>lastColumns,
+    filters:()=>filters
   });
   function theme() {
     if(!document.body)return;
@@ -135,6 +152,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
       bar.style.setProperty('--btr-text',dark?'#e3e5e7':'#18191c');
       bar.style.setProperty('--btr-placeholder',root().hasAttribute('data-btr-oled')?'#000':dark?'#222':'#f1f2f3');
       bar.style.colorScheme=dark?'dark':'light';
+      bar.style.setProperty('--btr-card',dark?'rgba(255,255,255,.05)':'rgba(255,255,255,.75)');
     }
   }
   function applySkin() {
@@ -199,16 +217,55 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     slots.forEach((n,i)=>{if(n.querySelector('a[href]:not([href=""]):not([href^="javascript"])'))last=i;});
     slots.forEach((n,i)=>{const empty=last>=0&&i>last;if(empty!==n.hasAttribute('data-btr-empty'))n.toggleAttribute('data-btr-empty',empty);});
   }
+  /* ---------- the user's block lists and cross-batch dedupe on the native grid ---------- */
+  const infiniteMode=()=>settings.homeInfinite===true;
+  // Batches seen since this page opened (url sets, newest last). Dedupe never looks at earlier visits:
+  // a reload may legitimately show some of the same videos again.
+  let pageBatches=[], readyCount=0; // readyCount: real cards in the grid, including the ones we hide.
+  function dedupeSet() {
+    if(infiniteMode()||filterRaw.filterDedupe===false)return null;
+    const prior=transaction?pageBatches:pageBatches.slice(0,-1); // While 换一批 runs, the live batch is the old one.
+    if(!prior.length)return null;
+    const set=new Set();for(const b of prior)for(const u of b)set.add(u);return set;
+  }
+  function metaFrom(node,c) {
+    const owner=node.querySelector('.bili-video-card__info--owner[href*="space.bilibili.com"],a[href*="space.bilibili.com"]');
+    const mid=(owner?.getAttribute('href')||'').match(/space\.bilibili\.com\/(\d+)/)?.[1]||'';
+    const bvid=(c.url.match(/BV[0-9A-Za-z]{10}/)||[])[0]||'';
+    const tags=bvid&&Array.isArray(tagCache.get(bvid))?tagCache.get(bvid):undefined;
+    return {title:c.title,author:c.author,mid,bvid,tags};
+  }
+  let tagFrame=0;
+  function wantTags(bvid) {
+    if(tagCache.has(bvid)||!globalThis.__BTR_TAGS__)return;
+    tagCache.set(bvid,null);
+    globalThis.__BTR_TAGS__.get(bvid).then(t=>{tagCache.set(bvid,t||[]);if(!tagFrame)tagFrame=requestAnimationFrame(()=>{tagFrame=0;if(active()&&grid?.isConnected){collect();render();}});});
+  }
+  function mark(node,name,value) {
+    if(value==null||value===false){if(node.hasAttribute(name))node.removeAttribute(name);return;}
+    const v=value===true?'':String(value);if(node.getAttribute(name)!==v)node.setAttribute(name,v);
+  }
   function collect() {
     if(!grid?.isConnected)return [];
     markEmpty();
     const nodes=[...grid.querySelectorAll(CARD)].filter(n=>!owns(n)&&!n.closest('.recommended-swipe'));
-    const result=[];
+    const result=[], dups=dedupeSet();
+    filtered=[];readyCount=0;
     for(const n of nodes.slice(0,144)) {
       const holder=gridItem(n), ad=isAd(n), c=cardFrom(n);
       if(ad!==holder.hasAttribute('data-btr-ad'))holder.toggleAttribute('data-btr-ad',ad);
       if(!!c!==holder.hasAttribute('data-btr-ready'))holder.toggleAttribute('data-btr-ready',!!c);
-      if(c&&!(ad&&settings.homeHideAds))result.push(c);
+      if(c&&!ad)readyCount++;
+      let hit=null,dup=false;
+      if(c&&!ad) {
+        const meta=metaFrom(n,c);hit=filters.match(meta);
+        if(!hit&&filters.needsTags&&meta.bvid&&meta.tags===undefined)wantTags(meta.bvid);
+        if(!hit&&dups?.has(c.url))dup=true;
+      }
+      mark(holder,'data-btr-filtered',hit?hit.label:null);
+      mark(holder,'data-btr-dup',dup);
+      if(hit)filtered.push({title:c.title,why:hit.label});else if(dup)filtered.push({title:c.title,why:'前几批已出现过'});
+      if(c&&!(ad&&settings.homeHideAds)&&!hit&&!dup)result.push(c);
     }
     // After ads are hidden the native last row can be short; the infinite feed tops it up (it owns the spares).
     if(settings.homeInfinite)requestAnimationFrame(()=>infinite?.fill?.());
@@ -236,7 +293,14 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
   function notify(text,error=false) {status=text;statusError=error;render();}
   function render() {
     if(!bar)return;
-    refs.back.hidden=refs.next.hidden=refs.count.hidden=!settings.homeHistory;
+    const inf=infiniteMode();
+    // 换一批 mode: browse batches. 无限下滑 mode: no batch buttons at all; the feed below is the batches.
+    for(const k of ['back','next','count','sep','refresh'])refs[k].hidden=inf;
+    if(!inf)refs.back.hidden=refs.next.hidden=refs.count.hidden=!settings.homeHistory;
+    refs.mode.replaceChildren(...(inf?[el('b','♾ 无限下滑'),document.createTextNode(' · 第 1 批 · 往下滑自动加载')]:[el('b','换一批模式'),document.createTextNode(settings.homeHistory?' · 可回看上一批':'')]));
+    const n=filtered.length;refs.blocked.hidden=!n;
+    if(n){refs.blocked.textContent=`已屏蔽 ${n} 个`;refs.blocked.title=filtered.slice(0,12).map(f=>`「${f.title.slice(0,24)}」— ${f.why}`).join('\n')+(n>12?`\n……共 ${n} 个`:'')+'\n点击管理屏蔽规则';}
+    renderChooser();
     refs.back.disabled=busy||index<=0;
     refs.next.disabled=busy||index<0||index>=snapshots.length-1;
     refs.count.textContent=snapshots.length?`${index+1} / ${snapshots.length}`:'—';
@@ -267,11 +331,36 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
       refs.count=el('span','—','count');
       refs.refresh=button('换一批',refresh,'使用 B 站原生换一换，不刷新整个页面');refs.refresh.className='refresh';
       refs.settings=button('设置',()=>globalThis.__BTR_QUICK__?globalThis.__BTR_QUICK__.open('home'):chrome.runtime.sendMessage({type:'flow-open-options'}).catch(()=>notify('请从扩展图标打开增强设置。',true)),'哔哩节流阀快捷面板');
-      refs.nav.append(refs.status,refs.back,refs.count,refs.next,el('span',null,'separator'),refs.refresh,refs.settings);
+      refs.mode=button('',()=>openQuick(),'切换首页模式（换一批 / 无限下滑）');refs.mode.className='mode';
+      refs.blocked=button('',()=>openQuick(),'');refs.blocked.className='blocked';refs.blocked.hidden=true;
+      refs.sep=el('span',null,'separator');
+      refs.nav.append(refs.status,refs.mode,refs.blocked,refs.back,refs.count,refs.next,refs.sep,refs.refresh,refs.settings);
       shadow.append(refs.nav);
     }
     if(bar.parentNode!==grid.parentNode||bar.nextElementSibling!==grid)grid.before(bar);
     toggle('data-btr-home-ui',true); columnCount();render();theme();infinite?.sync();
+  }
+  const openQuick=()=>globalThis.__BTR_QUICK__?globalThis.__BTR_QUICK__.open('home'):chrome.runtime.sendMessage({type:'flow-open-options',hash:'home'}).catch(()=>{});
+  /* First visit: ask once which way the homepage should work. Both stay one click away in the quick panel. */
+  function renderChooser() {
+    const want=active()&&!settings.homeModeChosen&&!view;
+    if(!want){if(refs.chooser){const c=refs.chooser;refs.chooser=null;ui?ui.fadeOut(c,180):c.remove();}return;}
+    if(refs.chooser)return;
+    const box=el('section',null,'chooser');box.setAttribute('aria-label','选择首页模式');
+    box.append(el('h3','想怎么刷首页？'),el('p','两种方式各有各的玩法，选一个就好。以后可以在右下角快捷面板「首页」里随时切换。'));
+    const opts=el('div',null,'opts');
+    const opt=(mode,title,text,bars)=>{const b=button('',()=>choose(mode));b.className='opt';const pic=el('span',null,'pic');
+      bars.forEach((y,i)=>{const r=el('i');r.style.top=`${y}px`;if(mode==='batch'&&i===bars.length-1)r.style.background='rgba(0,174,236,.55)';pic.append(r);});
+      const t=el('span');t.append(el('b',title),el('span',text));b.append(pic,t);return b;};
+    opts.append(opt('batch','换一批','一屏一屏地挑。点「换一批」看新推荐，手滑了用「上一批」翻回去，前几批出现过的视频不再重复。',[8,20,32]),
+      opt('infinite','无限下滑','一路往下刷。快到底就自动加载下一批，按「第 N 批」接在下面，往上翻之前的都还在。',[6,16,26,36]));
+    const later=button('先用默认的「换一批」',()=>choose('batch'));later.className='later';
+    box.append(opts,later);refs.chooser=box;refs.nav.before(box);
+    ui?.animate(box,[{opacity:0,transform:'translateY(-4px)'},{opacity:1,transform:'none'}],{duration:ui.MOTION.mid});
+  }
+  async function choose(mode) {
+    try{await chrome.storage.sync.set({homeInfinite:mode==='infinite',homeModeChosen:true});}
+    catch(_){notify('没保存上，请在快捷面板里选择模式。',true);}
   }
   function closeHistory() {view?.remove();view=null;toggle('data-btr-history-open',false);infinite?.sync();}
   function show(wanted) {
@@ -301,6 +390,8 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
   }
   function accept(items,replaceLatest=false) {
     if(items.length<2)return;
+    const urls=new Set(items.map(c=>c.url));
+    if(replaceLatest&&pageBatches.length)pageBatches[pageBatches.length-1]=urls;else pageBatches=[...pageBatches,urls].slice(-25);
     if(settings.homeHistory) {
       const atLatest=index>=snapshots.length-1, old=snapshots[index];
       if(replaceLatest&&snapshots.length)snapshots=[...snapshots.slice(0,-1),{...snapshots.at(-1),cards:items}];
@@ -318,12 +409,15 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     clearTimeout(settleTimer);
     if(!active()||!grid?.isConnected)return;
     const items=collect(), key=core.key(items);
+    render();
     if(items.length<2)return;
+    if(infiniteMode()){if(transaction)finishTransaction();return;} // 无限下滑 has its own batches; no 换一批 history.
     if(candidateKey!==key){candidateKey=key;settleTimer=setTimeout(settle,QUIET_MS);return;}
     if(transaction) {
       if(key===transaction.beforeKey)return;
+      // Completeness is judged on what B 站 rendered, not on what survives our filters and dedupe.
       const minimum=Math.max(2,Math.min(transaction.count,6));
-      if(items.length<minimum)return;
+      if(Math.max(items.length,readyCount)<minimum)return;
       const fromHistory=!!view;
       finishTransaction();index=snapshots.length-1;closeHistory();accept(items,false);index=snapshots.length-1;
       notify('');if(fromHistory)window.scrollTo({top:liveScroll,behavior:'instant'});
@@ -383,7 +477,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     if(busy||!active()||!grid)return false;
     const items=collect();
     // Lock synchronously, before storage promises or native handlers run.
-    busy=true;transaction={id:++generation,beforeKey:core.key(items),count:items.length};
+    busy=true;transaction={id:++generation,beforeKey:core.key(items),count:Math.max(items.length,readyCount)};
     if(!liveReady)accept(items);else if(settings.homeHistory&&items.length>=2&&core.grows(snapshots.at(-1)?.cards||[],items))accept(items,true);
     index=snapshots.length-1;closeHistory();notify('');candidateKey='';render();
     const id=transaction.id;
@@ -473,6 +567,11 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     return false;
   });
   chrome.storage.onChanged.addListener((changes,area)=>{
+    if(area==='sync'&&filt.KEYS.some(k=>changes[k])) {
+      for(const k of filt.KEYS)if(changes[k])filterRaw[k]=changes[k].newValue;
+      filters=filt.compile(filterRaw);infinite?.refilter?.();
+      if(active()&&grid?.isConnected){collect();render();}
+    }
     if(area==='sync'&&Object.keys(core.defaults).some(k=>changes[k])) {
       const priorHistory=settings.homeHistory;
       settings=core.settings({...settings,...Object.fromEntries(Object.keys(core.defaults).filter(k=>changes[k]).map(k=>[k,changes[k].newValue]))});
@@ -490,7 +589,8 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
   });
   async function start() {
     try {
-      const s=await chrome.storage.sync.get(core.defaults);settings=core.settings(s);
+      const s=await chrome.storage.sync.get({...core.defaults,...filt.defaults});settings=core.settings(s);
+      filterRaw={...filt.defaults,...s};filters=filt.compile(filterRaw);
       const data=await chrome.storage.local.get([storageKey,'flowHistoryClearedAt']);clearEpoch=Number(data.flowHistoryClearedAt)||0;
       if((Number(data[storageKey]?.epoch)||0)===clearEpoch)snapshots=core.history(data[storageKey]?.snapshots);
       index=snapshots.length-1;

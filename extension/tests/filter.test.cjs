@@ -1,0 +1,33 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const f=require('../src/filter-core.js'),c=require('../src/clean-core.js'),home=require('../src/home-core.js');
+
+test('filters default on with empty lists; lists are cleaned, deduped and capped',()=>{const s=f.settings({});assert.equal(s.filterEnabled,true);assert.deepEqual(s.filterKeywords,[]);
+ const t=f.settings({filterKeywords:[' 原神 ','原神','ＡＢＣ','abc','',null,'​'],filterTags:['#游戏','游戏'],filterUps:['123456','uid:123456:张三','某某']});
+ assert.deepEqual(t.filterKeywords,['原神','ＡＢＣ']);assert.deepEqual(t.filterTags,['游戏']);assert.deepEqual(t.filterUps,['uid:123456','uid:123456:张三','某某'].slice(0,3));
+ assert.equal(f.settings({filterKeywords:Array.from({length:500},(_,i)=>'k'+i)}).filterKeywords.length,f.MAX_ITEMS);});
+test('keywords match titles case- and width-insensitively; /regex/ works; bad regex never matches',()=>{const m=f.compile({filterKeywords:['原神','abc','/第\\d+集/','/[/']});
+ assert.equal(m.match({title:'【原神】新角色'}).type,'keyword');assert.equal(m.match({title:'ＡＢＣ教程'}).value,'abc');assert.equal(m.match({title:'动画 第12集'}).value,'/第\\d+集/');assert.equal(m.match({title:'普通视频'}),null);assert.equal(m.match({title:'[test'}),null);});
+test('uploaders match by UID or by exact name, not by substring',()=>{const m=f.compile({filterUps:['uid:42:老番茄','某科学']});
+ assert.equal(m.match({title:'x',author:'改名了',mid:42}).type,'up');assert.equal(m.match({title:'x',author:'某科学',mid:7}).type,'up');assert.equal(m.match({title:'x',author:'某科学的超电磁炮',mid:8}),null);});
+test('tags match exactly once known; needsTags only when a tag rule exists',()=>{const m=f.compile({filterTags:['Minecraft']});assert.equal(m.needsTags,true);
+ assert.equal(m.match({title:'x',tags:['我的世界','minecraft']}).type,'tag');assert.equal(m.match({title:'x',tags:['mine']}),null);assert.equal(m.match({title:'x'}),null);
+ assert.equal(f.compile({filterKeywords:['a']}).needsTags,false);});
+test('master switch off disables every rule',()=>{const m=f.compile({filterEnabled:false,filterKeywords:['a']});assert.equal(m.on,false);assert.equal(m.match({title:'abc'}),null);});
+test('add / remove / labels for list editing',()=>{assert.deepEqual(f.add(['a'],'A','keywords'),null);assert.deepEqual(f.add(['a'],'b','keywords'),['a','b']);
+ assert.deepEqual(f.add(['uid:1:甲'],'uid:1','ups'),null);assert.deepEqual(f.add([],f.upEntry(99,'乙'),'ups'),['uid:99:乙']);assert.equal(f.upLabel('uid:99:乙'),'乙');assert.equal(f.upLabel('uid:99'),'UID 99');
+ assert.deepEqual(f.remove(['a','b'],'a'),['b']);assert.deepEqual(f.add([],'#音乐','tags'),['音乐']);});
+test('clean rules: unique keys, valid attributes, page scoping, ads on by default and annoyances opt-in',()=>{assert.equal(new Set(c.KEYS).size,c.KEYS.length);
+ for(const r of c.RULES){assert.match(c.attr(r.key),/^data-btr-clean-[a-z-]+$/);assert(r.css.length);}
+ const keys=w=>c.forPage(w).map(r=>r.key);
+ assert(keys('www.bilibili.com/').includes('cleanHomeLive'));assert(!keys('www.bilibili.com/video/BV1xx411c7mD/').includes('cleanHomeLive'));assert(keys('www.bilibili.com/video/BV1xx411c7mD/').includes('cleanVideoAds'));
+ assert(keys('search.bilibili.com/all').includes('cleanSearchAds'));assert(keys('t.bilibili.com/').includes('cleanDynAds'));
+ assert.equal(c.defaults.cleanVideoAds,true);assert.equal(c.defaults.cleanHomeLive,false);assert.equal(c.defaults.cleanLoginTips,false);
+ assert.deepEqual(c.settings({cleanVideoAds:false,junk:1}).cleanVideoAds,false);});
+test('clean stylesheet parses as CSS selectors in a browser-like check (balanced, every rule gated)',()=>{const css=c.css();assert.equal((css.match(/\{display:none!important\}/g)||[]).length,c.RULES.length);
+ for(const line of css.split('\n'))assert(/^html\[data-btr-clean-/.test(line.trim()),line);});
+test('home mode choice flag defaults to unchosen; manifest loads the new scripts in order',()=>{assert.equal(home.defaults.homeModeChosen,false);
+ const m=JSON.parse(fs.readFileSync(path.join(__dirname,'../manifest.json'),'utf8'));const all=m.content_scripts.map(e=>e.js);
+ const cl=m.content_scripts.find(e=>e.js.includes('src/cleaner.js'));assert.deepEqual(cl.js,['src/clean-core.js','src/cleaner.js']);assert.equal(cl.run_at,'document_start');
+ const h=all.find(j=>j.includes('src/home-enhancer.js'));assert(h.indexOf('src/filter-core.js')<h.indexOf('src/home-infinite.js')&&h.indexOf('src/tag-source.js')<h.indexOf('src/home-infinite.js'));
+ const q=all.find(j=>j.includes('src/quick-panel.js'));assert(q.includes('src/filter-core.js')&&q.includes('src/clean-core.js'));assert.deepEqual(m.permissions.filter(p=>p!=='storage'),[]);});

@@ -1,5 +1,5 @@
 {
-  "browser": "154.0.8037.97",
+  "browser": "141.0.7390.37",
   "environment": "Renderer fixture, stub native player/fetch/clipboard; not live Bilibili or HDR hardware validation",
   "tests": [
     {

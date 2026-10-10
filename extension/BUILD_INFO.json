@@ -1,7 +1,7 @@
 {
   "name": "BiliThrottle (哔哩节流阀)",
-  "version": "2.3.0",
-  "build_date": "2026-10-09",
+  "version": "2.4.0",
+  "build_date": "2026-10-10",
   "distribution": "Unofficial Chrome/Edge MV3 fork; not an upstream extension release",
   "input": "BTR-Flow-1.0.0(1).zip",
   "input_sha256": "f211255fce9a3c0f06147da1a401884a90a7293c5e6a34c0336e7a608e0c4ba2",
@@ -21,15 +21,16 @@
     "theme": "native",
     "history": true,
     "focus_mode_enabled": false,
-    "infinite_feed": false
+    "infinite_feed": false,
+    "mode_chosen": false
   },
   "automatic_updates": false,
   "testing": {
-    "node_core_passed": 105,
+    "node_core_passed": 114,
     "renderer_home_options_fixture_passed": 35,
     "renderer_branch_diagnostics_fixture_passed": 9,
     "real_mse_synthetic_media_passed": "not re-run for 1.2.0 (open-source Chromium lacks H.264); 7 passed on 1.1.0",
-    "total_passed": 214,
+    "total_passed": 237,
     "real_bilibili_e2e_verified": false,
     "real_HDR_HiRes_hardware_verified": false,
     "firefox_safari_verified": false,
@@ -51,8 +52,10 @@
     "playback_investigation_round5": "BV1cNd8BoEoW, logged out, Playwright Chromium + unpacked extension. Player code identical to origin/main except version strings. curl from the box: uncached upos ranges 24-102 KB/s on cosov (TTFB 4-11 s), akam 0.065-2 MB/s. Unthrottled 90 s: branch/main/no-extension all play (35-72 s buffered), no freeze (heartbeat lag <0.3 s). 400 kbps: branch and main both black ~65 s (takeover, fetch failure, auto-retake); no extension starts at ~76 s. With the new 20 s slow-start guard: takeover at ~43 s, handed back at ~63 s, no retake, native playing from ~93 s, 110 media requests instead of 169-179.",
     "renderer_home_ads_passed": 6,
     "home_ads_markup_source": "laputa-home index-12fc55c2.js (2026-10-09): ad cards render <span class=bili-video-card__stats--text>广告</span> (or a rocket icon for creative ads, card_type 82) directly in .bili-video-card__stats instead of the duration; url/spaceUrl point at the ad link. Recording frame: 腾讯 WorkBuddy card with a 广告 corner label.",
-    "final_logged_in_check": "Logged-in live check (box browser, unpacked): extensions error page clean, no proxy warning, ad cards hidden, videos play, quick panel top edge stable, placeholder persists >11 s, 知道了 reflows. Reported 撤销 not restoring and native-grid holes were fixed afterwards and are covered by fixture tests only."
+    "final_logged_in_check": "Logged-in live check (box browser, unpacked): extensions error page clean, no proxy warning, ad cards hidden, videos play, quick panel top edge stable, placeholder persists >11 s, 知道了 reflows. Reported 撤销 not restoring and native-grid holes were fixed afterwards and are covered by fixture tests only.",
+    "renderer_home_filter_clean_passed": 14,
+    "adguard_coexistence": "Emulated AdGuard (@adguard/extended-css 2.2.1 + @adguard/scriptlets, cosmetic rules from AdGuard Base, Chinese and Annoyances filter lists for bilibili.com) loaded alongside the unpacked extension on routed homepage / video / search fixtures: no exceptions, no layout fights, infinite feed and refresh toolbar unaffected. Not verified with the real AdGuard browser extension or desktop app on live bilibili.com."
   },
-  "previous_version": "2.2.0",
+  "previous_version": "2.3.0",
   "proxy_feature": "removed in 2.3.0 (Chrome rejects proxy as an optional permission)"
 }
