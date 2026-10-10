@@ -5,7 +5,7 @@
   const defaults = Object.freeze({homeEnabled:true, homeHistory:true, homeTheme:'native', homeHideCarousel:true, homeHideBanner:false, homeHideAds:true,
     homeInfinite:false, homeInfiniteSize:24, homeInfiniteThreads:2,
     // Hover preview on infinite-feed cards: 'video' plays the video inline like B 站's own cards; 'frames' scrubs storyboard frames.
-    homePreview:'video',
+    homePreview:'video', homePreviewMuted:true,
     // The two homepage modes (换一批 / 无限下滑) are chosen once, the first time the homepage opens.
     homeModeChosen:false});
   function settings(raw = {}) {
@@ -15,7 +15,7 @@
     }
     // 1.0's light/dark/auto/off all return to Bilibili's own theme, never force a theme on upgrade.
     out.homeTheme = raw.homeTheme === 'oled' ? 'oled' : 'native';
-    out.homePreview = raw.homePreview === 'frames' ? 'frames' : 'video';
+    out.homePreview = raw.homePreview === 'frames' || raw.homePreview === 'off' ? raw.homePreview : 'video';
     const num = (v, lo, hi, d) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d; };
     // Each request returns 12 like B 站's own page; a batch is 1–3 merged requests.
     out.homeInfiniteSize = Math.round(num(raw.homeInfiniteSize, 12, 36, defaults.homeInfiniteSize) / 12) * 12;

@@ -106,7 +106,10 @@
 :is(#btr-flow-feed,[data-btr-fill]) .btr-inline.on{opacity:1}
 :is(#btr-flow-feed,[data-btr-fill]) .btr-inline video{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
 :is(#btr-flow-feed,[data-btr-fill]) .btr-inline-bar{position:absolute;left:0;bottom:0;height:3px;width:100%;background:#fb7299;transform-origin:0 50%;transform:scaleX(0)}
-:is(#btr-flow-feed,[data-btr-fill]) .btr-inline-mute{position:absolute;right:8px;bottom:10px;width:28px;height:28px;display:grid;place-items:center;border:0;border-radius:50%;background:rgba(0,0,0,.45);color:#fff;font-size:14px;line-height:1;cursor:pointer;transition:background-color .15s ease}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-inline-mute{position:absolute;right:8px;bottom:10px;width:30px;height:30px;display:grid;place-items:center;padding:0;border:0;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;cursor:pointer;transition:background-color .15s ease,transform .12s ease}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-inline-mute svg{width:18px;height:18px}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-inline-mute:active{transform:scale(.92)}
+:is(#btr-flow-feed,[data-btr-fill]) .btr-inline-mute:not(.muted){background:rgba(251,114,153,.9)}
 :is(#btr-flow-feed,[data-btr-fill]) .btr-inline-mute:hover,:is(#btr-flow-feed,[data-btr-fill]) .btr-inline-mute:focus-visible{background:rgba(251,114,153,.9);outline:none}
 /* Skeletons reuse B 站's own skeleton classes; the fallback below only applies if they are unstyled. */
 :is(#btr-flow-feed,[data-btr-fill]) .btr-skel .bili-video-card__skeleton--cover{aspect-ratio:16/9;border-radius:6px;background:var(--graph_bg_regular,rgba(128,128,128,.12))}
@@ -760,14 +763,18 @@
         e.target.__btrPf = setTimeout(() => { prefetcher.unobserve(e.target); if (previewMode() === 'frames') prefetchShots(e.target.__btrCardData); }, 300);
       }
     }, {rootMargin: '200px 0px'}) : null;
-    const previewMode = () => host.settings()?.homePreview === 'frames' ? 'frames' : 'video';
+    const previewMode = () => { const m = host.settings()?.homePreview; return m === 'frames' || m === 'off' ? m : 'video'; };
 
     /* ---------- inline video preview, like B 站's own homepage cards ----------
        B 站's card plays a muted low-quality copy of the video in its .v-inline-player after a short dwell, with a
        thin progress bar and a mute toggle; it stops and unloads as soon as the pointer leaves. Our cards are not
        Vue components, so the same behaviour is reproduced with the same public playurl API (html5 mp4, 360P). */
     const PLAY = 'https://api.bilibili.com/x/player/wbi/playurl';
-    const clips = new Map(); let muted = true;
+    const clips = new Map();
+    // Mute is one global choice (homePreviewMuted, synced): the card's speaker button, the popup and the options page all set it.
+    const isMuted = () => host.settings()?.homePreviewMuted !== false;
+    const SPK = 'M4 9v6h4l5 4V5L8 9H4z', WAVES = 'M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12', CROSS = 'M16 9.5l5 5m0-5-5 5';
+    function speaker(btn, m) { btn.replaceChildren(svg(SPK, null)); const p = document.createElementNS(svgNS, 'path'); p.setAttribute('d', m ? CROSS : WAVES); p.setAttribute('fill', 'none'); p.setAttribute('stroke', 'currentColor'); p.setAttribute('stroke-width', '2'); p.setAttribute('stroke-linecap', 'round'); btn.firstChild.append(p); btn.classList.toggle('muted', m); btn.setAttribute('aria-pressed', String(!m)); btn.setAttribute('aria-label', m ? '打开声音（所有卡片都记住）' : '静音（所有卡片都记住）'); btn.title = m ? '打开声音 · 会记住' : '静音 · 会记住'; }
     async function clip(c) {
       const hit = clips.get(c.bvid);
       if (hit && Date.now() - hit.at < 20 * 60000) return hit.p;
@@ -785,6 +792,10 @@
       clips.set(c.bvid, {at: Date.now(), p});
       return p;
     }
+    // Toggled in the popup / options / another tab while a clip plays: follow it at once.
+    chrome.storage.onChanged.addListener((ch, area) => {
+      if (area === 'sync' && ch.homePreviewMuted) for (const l of document.querySelectorAll('#btr-flow-feed .btr-inline,[data-btr-fill] .btr-inline')) l.__sync?.(ch.homePreviewMuted.newValue !== false);
+    });
     function videoPreview(c, wrap, link) {
       let layer = null, dwell = 0, inside = false, raf = 0;
       const stop = () => {
@@ -801,16 +812,17 @@
           const src = await clip(c);
           if (!inside || !src || layer) return;
           layer = el('div', 'btr-inline'); layer.dataset.bvid = c.bvid;
-          const v = el('video'); v.muted = muted; v.playsInline = true; v.loop = true; v.preload = 'auto'; v.disablePictureInPicture = true;
+          const v = el('video'); v.muted = isMuted(); v.playsInline = true; v.loop = true; v.preload = 'auto'; v.disablePictureInPicture = true;
           v.setAttribute('muted', ''); v.src = src;
           const bar = el('i', 'btr-inline-bar'), mute = el('button', 'btr-inline-mute'); mute.type = 'button';
-          const label = () => { mute.textContent = v.muted ? '🔇' : '🔊'; mute.setAttribute('aria-label', v.muted ? '打开声音' : '静音'); mute.title = v.muted ? '打开声音' : '静音'; };
-          label(); bind(mute, () => { v.muted = muted = !v.muted; label(); });
+          const label = () => speaker(mute, v.muted);
+          label(); bind(mute, () => { v.muted = !v.muted; label(); chrome.storage.sync.set({homePreviewMuted: v.muted}).catch(() => {}); });
+          layer.__sync = m => { if (v.muted !== m) { v.muted = m; label(); } };
           layer.append(v, bar, mute); wrap.append(layer);
           v.addEventListener('playing', () => layer?.classList.add('on'), {once: true});
           const tick = () => { if (!layer) return; if (v.duration) bar.style.transform = `scaleX(${v.currentTime / v.duration})`; raf = requestAnimationFrame(tick); };
           raf = requestAnimationFrame(tick);
-          v.play().catch(() => { if (!v.muted) { v.muted = muted = true; label(); v.play().catch(() => {}); } });
+          v.play().catch(() => { if (!v.muted) { v.muted = true; label(); v.play().catch(() => {}); } });
         }, 500);
       });
       link.addEventListener('pointerleave', stop);
@@ -822,7 +834,8 @@
       // Both behaviours are attached; each one checks the current setting, so switching needs no reload.
       const vp = {link: new EventTarget()}, fp = {link: new EventTarget()};
       for (const t of ['pointerenter', 'pointerleave', 'pointermove', 'click']) link.addEventListener(t, e => {
-        const target = previewMode() === 'video' ? vp.link : fp.link;
+        const mode = previewMode(); if (mode === 'off') return;
+        const target = mode === 'video' ? vp.link : fp.link;
         target.dispatchEvent(new PointerEvent(t, e));
       });
       videoPreview(c, wrap, vp.link);

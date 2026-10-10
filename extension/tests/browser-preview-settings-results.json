@@ -1,0 +1,14 @@
+[
+ {
+  "test": "popup: 悬停预览 segmented (视频播放 / 逐帧 / 关闭, keyboard arrows) and 悬停播放静音 switch save instantly and persist",
+  "passed": true
+ },
+ {
+  "test": "options page: 悬停预览 has 关闭, mute switch reflects the stored value",
+  "passed": true
+ },
+ {
+  "test": "welcome page mentions 悬停预览 and the mute speaker",
+  "passed": true
+ }
+]

@@ -101,9 +101,17 @@ with sync_playwright() as p:
  # Playwright's Chromium ships without H.264; where the codec exists the clip must actually be playing.
  if page.evaluate("document.createElement('video').canPlayType('video/mp4; codecs=\"avc1.42E01E\"')"):page.wait_for_function("(()=>{const v=document.querySelector('#btr-flow-feed .btr-inline video');return !v.paused&&v.currentTime>0})()",timeout=8000)
  assert st['play']==1 and st['shots']==0,(st['play'],st['shots'])
+ m=page.locator('#btr-flow-feed .btr-inline-mute');assert m.is_visible() and m.get_attribute('aria-pressed')=='false' and m.locator('svg').count()==1
  page.evaluate("document.querySelector('#btr-flow-feed .btr-inline-mute').click()");assert page.evaluate("document.querySelector('#btr-flow-feed .btr-inline video').muted")==False
+ page.wait_for_function("fixtureStorage.all.sync.homePreviewMuted===false",timeout=2000)
  assert page.evaluate("location.href")=='https://www.bilibili.com/'
  page.mouse.move(5,5);page.wait_for_function("!document.querySelector('#btr-flow-feed .btr-inline')",timeout=3000)
+ link2=page.locator('#btr-flow-feed .btr-batch .bili-video-card__image--link').nth(1);link2.hover()
+ page.wait_for_function("(()=>{const v=document.querySelector('#btr-flow-feed .btr-inline video');return v&&v.muted===false})()",timeout=8000)
+ page.evaluate("chromeMock.storage.sync.set({homePreviewMuted:true})");page.wait_for_function("document.querySelector('#btr-flow-feed .btr-inline video').muted===true",timeout=2000)
+ page.mouse.move(5,5);page.evaluate("chromeMock.storage.sync.set({homePreview:'off'})");time.sleep(.3);link.hover();time.sleep(1.2)
+ assert page.evaluate("!document.querySelector('#btr-flow-feed .btr-inline,#btr-flow-feed .btr-shot')")
+ ok('mute is a visible speaker icon on the clip, remembered globally (next card plays with sound; popup change applies to a playing clip); 关闭 disables preview')
  ok('video mode: hover plays the clip inline (muted, progress bar, mute toggle that does not open the video), stops on leave');ctx.close()
  # 7. 逐帧预览: storyboard prefetched when cards enter the viewport, first frame shows fast on hover
  ctx,page,st,errors=open_page(FIXTURE,[],preview='frames')

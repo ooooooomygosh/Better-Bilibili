@@ -18,6 +18,13 @@ for(const k of ['enabled','strategy','mode'])$(k).addEventListener('change',asyn
 // 空降助手: the content script listens to storage changes, so this takes effect at once (no reload).
 chrome.storage.sync.get({sbEnabled:true}).then(s=>{$('sbEnabled').checked=s.sbEnabled;});
 $('sbEnabled').addEventListener('change',async()=>{try{const on=$('sbEnabled').checked;await chrome.storage.sync.set({sbEnabled:on,sbChosen:true});say(on?'空降助手已开启，当前视频立即生效。':'空降助手已关闭。','ok');}catch(e){say(e.message,'error');}});
+// 悬停预览: the homepage reads these from storage on every hover, so changes apply at once (a playing clip follows too).
+const pvSeg=$('homePreview'),pvMute=$('homePreviewMuted');
+function pvPaint(mode,muted){for(const b of pvSeg.querySelectorAll('button')){const on=b.dataset.v===mode;b.setAttribute('aria-checked',String(on));b.tabIndex=on?0:-1;}pvMute.checked=muted;pvMute.closest('.pv-mute').classList.toggle('off',mode!=='video');pvMute.disabled=mode!=='video';}
+chrome.storage.sync.get({homePreview:'video',homePreviewMuted:true}).then(s=>pvPaint(['frames','off'].includes(s.homePreview)?s.homePreview:'video',s.homePreviewMuted!==false));
+for(const b of pvSeg.querySelectorAll('button'))b.addEventListener('click',async()=>{try{await chrome.storage.sync.set({homePreview:b.dataset.v});pvPaint(b.dataset.v,pvMute.checked);say(b.dataset.v==='video'?'悬停时像 B 站一样播放视频。':b.dataset.v==='frames'?'悬停时逐帧预览，左右移动鼠标拖动画面。':'已关闭悬停预览。','ok');}catch(e){say(e.message,'error');}});
+pvSeg.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight'].includes(e.key))return;e.preventDefault();const bs=[...pvSeg.querySelectorAll('button')],i=bs.findIndex(b=>b.getAttribute('aria-checked')==='true'),n=bs[(i+(e.key==='ArrowRight'?1:bs.length-1))%bs.length];n.click();n.focus();});
+pvMute.addEventListener('change',async()=>{try{await chrome.storage.sync.set({homePreviewMuted:pvMute.checked});say(pvMute.checked?'悬停播放默认静音。':'悬停播放会带声音。','ok');}catch(e){say(e.message,'error');}});
 $('reloadBtn').onclick=async()=>{try{await chrome.tabs.reload(tab.id);window.close();}catch(e){say(e.message,'error');}};
 $('options').onclick=()=>chrome.runtime.openOptionsPage();
 $('quick').onclick=async()=>{try{await chrome.tabs.sendMessage(tab.id,{type:'flow-quick-open'});window.close();}catch(_){say('请先打开或刷新 B 站页面，快捷面板在页面右下角。','error');}};
