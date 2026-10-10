@@ -11,16 +11,18 @@ const keys = {...globalThis.__BTR_HOME_CORE__.defaults, ...globalThis.__BTR_FOCU
 const ui = globalThis.__BTR_UI__;
 function said(text, kind) { ui.flash($('saved'), text, kind); }
 function show(s) {
-  $('homeInfinite').checked = s.homeInfinite === true;
+  for (const b of document.querySelectorAll('#modes button')) b.setAttribute('aria-checked', String(s.homeModeChosen && (b.dataset.mode === 'infinite') === (s.homeInfinite === true)));
   const active = PRESETS.findIndex(p => Object.entries(p).every(([k, v]) => s[k] === v));
   document.querySelectorAll('#presets button').forEach(b => b.setAttribute('aria-pressed', String(Number(b.dataset.p) === (s.focusEnabled ? active : 0))));
 }
 async function load() { show(await chrome.storage.sync.get(keys)); }
 
-$('homeInfinite').addEventListener('change', async e => {
-  await chrome.storage.sync.set({homeInfinite: e.target.checked});
-  said(e.target.checked ? '已开启无限下滑，刷新 B 站首页即可看到。' : '已关闭无限下滑。', 'ok');
-});
+document.querySelectorAll('#modes button').forEach(b => b.addEventListener('click', async () => {
+  const inf = b.dataset.mode === 'infinite';
+  await chrome.storage.sync.set({homeInfinite: inf, homeModeChosen: true});
+  said(inf ? '已选「无限下滑」：打开 B 站首页，一直往下刷就行。' : '已选「换一批」：推荐区上方有上一批 / 下一批 / 换一批。', 'ok');
+  load();
+}));
 // Watch limits go through the service worker, so a self-discipline lock can hold back loosening.
 document.querySelectorAll('#presets button').forEach(b => b.addEventListener('click', async () => {
   try {

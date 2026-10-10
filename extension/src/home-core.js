@@ -3,7 +3,9 @@
   'use strict';
   const MAX_SNAPSHOTS = 25, MAX_CARDS = 36, TTL = 7 * 86400000;
   const defaults = Object.freeze({homeEnabled:true, homeHistory:true, homeTheme:'native', homeHideCarousel:true, homeHideBanner:false, homeHideAds:true,
-    homeInfinite:false, homeInfiniteSize:24, homeInfiniteThreads:2});
+    homeInfinite:false, homeInfiniteSize:24, homeInfiniteThreads:2,
+    // The two homepage modes (换一批 / 无限下滑) are chosen once, the first time the homepage opens.
+    homeModeChosen:false});
   function settings(raw = {}) {
     const out = {...defaults};
     for (const k of Object.keys(defaults)) {

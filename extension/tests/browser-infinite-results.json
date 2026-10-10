@@ -22,7 +22,7 @@
    "passed": true
   },
   {
-   "test": "⋮ opens a small menu (稍后再看 / 不感兴趣 / 不想看此 UP 主) outside the card (fixed, no card / link ancestor); Esc closes it",
+   "test": "⋮ opens a small menu (稍后再看 / 不感兴趣 / 屏蔽 UP 主) outside the card (fixed, no card / link ancestor); Esc closes it",
    "passed": true
   },
   {

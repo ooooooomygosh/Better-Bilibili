@@ -2,549 +2,693 @@ TAP version 13
 # Subtest: strict closed byte ranges
 ok 1 - strict closed byte ranges
   ---
-  duration_ms: 1.714671
+  duration_ms: 1.240138
   type: 'test'
   ...
 # Subtest: content-range total must exceed end
 ok 2 - content-range total must exceed end
   ---
-  duration_ms: 0.339048
+  duration_ms: 0.370095
   type: 'test'
   ...
 # Subtest: split range covers exactly once for many sizes
 ok 3 - split range covers exactly once for many sizes
   ---
-  duration_ms: 0.667086
+  duration_ms: 0.559163
   type: 'test'
   ...
 # Subtest: concat rejects overflow and truncation
 ok 4 - concat rejects overflow and truncation
   ---
-  duration_ms: 0.395143
+  duration_ms: 0.31489
   type: 'test'
   ...
 # Subtest: CDN hostname boundary and HTTPS validation
 ok 5 - CDN hostname boundary and HTTPS validation
   ---
-  duration_ms: 1.021406
+  duration_ms: 0.775491
   type: 'test'
   ...
 # Subtest: auto routes retain real original URL and explore both regions
 ok 6 - auto routes retain real original URL and explore both regions
   ---
-  duration_ms: 1.405919
+  duration_ms: 1.10182
   type: 'test'
   ...
 # Subtest: custom routes stay within selected hosts
 ok 7 - custom routes stay within selected hosts
   ---
-  duration_ms: 0.377542
+  duration_ms: 0.203199
   type: 'test'
   ...
 # Subtest: 429 is cooldown, not permanent ban
 ok 8 - 429 is cooldown, not permanent ban
   ---
-  duration_ms: 0.739252
+  duration_ms: 0.512481
   type: 'test'
   ...
 # Subtest: policy differentiates short videos and high bitrate
 ok 9 - policy differentiates short videos and high bitrate
   ---
-  duration_ms: 0.599336
+  duration_ms: 0.434948
   type: 'test'
   ...
 # Subtest: 2x playback increases media-seconds buffer within cap
 ok 10 - 2x playback increases media-seconds buffer within cap
   ---
-  duration_ms: 0.808338
+  duration_ms: 0.365854
   type: 'test'
   ...
 # Subtest: high bitrate buffer obeys estimated memory budget
 ok 11 - high bitrate buffer obeys estimated memory budget
   ---
-  duration_ms: 0.246361
+  duration_ms: 0.162598
   type: 'test'
   ...
 # Subtest: economy uses four threads and narrow prefetch window
 ok 12 - economy uses four threads and narrow prefetch window
   ---
-  duration_ms: 0.319938
+  duration_ms: 0.093019
   type: 'test'
   ...
 # Subtest: hidden paused throttles, hidden playing does not
 ok 13 - hidden paused throttles, hidden playing does not
   ---
-  duration_ms: 0.469386
+  duration_ms: 0.076555
   type: 'test'
   ...
 # Subtest: explicit automatic hard cap honored
 ok 14 - explicit automatic hard cap honored
   ---
-  duration_ms: 0.189604
+  duration_ms: 0.101449
   type: 'test'
   ...
 # Subtest: fast-start max buffer is bounded
 ok 15 - fast-start max buffer is bounded
   ---
-  duration_ms: 0.192
+  duration_ms: 0.069684
   type: 'test'
   ...
 # Subtest: decode warning requires buffer, not just frame drops
 ok 16 - decode warning requires buffer, not just frame drops
   ---
-  duration_ms: 0.173044
+  duration_ms: 0.079847
   type: 'test'
   ...
 # Subtest: adaptive policy can be disabled
 ok 17 - adaptive policy can be disabled
   ---
-  duration_ms: 0.422578
+  duration_ms: 0.276031
   type: 'test'
   ...
 # Subtest: default CDN and settings are auto
 ok 18 - default CDN and settings are auto
   ---
-  duration_ms: 0.201444
+  duration_ms: 0.138597
   type: 'test'
   ...
 # Subtest: history strips query/tracking and rejects foreign video URLs
 ok 19 - history strips query/tracking and rejects foreign video URLs
   ---
-  duration_ms: 0.643212
+  duration_ms: 0.345898
   type: 'test'
   ...
 # Subtest: history rejects foreign cover and keeps titles as text
 ok 20 - history rejects foreign cover and keeps titles as text
   ---
-  duration_ms: 0.396547
+  duration_ms: 0.239137
   type: 'test'
   ...
 # Subtest: history dedupes same batch
 ok 21 - history dedupes same batch
   ---
-  duration_ms: 1.007831
+  duration_ms: 0.598
   type: 'test'
   ...
 # Subtest: history bounded to 25 and 7 days
 ok 22 - history bounded to 25 and 7 days
   ---
-  duration_ms: 32.665085
+  duration_ms: 19.509501
   type: 'test'
   ...
 # Subtest: history dedupes duplicate cards
 ok 23 - history dedupes duplicate cards
   ---
-  duration_ms: 0.241878
+  duration_ms: 0.148045
   type: 'test'
   ...
-# Subtest: proxy parser excludes passwords, scripts and subscription URLs
-ok 24 - proxy parser excludes passwords, scripts and subscription URLs
+# Subtest: manifest asks only for storage: no proxy (Chrome rejects it as optional), no broad host permissions
+ok 24 - manifest asks only for storage: no proxy (Chrome rejects it as optional), no broad host permissions
   ---
-  duration_ms: 0.445093
-  type: 'test'
-  ...
-# Subtest: proxy parser supports local HTTP and IPv6
-ok 25 - proxy parser supports local HTTP and IPv6
-  ---
-  duration_ms: 0.747582
-  type: 'test'
-  ...
-# Subtest: PAC routes exact Bili boundaries only; no DIRECT fallback for Bili
-ok 26 - PAC routes exact Bili boundaries only; no DIRECT fallback for Bili
-  ---
-  duration_ms: 1.511664
-  type: 'test'
-  ...
-# Subtest: manifest has no mandatory proxy or broad host permissions
-ok 27 - manifest has no mandatory proxy or broad host permissions
-  ---
-  duration_ms: 1.664379
+  duration_ms: 1.325495
   type: 'test'
   ...
 # Subtest: all manifest and HTML local assets exist
-ok 28 - all manifest and HTML local assets exist
+ok 25 - all manifest and HTML local assets exist
   ---
-  duration_ms: 0.932153
+  duration_ms: 3.48568
   type: 'test'
   ...
 # Subtest: valid concurrent download reassembles exact bytes
-ok 29 - valid concurrent download reassembles exact bytes
+ok 26 - valid concurrent download reassembles exact bytes
   ---
-  duration_ms: 28.640563
+  duration_ms: 19.505791
   type: 'test'
   ...
 # Subtest: wire requests omit cookies and reject pre-aborted task
-ok 30 - wire requests omit cookies and reject pre-aborted task
+ok 27 - wire requests omit cookies and reject pre-aborted task
   ---
-  duration_ms: 2.719174
+  duration_ms: 1.603771
   type: 'test'
   ...
 # Subtest: bad ranges rejected before network
-ok 31 - bad ranges rejected before network
+ok 28 - bad ranges rejected before network
   ---
-  duration_ms: 1.916436
+  duration_ms: 1.268955
   type: 'test'
   ...
 # Subtest: mismatched Content-Range is never delivered
-ok 32 - mismatched Content-Range is never delivered
+ok 29 - mismatched Content-Range is never delivered
   ---
-  duration_ms: 82.344934
+  duration_ms: 82.070955
   type: 'test'
   ...
 # Subtest: resource total consistency checked before reading wrong body
-ok 33 - resource total consistency checked before reading wrong body
+ok 30 - resource total consistency checked before reading wrong body
   ---
-  duration_ms: 86.294407
+  duration_ms: 82.955664
   type: 'test'
   ...
 # Subtest: oversize streaming response is canceled rather than accumulated
-ok 34 - oversize streaming response is canceled rather than accumulated
+ok 31 - oversize streaming response is canceled rather than accumulated
   ---
-  duration_ms: 105.656916
+  duration_ms: 103.340113
   type: 'test'
   ...
 # Subtest: progressive consumer failure cancels sibling tasks
-ok 35 - progressive consumer failure cancels sibling tasks
+ok 32 - progressive consumer failure cancels sibling tasks
   ---
-  duration_ms: 46.91695
+  duration_ms: 39.778655
   type: 'test'
   ...
 # Subtest: automatic concurrency respects economy cap inside downloader
-ok 36 - automatic concurrency respects economy cap inside downloader
+ok 33 - automatic concurrency respects economy cap inside downloader
   ---
-  duration_ms: 3.128484
+  duration_ms: 1.362644
   type: 'test'
   ...
 # Subtest: manual thread setting is not overwritten by economy cap
-ok 37 - manual thread setting is not overwritten by economy cap
+ok 34 - manual thread setting is not overwritten by economy cap
   ---
-  duration_ms: 4.544813
+  duration_ms: 1.176208
   type: 'test'
   ...
 # Subtest: manual auto cap applies even without smart content policy
-ok 38 - manual auto cap applies even without smart content policy
+ok 35 - manual auto cap applies even without smart content policy
   ---
-  duration_ms: 2.446959
+  duration_ms: 1.16634
   type: 'test'
   ...
 # Subtest: short 4K videos retain bitrate headroom without a long ahead target
-ok 39 - short 4K videos retain bitrate headroom without a long ahead target
+ok 36 - short 4K videos retain bitrate headroom without a long ahead target
   ---
-  duration_ms: 0.282728
+  duration_ms: 0.168104
   type: 'test'
   ...
 # Subtest: diagnostic postMessage failure cannot break playback observation
-ok 40 - diagnostic postMessage failure cannot break playback observation
+ok 37 - diagnostic postMessage failure cannot break playback observation
   ---
-  duration_ms: 2.913852
+  duration_ms: 2.552755
+  type: 'test'
+  ...
+# Subtest: home ad helpers: badge text is exact, API ad items are recognised
+ok 38 - home ad helpers: badge text is exact, API ad items are recognised
+  ---
+  duration_ms: 0.491488
   type: 'test'
   ...
 # Subtest: md5 matches node crypto for ASCII, UTF-8 and block boundaries
-ok 41 - md5 matches node crypto for ASCII, UTF-8 and block boundaries
+ok 39 - md5 matches node crypto for ASCII, UTF-8 and block boundaries
   ---
-  duration_ms: 3.397883
+  duration_ms: 2.001229
   type: 'test'
   ...
 # Subtest: WBI signing reproduces the documented example
-ok 42 - WBI signing reproduces the documented example
+ok 40 - WBI signing reproduces the documented example
   ---
-  duration_ms: 0.691322
+  duration_ms: 0.547374
   type: 'test'
   ...
 # Subtest: signing strips the characters the web client strips
-ok 43 - signing strips the characters the web client strips
+ok 41 - signing strips the characters the web client strips
   ---
-  duration_ms: 0.533851
+  duration_ms: 0.284901
   type: 'test'
   ...
 # Subtest: nav response yields keys only when both are 32-hex file names
-ok 44 - nav response yields keys only when both are 32-hex file names
+ok 42 - nav response yields keys only when both are 32-hex file names
   ---
-  duration_ms: 2.180267
+  duration_ms: 1.540955
   type: 'test'
   ...
 # Subtest: concurrent lanes use distinct page indices and requested size
-ok 45 - concurrent lanes use distinct page indices and requested size
+ok 43 - concurrent lanes use distinct page indices and requested size
   ---
-  duration_ms: 0.334801
+  duration_ms: 0.188659
   type: 'test'
   ...
 # Subtest: cards keep videos only: ads, live, bad ids, untitled and duplicates are dropped
-ok 46 - cards keep videos only: ads, live, bad ids, untitled and duplicates are dropped
+ok 44 - cards keep videos only: ads, live, bad ids, untitled and duplicates are dropped
   ---
-  duration_ms: 1.440997
+  duration_ms: 1.100909
   type: 'test'
   ...
 # Subtest: covers are forced to https on hdslb and downscaled; foreign hosts rejected
-ok 47 - covers are forced to https on hdslb and downscaled; foreign hosts rejected
+ok 45 - covers are forced to https on hdslb and downscaled; foreign hosts rejected
   ---
-  duration_ms: 1.812417
+  duration_ms: 0.28565
   type: 'test'
   ...
 # Subtest: durations, counts and dates read like B 站
-ok 48 - durations, counts and dates read like B 站
+ok 46 - durations, counts and dates read like B 站
   ---
-  duration_ms: 0.303638
+  duration_ms: 0.156633
   type: 'test'
   ...
 # Subtest: risk-control codes pause instead of retrying
-ok 49 - risk-control codes pause instead of retrying
+ok 47 - risk-control codes pause instead of retrying
   ---
-  duration_ms: 0.400537
+  duration_ms: 0.268112
   type: 'test'
   ...
 # Subtest: infinite feed is opt-in and its numbers are clamped
-ok 50 - infinite feed is opt-in and its numbers are clamped
+ok 48 - infinite feed is opt-in and its numbers are clamped
   ---
-  duration_ms: 0.722163
+  duration_ms: 0.619976
   type: 'test'
   ...
 # Subtest: manifest loads feed core and infinite module before the home enhancer, no new permissions
-ok 51 - manifest loads feed core and infinite module before the home enhancer, no new permissions
+ok 49 - manifest loads feed core and infinite module before the home enhancer, no new permissions
   ---
-  duration_ms: 0.504126
+  duration_ms: 0.414215
   type: 'test'
   ...
 # Subtest: quick panel runs in the top frame of every B 站 page after its cores; welcome page assets exist
-ok 52 - quick panel runs in the top frame of every B 站 page after its cores; welcome page assets exist
+ok 50 - quick panel runs in the top frame of every B 站 page after its cores; welcome page assets exist
   ---
-  duration_ms: 1.055845
+  duration_ms: 0.6827
+  type: 'test'
+  ...
+# Subtest: every ad shape the web feed API uses is skipped; plain videos with ad-ish titles stay
+ok 51 - every ad shape the web feed API uses is skipped; plain videos with ad-ish titles stay
+  ---
+  duration_ms: 0.313615
+  type: 'test'
+  ...
+# Subtest: filters default on with empty lists; lists are cleaned, deduped and capped
+ok 52 - filters default on with empty lists; lists are cleaned, deduped and capped
+  ---
+  duration_ms: 3.805611
+  type: 'test'
+  ...
+# Subtest: keywords match titles case- and width-insensitively; /regex/ works; bad regex never matches
+ok 53 - keywords match titles case- and width-insensitively; /regex/ works; bad regex never matches
+  ---
+  duration_ms: 0.607399
+  type: 'test'
+  ...
+# Subtest: uploaders match by UID or by exact name, not by substring
+ok 54 - uploaders match by UID or by exact name, not by substring
+  ---
+  duration_ms: 0.157203
+  type: 'test'
+  ...
+# Subtest: tags match exactly once known; needsTags only when a tag rule exists
+ok 55 - tags match exactly once known; needsTags only when a tag rule exists
+  ---
+  duration_ms: 0.264731
+  type: 'test'
+  ...
+# Subtest: master switch off disables every rule
+ok 56 - master switch off disables every rule
+  ---
+  duration_ms: 0.147261
+  type: 'test'
+  ...
+# Subtest: add / remove / labels for list editing
+ok 57 - add / remove / labels for list editing
+  ---
+  duration_ms: 0.366092
+  type: 'test'
+  ...
+# Subtest: clean rules: unique keys, valid attributes, page scoping, ads on by default and annoyances opt-in
+ok 58 - clean rules: unique keys, valid attributes, page scoping, ads on by default and annoyances opt-in
+  ---
+  duration_ms: 0.902119
+  type: 'test'
+  ...
+# Subtest: clean stylesheet parses as CSS selectors in a browser-like check (balanced, every rule gated)
+ok 59 - clean stylesheet parses as CSS selectors in a browser-like check (balanced, every rule gated)
+  ---
+  duration_ms: 0.302202
+  type: 'test'
+  ...
+# Subtest: home mode choice flag defaults to unchosen; manifest loads the new scripts in order
+ok 60 - home mode choice flag defaults to unchosen; manifest loads the new scripts in order
+  ---
+  duration_ms: 0.576296
   type: 'test'
   ...
 # Subtest: focus mode is off by default and settings are clamped
-ok 53 - focus mode is off by default and settings are clamped
+ok 61 - focus mode is off by default and settings are clamped
   ---
-  duration_ms: 1.317828
+  duration_ms: 0.975151
   type: 'test'
   ...
 # Subtest: disabled focus mode never blocks but still meters
-ok 54 - disabled focus mode never blocks but still meters
+ok 62 - disabled focus mode never blocks but still meters
   ---
-  duration_ms: 1.155202
+  duration_ms: 0.806022
   type: 'test'
   ...
 # Subtest: 5-hour window starts at first watched second and reports reset time
-ok 55 - 5-hour window starts at first watched second and reports reset time
+ok 63 - 5-hour window starts at first watched second and reports reset time
   ---
-  duration_ms: 0.447172
+  duration_ms: 0.487323
   type: 'test'
   ...
 # Subtest: window limit blocks until its reset, then a new window starts
-ok 56 - window limit blocks until its reset, then a new window starts
+ok 64 - window limit blocks until its reset, then a new window starts
   ---
-  duration_ms: 0.351504
+  duration_ms: 0.320948
   type: 'test'
   ...
 # Subtest: weekly allowance spans windows and resets after 7 days
-ok 57 - weekly allowance spans windows and resets after 7 days
+ok 65 - weekly allowance spans windows and resets after 7 days
   ---
-  duration_ms: 3.709456
+  duration_ms: 3.081108
   type: 'test'
   ...
 # Subtest: weekly block wins over window block and percentages are capped
-ok 58 - weekly block wins over window block and percentages are capped
+ok 66 - weekly block wins over window block and percentages are capped
   ---
-  duration_ms: 0.249925
+  duration_ms: 0.234601
   type: 'test'
   ...
 # Subtest: video count per window: current video may finish, new one is blocked
-ok 59 - video count per window: current video may finish, new one is blocked
+ok 67 - video count per window: current video may finish, new one is blocked
   ---
-  duration_ms: 0.327844
+  duration_ms: 0.251377
   type: 'test'
   ...
 # Subtest: pomodoro break starts after a continuous session and ends by itself
-ok 60 - pomodoro break starts after a continuous session and ends by itself
+ok 68 - pomodoro break starts after a continuous session and ends by itself
   ---
-  duration_ms: 0.293174
+  duration_ms: 0.235061
   type: 'test'
   ...
 # Subtest: a long pause resets the pomodoro session but not the window
-ok 61 - a long pause resets the pomodoro session but not the window
+ok 69 - a long pause resets the pomodoro session but not the window
   ---
-  duration_ms: 2.45642
+  duration_ms: 0.403337
   type: 'test'
   ...
 # Subtest: snooze grants five minutes / one video / skips break, never in strict mode
-ok 62 - snooze grants five minutes / one video / skips break, never in strict mode
+ok 70 - snooze grants five minutes / one video / skips break, never in strict mode
   ---
-  duration_ms: 0.735313
+  duration_ms: 0.529797
   type: 'test'
   ...
 # Subtest: snoozes and extra time expire with their window
-ok 63 - snoozes and extra time expire with their window
+ok 71 - snoozes and extra time expire with their window
   ---
-  duration_ms: 0.37098
+  duration_ms: 0.229683
   type: 'test'
   ...
 # Subtest: corrupt or future-dated storage is ignored and tick input is bounded
-ok 64 - corrupt or future-dated storage is ignored and tick input is bounded
+ok 72 - corrupt or future-dated storage is ignored and tick input is bounded
   ---
-  duration_ms: 1.722511
+  duration_ms: 1.126885
   type: 'test'
   ...
 # Subtest: reset and remaining times read like Claude Code
-ok 65 - reset and remaining times read like Claude Code
+ok 73 - reset and remaining times read like Claude Code
   ---
-  duration_ms: 0.309755
+  duration_ms: 0.162191
   type: 'test'
   ...
 # Subtest: video ids for normal, multi-part, bangumi and live pages
-ok 66 - video ids for normal, multi-part, bangumi and live pages
+ok 74 - video ids for normal, multi-part, bangumi and live pages
   ---
-  duration_ms: 0.705379
+  duration_ms: 0.536677
   type: 'test'
   ...
 # Subtest: focus scripts are declared in the manifest and the service worker loads the core
-ok 67 - focus scripts are declared in the manifest and the service worker loads the core
+ok 75 - focus scripts are declared in the manifest and the service worker loads the core
   ---
-  duration_ms: 0.549858
+  duration_ms: 0.438013
+  type: 'test'
+  ...
+# Subtest: looser rules: 0 means unlimited, breaks shorter and switches off are loosening
+ok 76 - looser rules: 0 means unlimited, breaks shorter and switches off are loosening
+  ---
+  duration_ms: 0.991702
+  type: 'test'
+  ...
+# Subtest: tightening applies at once, loosening waits for the cool-down
+ok 77 - tightening applies at once, loosening waits for the cool-down
+  ---
+  duration_ms: 1.518112
+  type: 'test'
+  ...
+# Subtest: disabling limits while locked is deferred; the password makes it immediate
+ok 78 - disabling limits while locked is deferred; the password makes it immediate
+  ---
+  duration_ms: 0.258297
+  type: 'test'
+  ...
+# Subtest: re-asking keeps the original countdown; asking for a new value restarts it
+ok 79 - re-asking keeps the original countdown; asking for a new value restarts it
+  ---
+  duration_ms: 1.406125
+  type: 'test'
+  ...
+# Subtest: a stricter change or going back to the approved value cancels pending loosening
+ok 80 - a stricter change or going back to the approved value cancels pending loosening
+  ---
+  duration_ms: 0.202161
+  type: 'test'
+  ...
+# Subtest: settle applies only due changes, and removal ends the lock
+ok 81 - settle applies only due changes, and removal ends the lock
+  ---
+  duration_ms: 0.283314
+  type: 'test'
+  ...
+# Subtest: cool-down: longer is immediate, shorter waits
+ok 82 - cool-down: longer is immediate, shorter waits
+  ---
+  duration_ms: 0.248184
+  type: 'test'
+  ...
+# Subtest: password: salted PBKDF2 hash, verify, lock-out after repeated failures
+ok 83 - password: salted PBKDF2 hash, verify, lock-out after repeated failures
+  ---
+  duration_ms: 307.542494
+  type: 'test'
+  ...
+# Subtest: a lock without a password can only be loosened by waiting
+ok 84 - a lock without a password can only be loosened by waiting
+  ---
+  duration_ms: 0.462959
+  type: 'test'
+  ...
+# Subtest: normalize rejects junk and keeps known pending keys
+ok 85 - normalize rejects junk and keeps known pending keys
+  ---
+  duration_ms: 0.488584
+  type: 'test'
+  ...
+# Subtest: no lock: focus-set writes straight through
+ok 86 - no lock: focus-set writes straight through
+  ---
+  duration_ms: 7.098547
+  type: 'test'
+  ...
+# Subtest: locked: loosening through the UI is deferred, tightening is immediate
+ok 87 - locked: loosening through the UI is deferred, tightening is immediate
+  ---
+  duration_ms: 101.200127
+  type: 'test'
+  ...
+# Subtest: locked: a direct storage write that loosens limits is reverted by the guard
+ok 88 - locked: a direct storage write that loosens limits is reverted by the guard
+  ---
+  duration_ms: 64.616337
+  type: 'test'
+  ...
+# Subtest: locked without password: snooze refused; removal only after the cool-down
+ok 89 - locked without password: snooze refused; removal only after the cool-down
+  ---
+  duration_ms: 7.084962
+  type: 'test'
+  ...
+# Subtest: changing the password needs the current one
+ok 90 - changing the password needs the current one
+  ---
+  duration_ms: 134.684016
+  type: 'test'
+  ...
+# Subtest: flow-open-options always answers: new tab, focus an open one, fallback to openOptionsPage
+ok 91 - flow-open-options always answers: new tab, focus an open one, fallback to openOptionsPage
+  ---
+  duration_ms: 7.46456
   type: 'test'
   ...
 # Subtest: upstream startup starts at16 then returns16->12->8 after15s ahead with cooldown
-ok 68 - upstream startup starts at16 then returns16->12->8 after15s ahead with cooldown
+ok 92 - upstream startup starts at16 then returns16->12->8 after15s ahead with cooldown
   ---
-  duration_ms: 63.718602
+  duration_ms: 55.76323
   type: 'test'
   ...
 # Subtest: startup never climbs past a429-refused level
-ok 69 - startup never climbs past a429-refused level
+ok 93 - startup never climbs past a429-refused level
   ---
-  duration_ms: 2.217546
+  duration_ms: 1.308449
   type: 'test'
   ...
 # Subtest: startup pressure climbs to24 and cancels startup reduction
-ok 70 - startup pressure climbs to24 and cancels startup reduction
+ok 94 - startup pressure climbs to24 and cancels startup reduction
   ---
-  duration_ms: 2.021431
+  duration_ms: 1.366129
   type: 'test'
   ...
 # Subtest: startup expires after30 seconds without being mistaken for successful buffering
-ok 71 - startup expires after30 seconds without being mistaken for successful buffering
+ok 95 - startup expires after30 seconds without being mistaken for successful buffering
   ---
-  duration_ms: 1.910364
+  duration_ms: 1.473805
   type: 'test'
   ...
 # Subtest: seek during startup retains original base level
-ok 72 - seek during startup retains original base level
+ok 96 - seek during startup retains original base level
   ---
-  duration_ms: 1.89332
+  duration_ms: 1.424024
   type: 'test'
   ...
 # Subtest: auto reset clears startup state
-ok 73 - auto reset clears startup state
+ok 97 - auto reset clears startup state
   ---
-  duration_ms: 1.828278
+  duration_ms: 1.269179
   type: 'test'
   ...
 # Subtest: Flow economy cap still wins over upstream startup controller
-ok 74 - Flow economy cap still wins over upstream startup controller
+ok 98 - Flow economy cap still wins over upstream startup controller
   ---
-  duration_ms: 3.740281
+  duration_ms: 2.420811
   type: 'test'
   ...
 # Subtest: home defaults preserve native theme and seasonal banner; remove carousel
-ok 75 - home defaults preserve native theme and seasonal banner; remove carousel
+ok 99 - home defaults preserve native theme and seasonal banner; remove carousel
   ---
-  duration_ms: 0.203051
+  duration_ms: 0.141657
   type: 'test'
   ...
 # Subtest: all1.0 custom themes migrate to native without changing explicit master/history off
-ok 76 - all1.0 custom themes migrate to native without changing explicit master/history off
+ok 100 - all1.0 custom themes migrate to native without changing explicit master/history off
   ---
-  duration_ms: 0.941283
+  duration_ms: 0.622604
   type: 'test'
   ...
 # Subtest: history rejects URL credentials, nonstandard port, javascript and foreign hosts
-ok 77 - history rejects URL credentials, nonstandard port, javascript and foreign hosts
+ok 101 - history rejects URL credentials, nonstandard port, javascript and foreign hosts
   ---
-  duration_ms: 0.78278
+  duration_ms: 0.560988
   type: 'test'
   ...
 # Subtest: history canonicalizes trailing slash and strips cover query tokens
-ok 78 - history canonicalizes trailing slash and strips cover query tokens
+ok 102 - history canonicalizes trailing slash and strips cover query tokens
   ---
-  duration_ms: 0.74812
+  duration_ms: 0.530121
   type: 'test'
   ...
 # Subtest: batch identity includes cards beyond first12, fixing old snapshot collision
-ok 79 - batch identity includes cards beyond first12, fixing old snapshot collision
+ok 103 - batch identity includes cards beyond first12, fixing old snapshot collision
   ---
-  duration_ms: 2.289181
+  duration_ms: 1.467817
   type: 'test'
   ...
 # Subtest: lazy growth is distinct from replacement or reorder
-ok 80 - lazy growth is distinct from replacement or reorder
+ok 104 - lazy growth is distinct from replacement or reorder
   ---
-  duration_ms: 0.727774
+  duration_ms: 0.341295
   type: 'test'
   ...
 # Subtest: future-dated and expired batches are discarded and card budget enforced
-ok 81 - future-dated and expired batches are discarded and card budget enforced
+ok 105 - future-dated and expired batches are discarded and card budget enforced
   ---
-  duration_ms: 1.316859
+  duration_ms: 0.86571
   type: 'test'
   ...
 # Subtest: diagnostics redact media URLs, ordinary query strings, fragments and JSON credentials
-ok 82 - diagnostics redact media URLs, ordinary query strings, fragments and JSON credentials
+ok 106 - diagnostics redact media URLs, ordinary query strings, fragments and JSON credentials
   ---
-  duration_ms: 0.983452
+  duration_ms: 0.582769
   type: 'test'
   ...
 # Subtest: all runtime version identifiers use the fork release version
-ok 83 - all runtime version identifiers use the fork release version
+ok 107 - all runtime version identifiers use the fork release version
   ---
-  duration_ms: 0.677665
+  duration_ms: 0.510351
   type: 'test'
   ...
 # Subtest: MV3 bundles one copy of every runtime dependency, has no remotely hosted executable code
-ok 84 - MV3 bundles one copy of every runtime dependency, has no remotely hosted executable code
+ok 108 - MV3 bundles one copy of every runtime dependency, has no remotely hosted executable code
   ---
-  duration_ms: 0.519744
+  duration_ms: 0.44813
   type: 'test'
   ...
 # Subtest: codec cleanup removes only five known flags and runs once per origin
-ok 85 - codec cleanup removes only five known flags and runs once per origin
+ok 109 - codec cleanup removes only five known flags and runs once per origin
   ---
-  duration_ms: 3.365218
+  duration_ms: 2.424312
   type: 'test'
   ...
 # Subtest: codec flag guard applies only while BTR takeover is active; unrelated writes remain valid
-ok 86 - codec flag guard applies only while BTR takeover is active; unrelated writes remain valid
+ok 110 - codec flag guard applies only while BTR takeover is active; unrelated writes remain valid
   ---
-  duration_ms: 1.860341
+  duration_ms: 1.190202
   type: 'test'
   ...
 # Subtest: native source wait observes source-buffer creation before takeover
-ok 87 - native source wait observes source-buffer creation before takeover
+ok 111 - native source wait observes source-buffer creation before takeover
   ---
-  duration_ms: 32.448989
+  duration_ms: 32.197307
   type: 'test'
   ...
 # Subtest: native source wait has a one-second upper bound when no buffers arrive
-ok 88 - native source wait has a one-second upper bound when no buffers arrive
+ok 112 - native source wait has a one-second upper bound when no buffers arrive
   ---
-  duration_ms: 1003.493816
+  duration_ms: 1003.123582
   type: 'test'
   ...
 # Subtest: native media source registry stays bounded and settled/closed sources do not wait
-ok 89 - native media source registry stays bounded and settled/closed sources do not wait
+ok 113 - native media source registry stays bounded and settled/closed sources do not wait
   ---
-  duration_ms: 2.242335
+  duration_ms: 1.897341
   type: 'test'
   ...
 # Subtest: native HiRes and Dolby preferences are honored only when codec support is reported
-ok 90 - native HiRes and Dolby preferences are honored only when codec support is reported
+ok 114 - native HiRes and Dolby preferences are honored only when codec support is reported
   ---
-  duration_ms: 2.541768
+  duration_ms: 1.77221
   type: 'test'
   ...
-1..90
-# tests 90
+1..114
+# tests 114
 # suites 0
-# pass 90
+# pass 114
 # fail 0
 # cancelled 0
 # skipped 0
 # todo 0
-# duration_ms 1353.740112
+# duration_ms 1676.889757

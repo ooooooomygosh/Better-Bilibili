@@ -7,11 +7,13 @@
 (function () {
   'use strict';
   const home = globalThis.__BTR_HOME_CORE__, focus = globalThis.__BTR_FOCUS_CORE__, ui = globalThis.__BTR_UI__;
-  if (!home || !focus || !ui || window.top !== window || globalThis.__BTR_QUICK__) return;
+  const filt = globalThis.__BTR_FILTER_CORE__, clean = globalThis.__BTR_CLEAN_CORE__;
+  if (!home || !focus || !ui || !filt || !clean || window.top !== window || globalThis.__BTR_QUICK__) return;
 
   const VERSION = chrome.runtime.getManifest().version;
   const PLAY = {enabled: true, mode: 'auto', strategy: 'auto', liveEnabled: true, quickFab: true};
-  const DEFAULTS = {...home.defaults, ...focus.defaults, ...PLAY};
+  const DEFAULTS = {...home.defaults, ...focus.defaults, ...filt.defaults, ...clean.defaults, ...PLAY};
+  const norm = raw => ({...raw, ...home.settings(raw), ...focus.settings(raw), ...filt.settings(raw), ...clean.settings(raw)});
   const FOCUS_KEYS = new Set(Object.keys(focus.defaults));
   const RELOAD_KEYS = new Set(['enabled', 'liveEnabled']); // Player hooks are installed at page start.
   const PRESETS = [
@@ -67,11 +69,11 @@ ${ui.scoped('.root')}
 .head small{display:block;color:var(--muted);font-size:12px;font-weight:400}
 .x{margin-left:auto;width:28px;height:28px;border:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;transition:background-color var(--btr-fast) ease}
 .x:hover{background:var(--soft)}
-.tabs{position:relative;display:grid;grid-template-columns:repeat(3,1fr);margin:0 14px 6px;padding:3px;border-radius:12px;background:var(--soft)}
+.tabs{position:relative;display:grid;grid-template-columns:repeat(4,1fr);margin:0 14px 6px;padding:3px;border-radius:12px;background:var(--soft)}
 .tabs button{position:relative;z-index:1;border:0;background:transparent;color:var(--muted);font:inherit;font-weight:600;padding:6px 0;border-radius:9px;cursor:pointer;transition:color var(--btr-mid) ease}
 .tabs button[aria-selected=true]{color:var(--fg)}
 .tabs button:focus-visible{outline:2px solid var(--pink);outline-offset:-2px}
-.tabs .slider{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px)/3);border-radius:9px;background:var(--btr-bg);box-shadow:0 1px 4px rgba(0,0,0,.12);transition:transform var(--btr-mid) var(--btr-ease)}
+.tabs .slider{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px)/4);border-radius:9px;background:var(--btr-bg);box-shadow:0 1px 4px rgba(0,0,0,.12);transition:transform var(--btr-mid) var(--btr-ease)}
 .body{overflow:auto;padding:4px 14px 6px;overscroll-behavior:contain;flex:1 1 auto;min-height:0}
 .page{animation:page var(--btr-mid) var(--btr-ease)}
 @keyframes page{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -129,6 +131,26 @@ ${ui.scoped('.root')}
 .lock .pwerr{margin:6px 0 0;font-size:12px;color:var(--btr-danger)}.lock .pwerr[hidden]{display:none}
 .lock input[aria-invalid]{border-color:var(--btr-danger)}
 .lock form button{border:0;border-radius:8px;padding:5px 10px;background:var(--pink);color:#fff;font:inherit;font-size:12px;cursor:pointer}
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:2px 0 10px}
+.modes button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border:1.5px solid var(--line);background:var(--btr-bg);color:var(--fg);font:inherit;border-radius:14px;padding:10px 12px;cursor:pointer;transition:border-color var(--btr-fast) ease,background-color var(--btr-fast) ease,transform var(--btr-fast) ease}
+.modes button:hover{border-color:var(--pink)}.modes button:active{transform:scale(.98)}
+.modes button[aria-checked=true]{border-color:var(--pink);background:var(--btr-brand-soft)}
+.modes b{font-size:13px}.modes button[aria-checked=true] b{color:var(--pink)}
+.modes span{font-size:11px;color:var(--muted);line-height:1.4}
+.sub{margin:12px 2px 4px;font-size:12px;font-weight:600;color:var(--muted)}
+.chips{padding:8px 2px 4px}
+.chips .add{display:flex;gap:6px;margin:8px 0 6px}
+.chips input{flex:1;min-width:0;border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:var(--btr-bg);color:var(--fg);font:inherit;font-size:12px}
+.chips input:focus{outline:none;border-color:var(--pink);box-shadow:0 0 0 3px var(--btr-brand-soft)}
+.chips .add button{border:0;border-radius:8px;padding:5px 10px;background:var(--pink);color:#fff;font:inherit;font-size:12px;cursor:pointer}
+.chips ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px;max-height:118px;overflow:auto}
+.chips li{display:inline-flex;align-items:center;gap:2px;max-width:100%;padding:2px 4px 2px 10px;border-radius:999px;background:var(--btr-bg);border:1px solid var(--line);font-size:12px}
+.chips li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chips li button{border:0;background:transparent;color:var(--muted);font:14px/1 sans-serif;width:18px;height:18px;border-radius:50%;cursor:pointer;padding:0}
+.chips li button:hover{background:var(--soft2);color:var(--fg)}
+.chips .empty{color:var(--faint);font-size:12px;padding:2px 0 4px}
+.chips .more{border:0;background:transparent;color:var(--pink);font:inherit;font-size:12px;cursor:pointer;padding:6px 0 0}
+.note{margin:6px 2px 10px;padding:8px 10px;border-radius:10px;background:var(--soft);color:var(--muted);font-size:12px;line-height:1.5}
 .foot{display:flex;gap:4px;align-items:center;padding:8px 12px 12px;border-top:1px solid var(--line)}
 .foot button{border:0;background:transparent;color:var(--muted);font:inherit;font-size:12px;padding:5px 8px;border-radius:8px;cursor:pointer;transition:background-color var(--btr-fast) ease,color var(--btr-fast) ease}
 .foot button:hover{background:var(--soft);color:var(--fg)}
@@ -193,10 +215,11 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
       if (RELOAD_KEYS.has(key) && isPlayer()) toast('刷新页面后对当前视频生效', {label: '刷新', fn: () => location.reload()});
       if (opts.onChange) opts.onChange(input.checked);
     });
-    const b = el('b', null, label); t.append(b); if (hint) t.append(el('span', null, hint));
+    const b = el('b', null, label); t.append(b);
+    const hs = hint ? el('span', null, typeof hint === 'function' ? hint() : hint) : null; if (hs) t.append(hs);
     const l = el('label'); l.htmlFor = id; l.append(t); l.style.flex = '1'; l.style.cursor = 'pointer';
     lab.append(input, el('i')); r.append(l, lab);
-    controls.push(() => { if (input.checked !== read()) input.checked = read(); });
+    controls.push(() => { if (input.checked !== read()) input.checked = read(); if (hs && typeof hint === 'function') hs.textContent = hint(); });
     return r;
   }
   function seg(key, label, hint, options) {
@@ -345,19 +368,87 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
     if (!lock.locked) p.append(btn('🔒 开启自律锁（防止随手放宽额度）', 'wide', () => openOptions('lock')));
     return p;
   }
+  let chipKind = 'keywords';
+  const CHIP = {keywords: ['filterKeywords', '关键词', '标题里出现就屏蔽；/正则/ 也行'], ups: ['filterUps', 'UP 主', '名字（完全一致）或 UID'], tags: ['filterTags', '标签', 'B 站视频标签，完全一致']};
+  /** Inline editor for the three block lists: pick a list, type + Enter to add, × to remove. */
+  function chips() {
+    const w = el('div', 'chips');
+    const kinds = el('div', 'seg'), thumb = el('i', 'thumb'); kinds.append(thumb); kinds.setAttribute('role', 'group'); kinds.setAttribute('aria-label', '屏蔽列表');
+    const kb = Object.entries(CHIP).map(([k, [, label]]) => { const b = btn(label, null, () => { chipKind = k; rebuildOrPatch(true); }); b.dataset.v = k; kinds.append(b); return b; });
+    const head = el('div', 'row'); head.style.borderBottom = '0'; head.style.padding = '2px'; const t = el('div', 't'); t.append(el('b', null, '屏蔽列表'));
+    head.append(t, kinds);
+    const [key, , hint] = CHIP[chipKind];
+    const form = el('form', 'add'), input = el('input'); input.placeholder = `添加${CHIP[chipKind][1]}（${hint}）`; input.setAttribute('aria-label', input.placeholder); input.maxLength = 80;
+    form.append(input, btn('添加')); form.querySelector('button').type = 'submit';
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const v = input.value.trim(); if (!v) { input.focus(); return; }
+      const entry = chipKind === 'ups' && /^\d{3,20}$/.test(v) ? filt.upEntry(v) : v;
+      const next = filt.add(s[key], entry, chipKind);
+      if (!next) { toast('已经在列表里了'); input.select(); return; }
+      s[key] = next; save({[key]: next}); input.value = ''; draw(); input.focus();
+    });
+    const ul = el('ul'); ul.setAttribute('aria-label', `已屏蔽的${CHIP[chipKind][1]}`);
+    const empty = el('div', 'empty');
+    function draw() {
+      const items = s[key] || [];
+      ul.replaceChildren(...items.slice().reverse().map(e => {
+        const li = el('li'), label = chipKind === 'ups' ? filt.upLabel(e) : chipKind === 'tags' ? `#${e}` : e;
+        const x = btn('×', null, () => { const next = filt.remove(s[key], e); s[key] = next; save({[key]: next}); draw(); });
+        x.setAttribute('aria-label', `移除 ${label}`); li.title = e; li.append(el('span', null, label), x); return li;
+      }));
+      empty.textContent = items.length ? '' : (chipKind === 'tags' ? '还没有屏蔽标签。无限下滑卡片的 ⋮ 菜单里也能按标签屏蔽。' : chipKind === 'ups' ? '还没有屏蔽 UP 主。卡片的 ⋮ 菜单里也能一键屏蔽。' : '还没有屏蔽词。');
+      empty.hidden = !!items.length;
+    }
+    draw(); controls.push(draw);
+    // The segmented thumb follows the chosen list.
+    requestAnimationFrame(() => { const on = kb.find(b => b.dataset.v === chipKind); for (const b of kb) b.setAttribute('aria-pressed', String(b === on)); if (on?.offsetWidth) { thumb.style.width = `${on.offsetWidth}px`; thumb.style.transform = `translateX(${on.offsetLeft}px)`; thumb.style.opacity = '1'; } });
+    w.append(head, form, ul, empty, btn('在完整设置里管理全部规则 ›', 'more', () => openOptions('filter')));
+    return w;
+  }
+  function modeCards() {
+    const g = el('div', 'modes'); g.setAttribute('role', 'radiogroup'); g.setAttribute('aria-label', '首页模式');
+    const opt = (inf, title, text) => {
+      const b = btn('', null, () => { if (s.homeInfinite === inf && s.homeModeChosen) return; save({homeInfinite: inf, homeModeChosen: true}); });
+      b.setAttribute('role', 'radio'); b.append(el('b', null, title), el('span', null, text));
+      const upd = () => b.setAttribute('aria-checked', String(s.homeInfinite === inf)); upd(); controls.push(upd);
+      return b;
+    };
+    g.append(opt(false, '🔄 换一批', '一屏一屏挑，可回看上一批，自动去掉重复'), opt(true, '♾ 无限下滑', '一路往下刷，自动按批加载，不用点'));
+    return g;
+  }
   function homepage() {
     const p = el('div', 'page');
     p.append(el('p', 'lead', isHome() ? '改动立即作用在当前首页。' : '这些设置作用在 B 站首页。'));
-    p.append(sw('homeInfinite', '无限下滑', '快到底时自动加载更多推荐，按「第 N 批」接在下面'));
-    if (s.homeInfinite) {
-      p.append(group('', undefined, '', seg('homeInfiniteSize', '每批视频数', '每次请求 12 个，与 B 站相同', [[12, '12'], [24, '24'], [36, '36']]),
-        seg('homeInfiniteThreads', '加载速度', '同时请求数；越快越容易被限流', [[1, '稳'], [2, '标准'], [3, '快']])));
-    }
+    p.append(modeCards());
+    p.append(s.homeInfinite
+      ? group('', () => s.homeEnabled, '开启「首页净化与操作栏」后生效',
+        seg('homeInfiniteSize', '每批视频数', '每次请求 12 个，与 B 站相同', [[12, '12'], [24, '24'], [36, '36']]),
+        seg('homeInfiniteThreads', '加载速度', '同时请求数；越快越容易被限流', [[1, '稳'], [2, '标准'], [3, '快']]))
+      : group('', () => s.homeEnabled, '开启「首页净化与操作栏」后生效',
+        sw('homeHistory', '可回看上一批', '本地保存每一批，手滑了能翻回去'),
+        sw('filterDedupe', '去掉重复推荐', '前几批出现过的视频，换一批后不再显示')));
+    p.append(el('div', 'sub', '屏蔽'));
+    p.append(sw('filterEnabled', '启用屏蔽规则', () => `${(s.filterKeywords?.length || 0) + (s.filterUps?.length || 0) + (s.filterTags?.length || 0)} 条规则 · 每次刷新都会过滤`));
+    p.append(group('', () => s.filterEnabled, '开启「启用屏蔽规则」后生效', chips()));
+    p.append(el('div', 'sub', '卡片'));
+    p.append(group('', () => s.homeEnabled, '开启「首页净化与操作栏」后生效',
+      sw('homeHideAds', '广告卡片', '只按明确的广告标记'), sw('cleanHomeLive', '直播卡片'), sw('cleanHomeFloor', '番剧 / 影视 / 课堂楼层'),
+      sw('cleanHomeCarouselAds', '轮播图里的广告'), sw('homeHideCarousel', '整个大图轮播'), sw('homeHideBanner', '顶部季节横幅')));
+    p.append(el('div', 'sub', '外观'));
     p.append(sw('homeEnabled', '首页净化与操作栏', '关闭即恢复 B 站原生首页'));
-    p.append(group('', () => s.homeEnabled, '开启「首页净化与操作栏」后这些选项才生效',
-      sw('homeHideCarousel', '移除大图轮播'), sw('homeHideAds', '隐藏广告卡片', '只按明确的广告标记'),
-      sw('homeHistory', '换一批可回看', '本地保存每一批推荐'), sw('homeHideBanner', '收起顶部季节横幅')));
     p.append(seg('homeTheme', '首页背景', 'B 站深色模式下可换成纯黑', [['native', '原生'], ['oled', '纯黑']]));
+    return p;
+  }
+  function cleaner() {
+    const p = el('div', 'page');
+    p.append(el('p', 'lead', '去掉 B 站各处的广告和烦人的东西。只按明确的广告标记和广告位隐藏，不按标题判断。'));
+    for (const {group: name, rules} of clean.groups()) {
+      if (name === '首页') continue; // Those live in the 首页 tab, next to the cards they hide.
+      p.append(el('div', 'sub', name));
+      p.append(group('', undefined, '', ...rules.map(r => sw(r.key, r.label, r.hint))));
+    }
+    p.append(el('div', 'note', '和 AdGuard、uBlock Origin 等去广告扩展一起用也没问题，两边隐藏的是同一类东西。如果某个页面排版乱了，先在这里关掉对应开关，或在去广告扩展里暂时停用 B 站规则，看是哪一边引起的。'));
     return p;
   }
   function throttle() {
@@ -386,6 +477,8 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
     document.documentElement.toggleAttribute('data-btr-quick', true);
     ui.onTheme(dark => r.classList.toggle('dark', dark)); // Follows B 站's own theme live, not the OS.
     shadow.addEventListener('keydown', onKey, true);
+    // Typing in our own fields must not reach B 站's shortcuts (F = fullscreen, space = pause…).
+    for (const type of ['keydown', 'keypress', 'keyup']) shadow.addEventListener(type, e => { if (editable(e) && !(e.altKey && e.code === 'KeyT')) e.stopPropagation(); });
   }
   const root = () => shadow.querySelector('.root');
 
@@ -533,8 +626,8 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
     if (open && panel && (inHeader || veilTimer)) veilCheck();
   }, true);
 
-  const TABS = [['brake', '刹车'], ['home', '首页'], ['play', '油门']];
-  const sig = () => [tab, s.homeInfinite, !!usage?.window, lock.locked, lock.hasPassword, lock.cooldownHours, JSON.stringify(lock.pending || {}), isPlayer()].join('|');
+  const TABS = [['brake', '刹车'], ['home', '首页'], ['clean', '净化'], ['play', '油门']];
+  const sig = () => [tab, s.homeInfinite, chipKind, !!usage?.window, lock.locked, lock.hasPassword, lock.cooldownHours, JSON.stringify(lock.pending || {}), isPlayer()].join('|');
 
   let heightAnim = null;
   function render() {
@@ -545,7 +638,7 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
     const from = shown ? panel.getBoundingClientRect().height : 0;
     heightAnim?.cancel(); heightAnim = null;
     controls = [];
-    const page = tab === 'brake' ? brake() : tab === 'home' ? homepage() : throttle();
+    const page = tab === 'brake' ? brake() : tab === 'home' ? homepage() : tab === 'clean' ? cleaner() : throttle();
     if (!switched) page.style.animation = 'none'; // A structural rebuild after a toggle: no entrance motion.
     body.replaceChildren(page); body.dataset.tab = tab;
     body.setAttribute('aria-labelledby', `q-tab-${tab}`);
@@ -589,7 +682,7 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
     // Arrow keys move between tabs (roving tabindex), Home / End jump to the ends.
     tabs.addEventListener('keydown', e => {
       const i = TABS.findIndex(([id]) => id === tab);
-      const next = e.key === 'ArrowRight' ? (i + 1) % 3 : e.key === 'ArrowLeft' ? (i + 2) % 3 : e.key === 'Home' ? 0 : e.key === 'End' ? 2 : -1;
+      const n = TABS.length, next = e.key === 'ArrowRight' ? (i + 1) % n : e.key === 'ArrowLeft' ? (i + n - 1) % n : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -1;
       if (next < 0) return;
       e.preventDefault(); selectTab(TABS[next][0], true);
     });
@@ -727,7 +820,7 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
     if (area === 'local' && changes.focusLock) { refreshLock().then(() => rebuildOrPatch()); return; }
     if (area !== 'sync' || !Object.keys(changes).some(k => k in DEFAULTS)) return;
     for (const k of Object.keys(DEFAULTS)) if (changes[k]) s[k] = changes[k].newValue;
-    s = {...s, ...home.settings(s), ...focus.settings(s)};
+    s = norm(s);
     if (panel) {
       const f = panel.querySelector('.foot .fabtoggle'); if (f) f.textContent = s.quickFab ? '隐藏悬浮按钮' : '显示悬浮按钮';
       rebuildOrPatch(); // Patch immediately, so switches never snap back and forth.
@@ -739,9 +832,9 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
   async function start() {
     try {
       const [sync, local] = await Promise.all([chrome.storage.sync.get(DEFAULTS), chrome.storage.local.get(['flowQuickY', 'flowQuickTab', 'flowQuickTipSeen'])]);
-      s = {...sync, ...home.settings(sync), ...focus.settings(sync)};
+      s = norm(sync);
       if (Number.isFinite(local.flowQuickY)) posY = local.flowQuickY;
-      tab = isHome() ? 'home' : isPlayer() ? 'play' : ['brake', 'home', 'play'].includes(local.flowQuickTab) ? local.flowQuickTab : 'brake';
+      tab = isHome() ? 'home' : isPlayer() ? 'play' : ['brake', 'home', 'clean', 'play'].includes(local.flowQuickTab) ? local.flowQuickTab : 'brake';
       await refreshUsage();
       renderFab();
       if (!local.flowQuickTipSeen) setTimeout(showTip, 1200);

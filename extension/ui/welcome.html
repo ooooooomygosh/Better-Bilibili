@@ -26,16 +26,19 @@
     <h2>三步上手</h2>
     <ol class="w-steps">
       <li><b>找到右下角的油门按钮</b><span>B 站每个页面都有。点开就是常用开关，按 <kbd>Alt</kbd>+<kbd>T</kbd> 也行，按钮可以上下拖动。</span></li>
-      <li><b>首页试试「无限下滑」</b><span>一直往下刷，插件按「第 N 批」接着加载，右侧告诉你看到第几批。</span></li>
+      <li><b>选一种刷首页的方式</b><span>「换一批」一屏一屏挑、能翻回去；「无限下滑」一路往下刷。下面就能选，之后随时换。</span></li>
       <li><b>给自己定个量</b><span>选一档观看额度。用完视频会暂停，到点自动恢复。</span></li>
     </ol>
   </section>
 
   <section class="w-setup" aria-label="快速设置">
     <div class="w-card">
-      <h3>♾️ 无限下滑</h3>
-      <p>快到底时自动加载更多推荐，按批次拼接，去重并过滤广告。</p>
-      <label class="w-toggle"><input type="checkbox" id="homeInfinite"><i></i><span>开启无限下滑</span></label>
+      <h3>🏠 想怎么刷首页？</h3>
+      <p>两种方式各自独立，选一个就好，之后在快捷面板里随时换。</p>
+      <div class="w-modes" id="modes" role="radiogroup" aria-label="首页模式">
+        <button type="button" role="radio" data-mode="batch"><b>🔄 换一批</b>一屏一屏挑，能翻回上一批，自动去重</button>
+        <button type="button" role="radio" data-mode="infinite"><b>♾ 无限下滑</b>一路往下刷，自动按批加载</button>
+      </div>
     </div>
     <div class="w-card">
       <h3>⏱️ 观看额度</h3>
@@ -72,6 +75,8 @@
       </article>
     </div>
     <ul class="w-more">
+      <li><b>🚫 屏蔽词 · UP 主 · 标签</b>不想看的关键词、UP 主和视频标签，每次刷新都会过滤掉。</li>
+      <li><b>🧽 全站净化</b>视频页、搜索、动态里的广告和烦人元素，按页面单独开关。</li>
       <li><b>⚡ 视频加载加速</b>多 CDN、Range 并发，按码率与倍速调整缓冲；清晰度仍由 B 站决定。</li>
       <li><b>🌑 OLED 纯黑</b>B 站深色模式下把首页背景换成真正的纯黑。</li>
       <li><b>🔒 只存本机</b>必需权限只有 storage；推荐历史、观看用量都不上传。</li>
@@ -83,6 +88,7 @@
     <details><summary>视频黑屏或画质菜单异常</summary><p>快捷面板 →「油门」→ 关闭视频加速后刷新；或在完整设置里把播放内核切到「兼容模式」。</p></details>
     <details><summary>首页布局不对</summary><p>快捷面板 →「首页」→ 关闭「首页净化与操作栏」即恢复原生首页。</p></details>
     <details><summary>无限下滑提示被限流</summary><p>把「加载速度」调到「稳」，过几分钟点「重试」。插件遇到限流会自己停下，不会一直请求。</p></details>
+    <details><summary>能和 AdGuard / uBlock 等去广告扩展一起用吗</summary><p>可以。两边隐藏的是同一类东西，叠在一起只是重复隐藏。如果某个页面排版乱了，先在快捷面板「净化」里关掉对应开关，或在去广告扩展里暂时停用 B 站规则，看看是哪一边引起的。</p></details>
     <details><summary>能和线程撕裂者一起用吗</summary><p>不要同时启用另一份线程撕裂者扩展或用户脚本，两套播放器拦截会冲突。</p></details>
   </section>
 </main>

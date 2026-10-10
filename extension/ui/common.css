@@ -150,3 +150,34 @@ body:has(.wrap>.savebar){padding-bottom:48px}
 button{transition:border-color var(--btr-fast) ease,background-color var(--btr-fast) ease,color var(--btr-fast) ease,transform var(--btr-fast) ease,box-shadow var(--btr-fast) ease}
 button.primary:hover{box-shadow:0 4px 14px color-mix(in srgb,var(--btr-brand) 32%,transparent)}
 @media (prefers-reduced-motion:reduce){.card,button{transition:none}}
+
+/* 2.4.0: 首页模式、屏蔽列表、净化开关 */
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mode-card{position:relative;display:flex;gap:10px;align-items:flex-start;padding:14px;border:1.5px solid var(--btr-line);border-radius:14px;cursor:pointer;background:var(--btr-bg);transition:border-color var(--btr-fast,.16s) ease,background-color var(--btr-fast,.16s) ease}
+.mode-card:hover{border-color:var(--btr-brand)}
+.mode-card input{margin-top:3px;accent-color:var(--btr-brand)}
+.mode-card span{font-size:13px;color:var(--btr-text2);line-height:1.55}
+.mode-card b{display:block;font-size:15px;color:var(--btr-text1);margin-bottom:2px}
+.mode-card:has(input:checked){border-color:var(--btr-brand);background:var(--btr-brand-soft)}
+.mode-card:has(input:checked) b{color:var(--btr-brand-hover)}
+.mode-card:has(input:focus-visible){outline:2px solid var(--btr-brand);outline-offset:2px}
+.mode-opts{margin-top:14px}
+.lists{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.list-editor{padding:14px;border:1px solid var(--btr-line);border-radius:12px;display:flex;flex-direction:column;min-width:0}
+.list-editor h3{font-size:14px;margin-bottom:4px}
+.list-editor .hint{min-height:54px}
+.list-editor code{font:12px ui-monospace,Menlo,monospace;padding:0 4px;border-radius:4px;background:var(--btr-bg2)}
+.list-editor .add{display:flex;gap:6px;margin:10px 0}
+.list-editor .add input{flex:1;min-width:0}
+.list-editor .add button{padding:7px 12px}
+.chiplist{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px;max-height:220px;overflow:auto;align-content:flex-start}
+.chiplist li{display:inline-flex;align-items:center;gap:2px;max-width:100%;padding:3px 4px 3px 10px;border-radius:999px;border:1px solid var(--btr-line);background:var(--btr-bg2);font-size:12px}
+.chiplist li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chiplist li button{border:0;background:transparent;padding:0;width:20px;height:20px;border-radius:50%;line-height:1;font-size:15px;color:var(--btr-text2)}
+.chiplist li button:hover{background:var(--btr-line);color:var(--btr-text1)}
+.chiplist li.none{border:0;background:none;color:var(--btr-text3,#9499a0);padding-left:0}
+#cleanGroups h3{font-size:14px;margin:18px 0 8px}
+#cleanGroups h3:first-child{margin-top:4px}
+#cleanGroups .lbl{display:flex;flex-direction:column}
+#cleanGroups .lbl small{color:var(--btr-text2);font-size:12px}
+@media(max-width:860px){.lists{grid-template-columns:1fr}.modes{grid-template-columns:1fr}}

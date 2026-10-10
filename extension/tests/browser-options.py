@@ -28,7 +28,7 @@ with sync_playwright() as p:
    for sec,frac in s['own']:
     if frac>.5:assert s['cur']==sec,(w,h,s)
    samples+=1
-  assert len(seen)==6,seen
+  assert len(seen)==8,seen
   ok(f'{w}×{h}: window scrolls; wheel through the page ({samples} samples) lights every section, a section filling >50% of the visible area is always current, page end lights the last')
   pg.close()
  # 1280×800, dark theme (as recorded from B 站): pinned save bar at the window bottom at top and end of the page,

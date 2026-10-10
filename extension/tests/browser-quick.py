@@ -13,7 +13,7 @@ with sync_playwright() as p:
  page.goto('https://www.bilibili.com/video/BV1xx411c7mD/')
  page.add_script_tag(content=(ROOT/'tests/browser-shim.js').read_text())
  page.evaluate("window.chrome=window.chromeMock;0")  # as in the isolated world: ui-kit sees chrome.storage
- for f in ['src/ui-kit.js','src/home-core.js','src/focus-core.js']:page.add_script_tag(content=(ROOT/f).read_text())
+ for f in ['src/ui-kit.js','src/home-core.js','src/focus-core.js','src/filter-core.js','src/clean-core.js']:page.add_script_tag(content=(ROOT/f).read_text())
  page.evaluate("chromeMock.runtime.getManifest=()=>({version:'test'});window.sent=[];chromeMock.runtime.sendMessage=async m=>{sent.push(m.type);if(m.type==='focus-check')return {enabled:true,window:{seconds:2700,limit:5400,percent:50,resetAt:Date.now()+3600000,remaining:2700},week:{seconds:7200,limit:36000,percent:20,resetAt:Date.now()+86400000,remaining:28800},videos:3,videoLimit:0,snoozes:0};if(m.type==='lock-state')return window.lockView;if(m.type==='focus-set'){if(window.lockView.locked){const d={};for(const k of Object.keys(m.changes))d[k]=Date.now()+86400000;window.lockView.pending=Object.fromEntries(Object.entries(m.changes).map(([k,v])=>[k,{value:v,requestedAt:Date.now(),effectiveAt:d[k]}]));return {applied:{},deferred:d,lock:window.lockView};}await chromeMock.storage.sync.set(m.changes);return {applied:m.changes,deferred:{}};}if(m.type==='lock-cancel'){delete window.lockView.pending[m.key];return {ok:true};}};window.lockView={locked:false};0")
  page.evaluate("chromeMock.storage.sync.set({focusEnabled:true})")
  page.evaluate("code=>new Function('chrome',code)(window.chromeMock)",(ROOT/'src/quick-panel.js').read_text())
@@ -52,9 +52,9 @@ with sync_playwright() as p:
  page.keyboard.press('Alt+t');page.wait_for_function(P,timeout=3000)
  ok('Alt+T is a toggle (focus on the panel, inside the shadow root, quick double press, page key handlers); the open panel does not move on scroll')
  page.evaluate(f"{q}.querySelector('.tabs [aria-selected=true]').focus()");page.keyboard.press('ArrowLeft');page.wait_for_timeout(150)
- assert page.evaluate(f"{q}.querySelector('.tabs [aria-selected=true]').textContent")=='首页'
- assert page.evaluate(f"{q}.activeElement?.textContent")=='首页'
- assert page.evaluate(f"[...{q}.querySelectorAll('.tabs [role=tab]')].map(b=>b.tabIndex).join()")=='-1,0,-1'
+ assert page.evaluate(f"{q}.querySelector('.tabs [aria-selected=true]').textContent")=='净化'
+ assert page.evaluate(f"{q}.activeElement?.textContent")=='净化'
+ assert page.evaluate(f"[...{q}.querySelectorAll('.tabs [role=tab]')].map(b=>b.tabIndex).join()")=='-1,-1,0,-1'
  assert page.evaluate(f"!!{q}.getElementById({q}.querySelector('.tabs [aria-selected=true]').getAttribute('aria-controls'))")
  page.keyboard.press('ArrowRight');page.wait_for_timeout(150)
  assert page.evaluate(f"{q}.querySelector('.tabs [aria-selected=true]').textContent")=='油门'
@@ -122,8 +122,8 @@ with sync_playwright() as p:
  assert page.evaluate(f"[...{q}.querySelectorAll('.seg button')].find(b=>b.textContent==='海外').getAttribute('aria-pressed')")=='true'
  ok('油门 tab: switch and segmented control write settings and re-render live')
  page.evaluate(f"[...{q}.querySelectorAll('.tabs button')].find(b=>b.textContent==='首页').click()");page.wait_for_timeout(200)
- page.evaluate(f"{q}.querySelector('#q-homeInfinite').click()");page.wait_for_timeout(250)
- assert page.evaluate("fixtureStorage.all.sync.homeInfinite")==True
+ page.evaluate(f"[...{q}.querySelectorAll('.modes button')].find(b=>b.textContent.includes('无限下滑')).click()");page.wait_for_timeout(250)
+ assert page.evaluate("fixtureStorage.all.sync.homeInfinite")==True and page.evaluate("fixtureStorage.all.sync.homeModeChosen")==True
  assert page.evaluate(f"[...{q}.querySelectorAll('.seg button')].map(b=>b.textContent).join(',')").startswith('12,24,36,稳,标准,快')
  page.evaluate(f"[...{q}.querySelectorAll('.seg button')].find(b=>b.textContent==='36').click()");page.wait_for_timeout(200)
  assert page.evaluate("fixtureStorage.all.sync.homeInfiniteSize")==36

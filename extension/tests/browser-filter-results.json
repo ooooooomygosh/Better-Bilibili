@@ -1,0 +1,61 @@
+{
+ "scope": "B 站-shaped pages; feed / nav / tag APIs answered locally; mocked chrome.*",
+ "results": [
+  {
+   "test": "first homepage visit asks once: 换一批 or 无限下滑",
+   "passed": true
+  },
+  {
+   "test": "choosing 换一批 saves the mode and the chooser goes away",
+   "passed": true
+  },
+  {
+   "test": "换一批 mode shows 上一批 / 批次 / 下一批 / 换一批 and says which mode it is",
+   "passed": true
+  },
+  {
+   "test": "keyword and UID rules hide native cards at once; the toolbar says 已屏蔽 2 个 and why",
+   "passed": true
+  },
+  {
+   "test": "the master switch turns every rule off and back on",
+   "passed": true
+  },
+  {
+   "test": "换一批 drops videos the earlier batches already showed (cross-batch dedupe)",
+   "passed": true
+  },
+  {
+   "test": "dedupe can be switched off",
+   "passed": true
+  },
+  {
+   "test": "无限下滑 mode has no 换一批 / 上一批 / 下一批 at all; the toolbar just says it is the infinite feed",
+   "passed": true
+  },
+  {
+   "test": "infinite batches never show blocked titles; the batch divider counts what was filtered",
+   "passed": true
+  },
+  {
+   "test": "a tag rule looks tags up (B 站 tag API) and keeps those videos out, including cards already on screen",
+   "passed": true
+  },
+  {
+   "test": "⋮ → 按标签屏蔽… shows the video's tags; one click adds the tag to the synced block list",
+   "passed": true
+  },
+  {
+   "test": "video page: ad slots and game cards hidden by default; opt-in rules (小窗直播) stay until switched on",
+   "passed": true
+  },
+  {
+   "test": "switches apply live and are mirrored for the next page start (no flash)",
+   "passed": true
+  },
+  {
+   "test": "no uncaught errors",
+   "passed": true
+  }
+ ]
+}

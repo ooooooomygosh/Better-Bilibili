@@ -25,7 +25,7 @@ with sync_playwright() as p:
  browser=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH','/usr/lib/chromium/chromium'),headless=True,args=['--no-sandbox'])
  page=browser.new_page(viewport={'width':1600,'height':900});errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
  page.set_content(FIXTURE)
- page.add_script_tag(content=(ROOT/'tests/browser-shim.js').read_text());page.add_script_tag(content=(ROOT/'src/home-core.js').read_text())
+ page.add_script_tag(content=(ROOT/'tests/browser-shim.js').read_text());page.add_script_tag(content=(ROOT/'src/home-core.js').read_text());page.add_script_tag(content=(ROOT/'src/filter-core.js').read_text())
  page.evaluate("window.fixtureLocation={pathname:'/',origin:'https://www.bilibili.com',href:'https://www.bilibili.com/',reload:()=>{throw Error('unexpected reload')}}")
  page.evaluate("code=>new Function('chrome','location','crypto',code)(window.chromeMock,window.fixtureLocation,{randomUUID:()=> 'fixture-tab-refresh-1234'})",(ROOT/'src/home-enhancer.js').read_text())
  count=lambda t:page.wait_for_function("t=>document.querySelector('#btr-flow-toolbar')?.shadowRoot.querySelector('.count')?.textContent===t",arg=t,timeout=12000)
