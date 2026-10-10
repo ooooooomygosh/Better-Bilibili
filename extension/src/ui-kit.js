@@ -163,7 +163,56 @@
     return () => listeners.delete(fn);
   }
 
-  const api = Object.freeze({LIGHT, DARK, MOTION, EASE, EASE_IN, FONT, scoped, page, reduced, animate, fadeOut, flash, isDark, onTheme});
+  /* ---------- toast: one small status card at the bottom of the page, in our style ----------
+     toast({title, text, kind: 'info'|'warn'|'error'|'ok', actions: [{label, fn, primary}], timeout, key})
+     A toast with the same key replaces the previous one. Returns {close}. Content scripts only. */
+  const TOAST_CSS = `${scoped('.root')}
+.root{position:fixed;left:50%;bottom:28px;z-index:2147483000;transform:translateX(-50%);display:flex;align-items:flex-start;gap:12px;max-width:min(520px,calc(100vw - 32px));
+  padding:12px 14px 12px 16px;border-radius:14px;background:var(--btr-bg-float);color:var(--btr-text1);box-shadow:var(--btr-shadow);border:1px solid var(--btr-line);
+  font:13px/1.5 var(--btr-font);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.dot{flex:none;width:8px;height:8px;margin-top:6px;border-radius:50%;background:var(--btr-brand)}
+.root.warn .dot{background:#f5a623}.root.error .dot{background:var(--btr-danger)}.root.ok .dot{background:var(--btr-ok)}
+.body{flex:1;min-width:0}.body b{display:block;font-size:14px;font-weight:600}.body span{display:block;color:var(--btr-text2);font-size:12px;margin-top:1px}
+.acts{display:flex;gap:8px;align-items:center;flex:none;margin-left:4px}
+button{font:inherit;font-size:12px;padding:5px 12px;border-radius:999px;border:1px solid var(--btr-line);background:transparent;color:inherit;cursor:pointer;white-space:nowrap;transition:border-color var(--btr-fast) ease,color var(--btr-fast) ease,background-color var(--btr-fast) ease}
+button:hover{border-color:var(--btr-brand);color:var(--btr-brand)}button.primary{background:var(--btr-brand);border-color:var(--btr-brand);color:#fff}button.primary:hover{background:var(--btr-brand-hover);color:#fff}
+button.x{border:0;padding:2px 6px;font-size:16px;line-height:1;color:var(--btr-text3)}
+button:focus-visible{outline:2px solid var(--btr-brand);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}`;
+  const toasts = new Map();
+  function toast({title = '', text = '', kind = 'info', actions = [], timeout = 0, key = 'default'} = {}) {
+    if (typeof document === 'undefined' || !document.documentElement) return {close() {}};
+    toasts.get(key)?.close(true);
+    const host = document.createElement('div'); host.dataset.btrFlowOwned = ''; host.dataset.btrToast = key;
+    const sh = host.attachShadow({mode: 'open'}), style = document.createElement('style'); style.textContent = TOAST_CSS;
+    const box = document.createElement('div'); box.className = `root ${kind}${isDark() ? ' dark' : ''}`;
+    box.setAttribute('role', kind === 'error' || kind === 'warn' ? 'alert' : 'status');
+    const dot = document.createElement('i'); dot.className = 'dot';
+    const body = document.createElement('div'); body.className = 'body';
+    const b = document.createElement('b'); b.textContent = title; const sp = document.createElement('span'); sp.textContent = text;
+    body.append(b); if (text) body.append(sp);
+    const acts = document.createElement('div'); acts.className = 'acts';
+    let timer = 0, closed = false;
+    const close = instant => {
+      if (closed) return; closed = true; clearTimeout(timer); if (toasts.get(key) === handle) toasts.delete(key);
+      if (instant) host.remove(); else fadeOut(box, MOTION.fast, [{opacity: 1, transform: 'translateX(-50%)'}, {opacity: 0, transform: 'translate(-50%,8px)'}]).then(() => host.remove());
+    };
+    for (const a of actions) {
+      const btn = document.createElement('button'); btn.type = 'button'; btn.textContent = a.label; if (a.primary) btn.className = 'primary';
+      btn.addEventListener('click', () => { close(); try { a.fn?.(); } catch (_) {} }); acts.append(btn);
+    }
+    const x = document.createElement('button'); x.type = 'button'; x.className = 'x'; x.textContent = '×'; x.setAttribute('aria-label', '关闭'); x.addEventListener('click', () => close());
+    acts.append(x); box.append(dot, body, acts); sh.append(style, box);
+    (document.body || document.documentElement).append(host);
+    animate(box, [{opacity: 0, transform: 'translate(-50%,10px)'}, {opacity: 1, transform: 'translateX(-50%)'}], {duration: MOTION.mid});
+    const arm = () => { clearTimeout(timer); if (timeout > 0) timer = setTimeout(() => close(), timeout); };
+    box.addEventListener('pointerenter', () => clearTimeout(timer)); box.addEventListener('pointerleave', arm); arm();
+    const handle = {close, host};
+    toasts.set(key, handle);
+    return handle;
+  }
+
+  const api = Object.freeze({LIGHT, DARK, MOTION, EASE, EASE_IN, FONT, scoped, page, reduced, animate, fadeOut, flash, isDark, onTheme, toast});
   root.__BTR_UI__ = api;
   // Extension pages get the tokens as :root custom properties before first paint, and a theme:
   // 跟随 B 站 (default: the last theme the content scripts saw on B 站, else the OS) / 跟随系统 / 浅色 / 深色.

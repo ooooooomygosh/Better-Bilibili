@@ -42,7 +42,7 @@ with sync_playwright() as p:
  page.evaluate("""window.opens=[];window.open=(u)=>{opens.push(String(u));return null};
  for(const t of ['pointerdown','mousedown','pointerup','mouseup','click','auxclick'])window.addEventListener(t,e=>{const a=e.target.closest?.('a[href]'),c=e.target.closest?.('.bili-video-card,.feed-card');if(a||c){if(t==='click'||t==='auxclick'||t==='mousedown'&&e.button===1)window.open((a&&a.href)||'card:'+t);}},true);
  document.addEventListener('click',e=>{if(e.target.closest?.('.bili-video-card'))window.open('doc-card');});0""")
- for f in ['tests/browser-shim.js','src/ui-kit.js','src/home-core.js','src/filter-core.js','src/feed-core.js']:page.add_script_tag(content=(ROOT/f).read_text())
+ for f in ['tests/browser-shim.js','src/ui-kit.js','src/home-core.js','src/filter-core.js','src/feed-core.js','src/adaptive-core.js']:page.add_script_tag(content=(ROOT/f).read_text())
  page.evaluate("chromeMock.storage.sync.set({homeInfinite:true,homeModeChosen:true,homeInfiniteSize:24,homeInfiniteThreads:2})")
  page.evaluate("code=>new Function('chrome',code)(window.chromeMock)",(ROOT/'src/home-infinite.js').read_text())
  page.evaluate("code=>new Function('chrome','crypto',code)(window.chromeMock,{randomUUID:()=> 'fixture-tab-infinite-1234'})",(ROOT/'src/home-enhancer.js').read_text())

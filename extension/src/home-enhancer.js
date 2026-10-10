@@ -29,7 +29,22 @@
   } catch (_) { tabKey = crypto.randomUUID(); }
   const storageKey = 'flowHistory:' + tabKey;
   const isHome = () => /^\/(?:index\.html)?$/.test(location.pathname);
-  const active = () => ready && isHome() && settings.homeEnabled;
+  let fallback = false; // Set when the homepage ended up without a single visible video: we step aside for this page.
+  const active = () => ready && !fallback && isHome() && settings.homeEnabled;
+  // Never touch Vue's tree before hydration has finished (see hydration-signal.js for why).
+  const hydrated = () => document.documentElement?.hasAttribute('data-btr-hydrated');
+  let hydrationWatch = null;
+  function whenHydrated(fn) {
+    if (hydrated()) return true;
+    if (!hydrationWatch) {
+      hydrationWatch = new MutationObserver(() => { if (hydrated()) { hydrationWatch.disconnect(); hydrationWatch = null; fn(); } });
+      hydrationWatch.observe(document.documentElement, {attributes: true, attributeFilter: ['data-btr-hydrated']});
+      // Our MAIN-world signal could be missing (blocked script, old browser): never wait forever.
+      const late = () => setTimeout(() => { if (!hydrated()) document.documentElement.setAttribute('data-btr-hydrated', 'fallback'); }, 4000);
+      if (document.readyState === 'complete') late(); else addEventListener('load', late, {once: true});
+    }
+    return false;
+  }
   const owns = n => !!(n?.nodeType === 1 ? n.closest(OWN) : n?.parentElement?.closest(OWN));
   const root = () => document.documentElement;
   const ui = globalThis.__BTR_UI__;
@@ -322,7 +337,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
   function ensureBar() {
     if(!grid?.parentElement)return;
     if(!bar) {
-      bar=el('div');bar.id='btr-flow-toolbar';bar.dataset.btrFlowOwned='';
+      bar=el('btr-toolbar');bar.id='btr-flow-toolbar';bar.dataset.btrFlowOwned='';
       shadow=bar.attachShadow({mode:'open'});shadow.append(el('style',uiCSS));
       refs.nav=el('nav',null,'toolbar');refs.nav.setAttribute('aria-label','推荐批次');
       refs.status=el('span','', 'status');refs.status.setAttribute('role','status');refs.status.setAttribute('aria-live','polite');
@@ -527,9 +542,40 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
   function scanMount() {
     clearTimeout(mountTimer);
     if(!active())return;
+    if(!whenHydrated(scanMount))return;
+    armWatchdog();
     const next=chooseGrid();
     if(next!==grid)connectGrid(next);
     else if(grid){ensureBar();tagRefresh();}
+  }
+  /* ---------- blank-page watchdog ----------
+     If the homepage shows no video at all a while after hydration (B 站's feed request failed, or the site's
+     markup changed under our CSS), every homepage change of ours is undone for this page so whatever B 站
+     rendered is visible, and a toast in our style offers a reload. */
+  let watchdog = 0, watchdogArmed = false;
+  const nativeVisible = () => [...document.querySelectorAll('.bili-video-card a[href*="/video/"],.feed-card a[href*="/video/"]')]
+    .filter(a => !owns(a) && a.getClientRects().length && a.offsetWidth > 20).length;
+  function armWatchdog() {
+    if (watchdogArmed) return; watchdogArmed = true;
+    let checks = 0;
+    const check = () => {
+      if (!isHome() || fallback) return;
+      if (busy || view || root().hasAttribute('data-btr-history-open') || document.hidden) { watchdog = setTimeout(check, 3000); return; } // History shown on purpose / tab hidden: look again later.
+      if (nativeVisible() > 0) return; // Healthy: one look is enough; later changes are B 站's own.
+      if (++checks < 3) { watchdog = setTimeout(check, 3000); return; }
+      // Vue rendered the grid into a node of ours (a late hydration mismatch): only a reload can fix it.
+      const swallowed = !!bar && [...bar.children].some(n => !owns(n) || n.matches?.(CARD) || n.querySelector?.(CARD));
+      stepAside(swallowed ? 'swallowed' : 'empty');
+    };
+    watchdog = setTimeout(check, 6000);
+  }
+  function stepAside(why) {
+    fallback = true; clearTimeout(watchdog);
+    stopHome(); for (const a of Object.values(FLAG_ATTRS)) toggle(a, false);
+    root().setAttribute('data-btr-home-fallback', why);
+    ui?.toast?.({key: 'btr-home', kind: 'warn', title: '首页推荐没显示出来',
+      text: why === 'swallowed' ? '页面加载时被打乱了，已恢复 B 站原样。刷新一下就好。' : 'B 站这次没有返回推荐（可能是网络或风控）。已恢复 B 站原样，可以刷新重试。',
+      actions: [{label: '刷新页面', primary: true, fn: () => location.reload()}]});
   }
   function stopHome() {
     clearTimeout(settleTimer);clearTimeout(mountTimer);clearTimeout(paintTimer);finishTransaction();
@@ -620,7 +666,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
   });
   window.addEventListener('popstate',()=>{lastPath=location.pathname;syncRoute();});
   // A low-frequency path comparison avoids patching the site's History API in an isolated world.
-  routeTimer=setInterval(()=>{if(lastPath!==location.pathname){lastPath=location.pathname;liveReady=false;syncRoute();}},1000);
+  routeTimer=setInterval(()=>{if(lastPath!==location.pathname){lastPath=location.pathname;liveReady=false;fallback=false;watchdogArmed=false;clearTimeout(watchdog);root().removeAttribute('data-btr-home-fallback');syncRoute();}},1000);
   window.addEventListener('pagehide',()=>{
     clearTimeout(saveTimer);
     if(settings.homeHistory&&snapshots.length){const value={at:Date.now(),epoch:clearEpoch,snapshots:core.history(snapshots)};chrome.storage.local.set({[storageKey]:value}).catch(()=>{});}

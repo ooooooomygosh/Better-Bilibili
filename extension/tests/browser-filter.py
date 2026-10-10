@@ -33,7 +33,7 @@ def tags(route):
  route.fulfill(status=200,headers=CORS,body=json.dumps({'code':0,'data':[{'tag_name':t} for t in TAGS.get(bv,[])]}))
 def boot(page,sync):
  page.goto('https://www.bilibili.com/')
- for f in ['tests/browser-shim.js','src/ui-kit.js','src/home-core.js','src/filter-core.js','src/feed-core.js']:page.add_script_tag(content=(ROOT/f).read_text())
+ for f in ['tests/browser-shim.js','src/ui-kit.js','src/home-core.js','src/filter-core.js','src/feed-core.js','src/adaptive-core.js']:page.add_script_tag(content=(ROOT/f).read_text())
  page.evaluate("s=>chromeMock.storage.sync.set(s)",sync)
  page.evaluate("code=>new Function('chrome',code)(window.chromeMock)",(ROOT/'src/tag-source.js').read_text())
  page.evaluate("code=>new Function('chrome',code)(window.chromeMock)",(ROOT/'src/home-infinite.js').read_text())

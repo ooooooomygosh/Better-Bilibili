@@ -102,7 +102,7 @@
       if (!title) continue;
       seen.add(bvid);
       const pic = cover(it.pic);
-      out.push({bvid, aid: Math.max(0, Math.trunc(Number(it.id)) || 0), mid: Math.max(0, Math.trunc(Number(it.owner?.mid)) || 0),
+      out.push({bvid, cid: Math.max(0, Math.trunc(Number(it.cid)) || 0), aid: Math.max(0, Math.trunc(Number(it.id)) || 0), mid: Math.max(0, Math.trunc(Number(it.owner?.mid)) || 0),
         url: `https://www.bilibili.com/video/${bvid}`, title, cover: pic, coverBase: pic ? pic.split('@')[0] : '', duration: duration(it.duration),
         author: text(it.owner?.name, 60), views: count(it.stat?.view), danmaku: count(it.stat?.danmaku),
         date: date(it.pubdate, now), followed: it.is_followed === 1 || it.is_followed === true});
@@ -110,8 +110,8 @@
     return out;
   }
 
-  // -352 / -412 / -401 are B 站's risk-control answers: stop and back off instead of hammering.
-  const RISK = new Set([-352, -412, -401, -509]);
+  // -352 / -412 / -401 / -509 / -799 are B 站's risk-control answers: stop and back off instead of hammering.
+  const RISK = new Set([-352, -412, -401, -509, -799]);
   function classify(json) {
     if (!json || typeof json !== 'object') return 'bad';
     if (json.code === 0) return 'ok';

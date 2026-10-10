@@ -1,5 +1,7 @@
 /* TEST ONLY. Browser APIs are mocked; this file is never loaded by the extension manifest. */
 (()=>{
+ // The extension waits for Vue hydration (hydration-signal.js); fixtures have no Vue, so they are hydrated at once.
+ document.documentElement.setAttribute('data-btr-hydrated','fixture');
  const all={sync:{},local:{}},listeners=[],messages=[];
  window.fixtureStorage={all,reads:0,writes:0,fail:false,delay:0};
  const copy=x=>structuredClone(x);
