@@ -18,6 +18,7 @@
 </p>
 
 <p>
+<a href="#sponsor">🪂 空降助手</a> ·
 <a href="#modes">🔀 两种模式</a> ·
 <a href="#filter">🚫 屏蔽</a> ·
 <a href="#clean">🧽 全站净化</a> ·
@@ -39,6 +40,18 @@
 ## ✨ 一眼看懂
 
 <table>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/media/sponsor-skip-undo.gif" alt="空降助手：自动跳过恰饭片段，提示里可一键撤销"><br>
+<b>🪂 空降助手</b> <sup>🆕 2.5.0</sup><br>
+恰饭、片头片尾自动跳过，进度条标出片段，跳过后一键撤销。
+</td>
+<td width="50%" valign="top">
+<img src="docs/media/sponsor-popup-toggle.png" alt="弹窗里的空降助手一键开关"><br>
+<b>🔘 一键开关</b><br>
+弹窗里一个开关，立即生效不用刷新；首次安装时欢迎页会先问你。
+</td>
+</tr>
 <tr>
 <td width="50%" valign="top">
 <img src="docs/media/infinite-feed.gif" alt="无限下滑：一批接一批，右侧显示第几批"><br>
@@ -64,6 +77,13 @@
 </td>
 </tr>
 </table>
+
+> [!TIP]
+> **🆕 2.5.0：空降助手来了**
+> - 🪂 **整合 [BilibiliSponsorBlock](https://github.com/hanydd/BilibiliSponsorBlock)**：只装哔哩节流阀一个扩展，就能自动跳过恰饭、片头片尾等 11 类片段，进度条按颜色标出，跳过后一键撤销。
+> - 🔘 **弹窗一键开关**，立即生效；首次安装的欢迎页会问你要不要开。
+> - 🔒 **隐私**：查询只发送 BV 号哈希的前 4 位，不带 Cookie，不新增权限。
+> - ⚖️ **许可证改为 GPL-3.0**（2.4.0 及以前仍为 MIT），致谢见[文末](#credits)。
 
 > [!NOTE]
 > **🆕 2.4.0 更新了什么**
@@ -155,6 +175,8 @@ B 站的「换一换」**每次只换两行**，点一下，上一批就没了�
 
 <a id="quick"></a>
 
+<a id="sponsor"></a>
+
 ## 🪂 空降助手：恰饭片段，自动跳过
 
 整合自 [BilibiliSponsorBlock](https://github.com/hanydd/BilibiliSponsorBlock)（B 站版 SponsorBlock），只装哔哩节流阀一个扩展就能用：
@@ -165,6 +187,18 @@ B 站的「换一换」**每次只换两行**，点一下，上一批就没了�
 - 按 <kbd>;</kbd> 标记开始和结束，选分类后提交给社区。
 - 弹窗和快捷面板「油门」页都有一键开关，11 个分类在设置页调整，立即生效不用刷新；首次安装的欢迎页会问你要不要开。
 - 提示、标记和对话框都用本扩展自己的界面样式，跟随 B 站深浅色。
+
+<table>
+<tr>
+<td width="60%" valign="top"><img src="docs/media/sponsor-skip-toast.jpg" alt="跳过提示：已跳过「赞助/恰饭」，可撤销"><br><sub>自动跳过后右下角提示，进度条下方的计时条走完就收起；点「撤销」回到片段开头。</sub></td>
+<td width="40%" valign="top"><img src="docs/media/sponsor-welcome.png" alt="欢迎页询问是否开启空降助手"><br><sub>首次安装：欢迎页介绍空降助手，问你开不开。</sub></td>
+</tr>
+<tr>
+<td colspan="2"><img src="docs/media/sponsor-progress-markers.png" alt="进度条上的绿色片段标记"><br><sub>进度条上的绿色一段就是「赞助/恰饭」，颜色和 BilibiliSponsorBlock 保持一致。</sub></td>
+</tr>
+</table>
+
+<sub>截图在无登录的无痕浏览器里拍摄，画面已模糊、弹幕已隐藏；示例视频 BV1Yo3sz6EbG（30–46 秒有社区标注的恰饭片段）。</sub>
 
 ## 🎛️ 快捷面板：常用开关，一个按钮全搞定
 
@@ -397,6 +431,7 @@ CHROMIUM_PATH=/path/to/chrome python3 extension/tests/browser-quick.py   # 任�
 
 | | Feature |
 |---|---|
+| 🪂 **Segment skip (空降助手)** | Built in from [BilibiliSponsorBlock](https://github.com/hanydd/BilibiliSponsorBlock) (a Bilibili port of [SponsorBlock](https://github.com/ajayyy/SponsorBlock)): auto / manual skip of sponsor, intro, outro and 8 more categories, colour markers on the progress bar, one-click undo, and <kbd>;</kbd> to submit new segments. One switch in the popup; lookups send only a 4-char hash prefix. |
 | ♾️ **Infinite native feed** | The homepage becomes an endless feed: batches append below (scroll back anytime), with batch dividers and a side counter. Appended cards are Bilibili's own cards — hover frame preview, Watch Later, and a "⋮" menu with *Not interested* (local only, undoable). |
 | 🔀 **Two homepage modes** | Chosen on first visit: *Refresh* (Previous · Next · Refresh, every batch kept) or *Infinite* (just scroll, no refresh buttons). Each mode has its own controls and never interferes with the other. |
 | 🚫 **Block lists** | Hide videos by title keyword (plain or `/regex/`), uploader (by UID) or Bilibili tag. Every refresh is filtered and de-duplicated before it is shown. Import / export as JSON. |
@@ -409,11 +444,15 @@ CHROMIUM_PATH=/path/to/chrome python3 extension/tests/browser-quick.py   # 任�
 | 🌗 **Dark mode** | The panel, overlays and feed cards follow Bilibili's own theme live; popup, options and welcome pages can follow Bilibili, follow the system, or stay light / dark. |
 | 🐢 **Slow-network guard** | If no media segment arrives within 20 s of taking over, playback is handed back to Bilibili's own player (with a *Take over again* button) instead of a long black screen. |
 
-**New in 2.4.0:** a homepage mode chooser, keyword / uploader / tag block lists with de-duplication, and site-wide cleanup switches. Works alongside AdGuard and uBlock Origin (tested with AdGuard's real filter lists); if Bilibili shows an "ad blocker detected" notice, switch it off under *Cleanup*. See the [changelog](extension/CHANGELOG.md) (Chinese).
+**New in 2.5.0:** built-in segment skipping (空降助手) from BilibiliSponsorBlock; the project is now **GPL-3.0-or-later** (2.4.0 and earlier remain MIT).
+
+**2.4.0:** a homepage mode chooser, keyword / uploader / tag block lists with de-duplication, and site-wide cleanup switches. Works alongside AdGuard and uBlock Origin (tested with AdGuard's real filter lists); if Bilibili shows an "ad blocker detected" notice, switch it off under *Cleanup*. See the [changelog](extension/CHANGELOG.md) (Chinese).
 
 **Install:** download `BiliThrottle-x.y.z.zip` from [Releases](https://github.com/ooooooomygosh/Better-Bilibili/releases/latest), unzip, open `chrome://extensions` (or `edge://extensions`), enable *Developer mode*, click *Load unpacked* and pick the folder. Chrome / Edge 114+.
 
 **Privacy:** the only required permission is `storage`. Everything (feed history, usage, lock) stays local; no analytics. The segment-skip feature (from BilibiliSponsorBlock) sends only a 4-char SHA-256 prefix of the video id to bsbsb.top. The infinite feed calls Bilibili's own recommendation API with your existing session; the extension never stores cookies.
+
+<a id="credits"></a>
 
 ## 🙏 致谢与许可 · Credits & License
 
