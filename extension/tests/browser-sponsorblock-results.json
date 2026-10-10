@@ -1,0 +1,34 @@
+[
+ {
+  "test": "first-install welcome introduces 空降助手, asks, and stores the choice (no / yes)",
+  "passed": true
+ },
+ {
+  "test": "segments fetched from bsbsb.top by hash prefix for BV1Yo3sz6EbG (cid-matched)",
+  "passed": true
+ },
+ {
+  "test": "progress-bar marker drawn inside B 站 progress bar (left=21.1268%)",
+  "passed": true
+ },
+ {
+  "test": "auto-skipped sponsor segment; toast \"已跳过「赞助/恰饭」\" uses BiliThrottle tokens (#fb7299, 12px)",
+  "passed": true
+ },
+ {
+  "test": "undo returns to segment start and does not re-skip (t=30.6s after 1.5 s)",
+  "passed": true
+ },
+ {
+  "test": "popup one-click switch turns 空降助手 off and markers vanish without reload",
+  "passed": true
+ },
+ {
+  "test": "switching back on restores markers live",
+  "passed": true
+ },
+ {
+  "test": "no page errors from the feature",
+  "passed": true
+ }
+]

@@ -50,6 +50,14 @@
         <button type="button" data-p="3"><b>放纵</b>3 时 / 周 20 时</button>
       </div>
     </div>
+    <div class="w-card" id="sbCard">
+      <h3>🪂 空降助手</h3>
+      <p>看视频时自动跳过恰饭、片头片尾等片段，进度条上会标出位置，跳过后能一键撤销。片段数据来自 <a href="https://github.com/hanydd/BilibiliSponsorBlock" target="_blank" rel="noopener">BilibiliSponsorBlock</a> 社区；查询时只发送视频编号哈希的前 4 位。</p>
+      <div class="w-presets" id="sbChoice" role="radiogroup" aria-label="是否开启空降助手">
+        <button type="button" role="radio" data-sb="1"><b>开启</b>推荐，可随时在弹窗里关闭</button>
+        <button type="button" role="radio" data-sb="0"><b>先不用</b>之后在弹窗或设置里打开</button>
+      </div>
+    </div>
     <p class="w-saved" id="saved" role="status" aria-live="polite"></p>
     <p class="w-note">选「不限制」只是暂时关闭观看额度，之前设好的时长和用量都会保留；想再开，在快捷面板「刹车」里一键打开即可。需要防止自己随手放宽？在完整设置里开启<a href="options.html#lock">自律锁</a>。</p>
   </section>
@@ -78,6 +86,7 @@
       <li><b>🚫 屏蔽词 · UP 主 · 标签</b>不想看的关键词、UP 主和视频标签，每次刷新都会过滤掉。</li>
       <li><b>🧽 全站净化</b>视频页、搜索、动态里的广告和烦人元素，按页面单独开关。</li>
       <li><b>⚡ 视频加载加速</b>多 CDN、Range 并发，按码率与倍速调整缓冲；清晰度仍由 B 站决定。</li>
+      <li><b>🪂 空降助手</b>整合自 BilibiliSponsorBlock：自动 / 手动跳过、进度条标记、撤销，按 ; 键标记并提交新片段。</li>
       <li><b>🌑 OLED 纯黑</b>B 站深色模式下把首页背景换成真正的纯黑。</li>
       <li><b>🔒 只存本机</b>必需权限只有 storage；推荐历史、观看用量都不上传。</li>
     </ul>

@@ -25,7 +25,7 @@ async function prepareExtension() {
     await chrome.storage.sync.set({flowHomeSchema:2,homeTheme:["native","oled"].includes(s.homeTheme)?s.homeTheme:"native",
       homeHideCarousel:s.homeHideCarousel !== false,homeHideBanner:s.homeHideBanner === true,homeHideAds:s.homeHideAds !== false});
   }
-  // 2.4.0: the homepage has two separate modes. Someone already on 无限下滑 has made that choice;
+  // 2.5.0: the homepage has two separate modes. Someone already on 无限下滑 has made that choice;
   // "不想看此 UP 主" from the feed menu (kept locally until now) joins the synced uploader block list.
   if (s.homeInfinite === true && s.homeModeChosen === undefined) await chrome.storage.sync.set({homeModeChosen: true});
   try {

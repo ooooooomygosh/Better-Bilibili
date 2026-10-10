@@ -7,13 +7,13 @@
 (function () {
   'use strict';
   const home = globalThis.__BTR_HOME_CORE__, focus = globalThis.__BTR_FOCUS_CORE__, ui = globalThis.__BTR_UI__;
-  const filt = globalThis.__BTR_FILTER_CORE__, clean = globalThis.__BTR_CLEAN_CORE__;
-  if (!home || !focus || !ui || !filt || !clean || window.top !== window || globalThis.__BTR_QUICK__) return;
+  const filt = globalThis.__BTR_FILTER_CORE__, clean = globalThis.__BTR_CLEAN_CORE__, sbc = globalThis.__BTR_SB_CORE__;
+  if (!home || !focus || !ui || !filt || !clean || !sbc || window.top !== window || globalThis.__BTR_QUICK__) return;
 
   const VERSION = chrome.runtime.getManifest().version;
   const PLAY = {enabled: true, mode: 'auto', strategy: 'auto', liveEnabled: true, quickFab: true};
-  const DEFAULTS = {...home.defaults, ...focus.defaults, ...filt.defaults, ...clean.defaults, ...PLAY};
-  const norm = raw => ({...raw, ...home.settings(raw), ...focus.settings(raw), ...filt.settings(raw), ...clean.settings(raw)});
+  const DEFAULTS = {...home.defaults, ...focus.defaults, ...filt.defaults, ...clean.defaults, ...sbc.defaults, ...PLAY};
+  const norm = raw => ({...raw, ...home.settings(raw), ...focus.settings(raw), ...filt.settings(raw), ...clean.settings(raw), ...sbc.settings(raw)});
   const FOCUS_KEYS = new Set(Object.keys(focus.defaults));
   const RELOAD_KEYS = new Set(['enabled', 'liveEnabled']); // Player hooks are installed at page start.
   const PRESETS = [
@@ -459,6 +459,10 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
       seg('mode', 'CDN 路线', null, [['auto', '自动'], ['mainland', '大陆'], ['overseas', '海外']]),
       seg('strategy', '观看策略', null, [['auto', '自动'], ['smooth', '稳播'], ['fast', '起播'], ['economy', '省流']]),
       sw('liveEnabled', '直播加速')));
+    p.append(el('div', 'sub', '空降助手'));
+    p.append(sw('sbEnabled', '空降助手', () => isPlayer() && document.documentElement.dataset.btrSbSegments ? `本视频有 ${document.documentElement.dataset.btrSbSegments} 个片段 · 立即生效` : '跳过恰饭、片头片尾 · 立即生效'));
+    const SBO = [['auto', '自动'], ['manual', '手动'], ['show', '仅标记'], ['off', '关']];
+    p.append(btn('空降分类、进度条标记与提交', 'wide', () => { close(); openOptions('sponsor'); }));
     if (isPlayer()) p.append(btn('高级播放设置（线程数、播放内核、诊断）', 'wide', () => {
       close();
       window.postMessage({channel: '__BILI_RANGE_ACCELERATOR_V1__', type: 'open-settings', payload: {toggle: true}}, '*');
