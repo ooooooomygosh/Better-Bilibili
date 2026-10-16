@@ -1,7 +1,7 @@
 {
   "name": "BiliThrottle (哔哩节流阀)",
-  "version": "2.5.2",
-  "build_date": "2026-10-10",
+  "version": "2.6.0",
+  "build_date": "2026-10-16",
   "distribution": "Unofficial Chrome/Edge MV3 fork; not an upstream extension release",
   "input": "BTR-Flow-1.0.0(1).zip",
   "input_sha256": "f211255fce9a3c0f06147da1a401884a90a7293c5e6a34c0336e7a608e0c4ba2",
@@ -56,6 +56,6 @@
     "renderer_home_filter_clean_passed": 14,
     "adguard_coexistence": "Emulated AdGuard (@adguard/extended-css 2.2.1 + @adguard/scriptlets, cosmetic rules from AdGuard Base, Chinese and Annoyances filter lists for bilibili.com) loaded alongside the unpacked extension on routed homepage / video / search fixtures: no exceptions, no layout fights, infinite feed and refresh toolbar unaffected. Not verified with the real AdGuard browser extension or desktop app on live bilibili.com."
   },
-  "previous_version": "2.3.0",
+  "previous_version": "2.5.2",
   "proxy_feature": "removed in 2.3.0 (Chrome rejects proxy as an optional permission)"
 }

@@ -1299,7 +1299,7 @@
       urlDeadlineSeconds,
       video,
       getDebug: () => ({
-        version: "2.5.2",
+        version: "2.6.0",
         architecture: "bilibili-native-ui-progressive-mse-0.8-core",
         quality: qualityLabel(selectedVideo),
         qualityId: Number(selectedVideo?.id) || 0,
