@@ -366,6 +366,7 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
     p.append(group('', undefined, '', sw('focusStrict', '严格模式', '不给“再看 5 分钟 / 跳过休息”'),
       seg('focusSessionMinutes', '番茄钟', () => `连续看满后休息 ${s.focusBreakMinutes} 分钟`, [[0, '关'], [25, '25'], [45, '45']])));
     if (!lock.locked) p.append(btn('🔒 开启自律锁（防止随手放宽额度）', 'wide', () => openOptions('lock')));
+    p.append(btn('📊 本周观看报告', 'wide', () => { close(); openPage('flow-open-report'); }));
     return p;
   }
   let chipKind = 'keywords';

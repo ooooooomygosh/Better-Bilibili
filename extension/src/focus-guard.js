@@ -1,6 +1,7 @@
 /* BTR Flow focus mode — isolated world. Measures real playback time of the main player only
  * (hover previews and small inline players are ignored), reports it to the service worker, and
  * shows a gentle overlay when the daily limit or a Pomodoro break is reached.
+ * The same ticks feed the 观看周报 (statsEnabled), even with the quota off: then nothing is ever blocked.
  */
 (function () {
   'use strict';
@@ -11,7 +12,8 @@
   const FLUSH_EVERY = 5, MIN_WIDTH = 320;
   const EASE = 'cubic-bezier(.2,.75,.25,1)';
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
-  let settings = core.settings({}), state = null, pending = 0, pendingId = null, currentId = null;
+  let settings = core.settings({}), state = null, pending = 0, pendingId = null, currentId = null, statsOn = false;
+  const metering = () => settings.focusEnabled || statsOn;
   let host = null, shadow = null, card = null, shownKind = '', countdown = null, dead = false;
   const warned = new Set();
 
@@ -53,9 +55,28 @@
     }
   }
 
+  // Uploader of the video on screen, for the weekly report's top UP list. B 站 markup varies by page type and
+  // redesign, so try the known spots and accept only a link to a space.bilibili.com/<mid> with visible text.
+  const UP_SEL = ['.up-detail-top a.up-name', '.up-info--right a.up-name', 'a.up-name', '.membersinfo-upcard a[href*="space.bilibili.com"]',
+    '.up-info__right a[href*="space.bilibili.com"]', '.up-panel-container a[href*="space.bilibili.com"]', 'a.room-owner-username', '.upinfo-detail a[href*="space.bilibili.com"]'];
+  let upCache = {id: null, up: null};
+  function upInfo(id) {
+    if (upCache.id === id && upCache.up) return upCache.up;
+    let up = null;
+    try {
+      outer: for (const sel of UP_SEL) for (const a of document.querySelectorAll(sel)) {
+        const m = /space\.bilibili\.com\/(\d{1,20})/.exec(a.getAttribute('href') || '');
+        const name = (a.textContent || a.getAttribute('title') || '').replace(/\s+/g, ' ').trim();
+        if (m && name) { up = {mid: m[1], name: name.slice(0, 40)}; break outer; }
+      }
+    } catch (_) {}
+    upCache = {id, up};
+    return up;
+  }
+
   function flush() {
     if (!pending || !pendingId) return;
-    const msg = {type: 'focus-tick', seconds: pending, id: pendingId};
+    const msg = {type: 'focus-tick', seconds: pending, id: pendingId, up: statsOn ? upInfo(pendingId) : null};
     pending = 0;
     send(msg).then(apply).catch(() => {});
   }
@@ -66,7 +87,7 @@
   }
 
   setInterval(() => {
-    if (dead || !settings.focusEnabled) return;
+    if (dead || !metering()) return;
     const id = core.videoId(location.href);
     if (id !== currentId) { flush(); currentId = id; check(); }
     if (!id) return;
@@ -291,8 +312,22 @@ button:focus-visible{outline:2px solid var(--btr-brand);outline-offset:2px}
     }
   }, true);
 
+  // Weekly report: once a week, on the first B 站 visit after Monday, a quiet card with last week's total.
+  // The service worker marks the week as noticed before answering, so only one tab shows it.
+  function weeklyNotice() {
+    send({type: 'stats-notice'}).then(r => {
+      if (!r?.show || !ui?.toast) return;
+      ui.toast({key: 'btr-weekly', title: `上周观看报告出炉了：${r.total || core.fmt(r.seconds)}`, text: `${r.range} · 看看这周刹车踩得怎么样`, timeout: 15000,
+        actions: [{label: '查看', primary: true, fn: () => send({type: 'flow-open-report'}).catch(() => {})}]});
+    }).catch(() => {});
+  }
+  chrome.storage.sync.get({statsEnabled: true, statsWeeklyNotice: true}).then(s => {
+    statsOn = s.statsEnabled !== false;
+    if (statsOn && s.statsWeeklyNotice !== false) setTimeout(weeklyNotice, 2500);
+  }).catch(() => {});
   chrome.storage.sync.get(core.defaults).then(s => { settings = core.settings(s); check(); }).catch(() => {});
   chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'sync' && changes.statsEnabled) statsOn = changes.statsEnabled.newValue !== false;
     if (area !== 'sync' || !Object.keys(core.defaults).some(k => changes[k])) return;
     const next = {...settings};
     for (const k of Object.keys(core.defaults)) if (changes[k]) next[k] = changes[k].newValue;

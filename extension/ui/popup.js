@@ -27,6 +27,7 @@ pvSeg.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight'].includes(e.k
 pvMute.addEventListener('change',async()=>{try{await chrome.storage.sync.set({homePreviewMuted:pvMute.checked});say(pvMute.checked?'悬停播放默认静音。':'悬停播放会带声音。','ok');}catch(e){say(e.message,'error');}});
 $('reloadBtn').onclick=async()=>{try{await chrome.tabs.reload(tab.id);window.close();}catch(e){say(e.message,'error');}};
 $('options').onclick=()=>chrome.runtime.openOptionsPage();
+$('report').onclick=async()=>{try{await chrome.tabs.create({url:chrome.runtime.getURL('ui/report.html')});window.close();}catch(e){say(e.message,'error');}};
 $('quick').onclick=async()=>{try{await chrome.tabs.sendMessage(tab.id,{type:'flow-quick-open'});window.close();}catch(_){say('请先打开或刷新 B 站页面，快捷面板在页面右下角。','error');}};
 let reachable=false;
 // Read live from the tab every second: infinite-feed batches (current / loaded) and 换一批 history are different things.

@@ -1,0 +1,49 @@
+{
+ "environment": "unpacked extension in Playwright Chromium (headless), real report.html, clock pinned to 2026-10-18 21:40",
+ "results": [
+  {
+   "test": "light: 6 小时 40 分 vs 上周 9 小时 10 分 (↓27%, 节流成功), 3 次踩刹车, 最长一天周三, top UP, 7+7 bars, 22 点 peak, bar tooltip, no horizontal scroll",
+   "passed": true
+  },
+  {
+   "test": "light: share card is a 724 KB 1080×1440 PNG; 隐藏 UP 主名字 redraws it; copy answers (已复制，去粘贴吧 ✨); Esc closes",
+   "passed": true
+  },
+  {
+   "test": "light: 上一周 shows 9 小时 10 分 (no earlier record), two weeks back is the empty state, 下一周 returns and stops at this week",
+   "passed": true
+  },
+  {
+   "test": "dark: 6 小时 40 分 vs 上周 9 小时 10 分 (↓27%, 节流成功), 3 次踩刹车, 最长一天周三, top UP, 7+7 bars, 22 点 peak, bar tooltip, no horizontal scroll",
+   "passed": true
+  },
+  {
+   "test": "dark: share card is a 724 KB 1080×1440 PNG; 隐藏 UP 主名字 redraws it; copy answers (已复制，去粘贴吧 ✨); Esc closes",
+   "passed": true
+  },
+  {
+   "test": "dark: 上一周 shows 9 小时 10 分 (no earlier record), two weeks back is the empty state, 下一周 returns and stops at this week",
+   "passed": true
+  },
+  {
+   "test": "B 站 page: weekly notice \"上周观看报告出炉了：7 小时10月5日 – 10月11日 · 看看这周刹车踩得怎么样\" shows once, 查看 opens ui/report.html via the service worker",
+   "passed": true
+  },
+  {
+   "test": "real playback with the quota off: 10 s recorded for 芝士焗饭研究所 (mid read from a.up-name), focusUsage untouched, video never paused",
+   "passed": true
+  },
+  {
+   "test": "empty state without data; focus-tick with the quota off records 15 s / 1 video / UP in watchStats and leaves focusUsage untouched",
+   "passed": true
+  },
+  {
+   "test": "statsEnabled off: ticks are not recorded",
+   "passed": true
+  },
+  {
+   "test": "no uncaught errors on the report page",
+   "passed": true
+  }
+ ]
+}

@@ -25,6 +25,7 @@
 <a href="#quick">🎛️ 快捷面板</a> ·
 <a href="#limit">⏱️ 观看额度</a> ·
 <a href="#lock">🔒 自律锁</a> ·
+<a href="#report">📊 观看周报</a> ·
 <a href="#speed">⚡ 加载加速</a> ·
 <a href="#install">📦 安装</a> ·
 <a href="#english">English</a>
@@ -214,7 +215,7 @@ B 站每个页面的右下角都有一个粉色的油门按钮，点开（或按
 
 | 标签 | 能做什么 |
 |---|---|
-| **刹车** | 开关观看额度；5 小时 / 每周用量条；自律 · 适中 · 放纵三档预设；严格模式；番茄钟 |
+| **刹车** | 开关观看额度；5 小时 / 每周用量条；自律 · 适中 · 放纵三档预设；严格模式；番茄钟；本周观看报告 |
 | **首页** | 选模式（换一批 / 无限下滑）及各自的设置、屏蔽关键词 / UP 主 / 标签、去重、纯黑背景 |
 | **净化** | 按页面分组的全站净化开关（首页、视频页、搜索与动态、全站） |
 | **油门** | 视频加速、CDN 路线、观看策略、直播加速 |
@@ -274,6 +275,22 @@ B 站每个页面的右下角都有一个粉色的油门按钮，点开（或按
 - 这是给自己设的门槛，不是防破解：卸载扩展、用开发者工具改存储都能绕过。
 
 <p align="center"><img src="docs/media/lock-confirm-dark.jpg" width="600" alt="开启自律锁的确认框"></p>
+
+<a id="report"></a>
+
+### 📊 观看周报：这周到底刷了多久
+
+光有刹车还不够，得知道自己踩得怎么样。每周一份周报：
+
+<img src="docs/media/weekly-report.png" alt="观看周报：本周 vs 上周" width="100%">
+
+- 本周 vs 上周：总时长、看了几个视频、日均、最长的一天，外加一句评语——少刷了夸你「节流成功 🎉」，多刷了提醒你「刹车该踩了 🛑」。
+- 每天的柱状图叠着上周做对比；一天里几点在看的热力条（夜猫子一眼就露馅 🦉）；最常看的 5 位 UP；额度用完、番茄钟休息算作「踩刹车次数」。
+- 「生成分享图」一键出 1080×1440 竖版图，下载或复制到剪贴板，可以先隐藏 UP 主名字。
+- 观看额度关着也照样记录（只记，不拦）。数据只存本机、保留 10 周，设置页「观看统计」里能关掉或一键清空。每周第一次打开 B 站会轻轻提醒一次「上周观看报告出炉了」。
+- 入口：弹窗「本周报告」、快捷面板「刹车」、设置页「观看统计」。
+
+<p align="center"><img src="docs/media/weekly-share-card.png" width="360" alt="观看周报分享图"></p>
 
 <a id="home"></a>
 
@@ -407,7 +424,7 @@ B 站每个页面的右下角都有一个粉色的油门按钮，点开（或按
 
 ## 🔒 隐私
 
-- 必需权限只有 `storage`。推荐历史、观看用量、「不感兴趣」和自律锁都只存在本机；屏蔽列表存在浏览器自带的同步存储里（跟随你登录的浏览器账号）。不上传任何数据，没有统计上报。
+- 必需权限只有 `storage`。推荐历史、观看用量、观看周报、「不感兴趣」和自律锁都只存在本机；屏蔽列表存在浏览器自带的同步存储里（跟随你登录的浏览器账号）。不上传任何数据，没有统计上报。
 - 只有在你添加了「标签」屏蔽规则时，扩展才会请求 B 站公开的视频标签接口，结果缓存在本机。
 - 开启「无限下滑」后，扩展会以你的登录状态请求 B 站**自己的**首页推荐接口，和 B 站网页用的是同一组接口；扩展不保存 Cookie。只有你点「稍后再看」时，才会读取 `bili_jct` 这一个值作为 B 站要求的防跨站令牌（和 B 站网页的做法一样）。
 - 空降助手查询片段时，只向 BilibiliSponsorBlock 服务器（bsbsb.top）发送 BV 号 SHA-256 哈希的**前 4 位**，服务器无法确定你在看哪个视频，也不发送 Cookie。首次提交片段时才在本机生成匿名 ID（不同步），只随提交发送。可在弹窗里一键关闭。
@@ -449,6 +466,7 @@ CHROMIUM_PATH=/path/to/chrome python3 extension/tests/browser-quick.py   # 任�
 | 🧽 **Site-wide cleanup** | Per-item switches for ads and nags across the homepage, video pages, search and dynamics — carousel ads, live cards, promo floors, "ad blocker detected" notices, login pop-ups, "open the app" prompts. Pure CSS, applied before first paint. |
 | 🎛️ **Quick panel** | A pink button on every page (or <kbd>Alt</kbd>+<kbd>T</kbd>) with four tabs: **Brake**, **Home**, **Cleanup**, **Throttle**. Doesn't fire while you're typing. |
 | ⏱️ **Viewing quota** | Metered like Claude Code: a rolling **5-hour window** plus a **weekly cap**, optional per-window video count and a Pomodoro timer. Only real playback of the main player counts; data stays on your device. |
+| 📊 **Weekly watch report** | How long you really watched this week vs last week, a daily bar chart, the hours you watch, your top 5 uploaders and how often you hit the brake — with a cheeky one-liner and a 1080×1440 share card (uploader names can be hidden). Recorded locally even with the quota off; kept 10 weeks. |
 | 🔒 **Self-discipline lock** | Once locked, *tightening* applies instantly, while *loosening* (raising limits, turning the quota off, removing the lock) waits out a cooldown of 1 hour – 7 days — or needs the password. Salted PBKDF2 hash only; no back door. Ask a friend to set a password you don't know. |
 | 🧹 **Clean homepage** | Removes the banner carousel and explicit ad cards; adds *Previous · Next · Refresh* so every reshuffle can be revisited. Optional OLED black. |
 | ⚡ **Faster loading** | Multi-CDN + parallel range requests (from [Bilibili-thread-ripper](https://github.com/MrTangLuyao/Bilibili-thread-ripper)), adaptive buffering. Video quality stays Bilibili's call. |

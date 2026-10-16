@@ -1,7 +1,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
-const ui=globalThis.__BTR_UI__,focusCore=globalThis.__BTR_FOCUS_CORE__,homeCore=globalThis.__BTR_HOME_CORE__,lockCore=globalThis.__BTR_LOCK_CORE__,filterCore=globalThis.__BTR_FILTER_CORE__,cleanCore=globalThis.__BTR_CLEAN_CORE__,sbCore=globalThis.__BTR_SB_CORE__;
-const defaults={enabled:true,liveEnabled:true,autoConcurrency:true,smartPolicy:true,strategy:'auto',mode:'auto',maxAutoThreads:32,memoryBudgetMB:64,takeover:'full',...homeCore.defaults,...focusCore.defaults,filterEnabled:true,filterDedupe:true,...cleanCore.defaults,quickFab:true,uiTheme:'bili',...sbCore.defaults};
+const ui=globalThis.__BTR_UI__,focusCore=globalThis.__BTR_FOCUS_CORE__,homeCore=globalThis.__BTR_HOME_CORE__,lockCore=globalThis.__BTR_LOCK_CORE__,filterCore=globalThis.__BTR_FILTER_CORE__,cleanCore=globalThis.__BTR_CLEAN_CORE__,sbCore=globalThis.__BTR_SB_CORE__,statsCore=globalThis.__BTR_STATS_CORE__;
+const defaults={enabled:true,liveEnabled:true,autoConcurrency:true,smartPolicy:true,strategy:'auto',mode:'auto',maxAutoThreads:32,memoryBudgetMB:64,takeover:'full',...homeCore.defaults,...focusCore.defaults,filterEnabled:true,filterDedupe:true,...cleanCore.defaults,quickFab:true,uiTheme:'bili',...sbCore.defaults,...statsCore.defaults};
 const LISTS=['filterKeywords','filterUps','filterTags'];
 const FOCUS=new Set(Object.keys(focusCore.defaults));
 const RELOAD=new Set(['takeover','enabled','liveEnabled']);
@@ -90,6 +90,7 @@ $('restore').onclick=async()=>{
  await save({...defaults});await load();
 };
 $('clearHistory').onclick=async()=>{if(!await dialog({title:'清空推荐历史？',text:'本扩展保存的全部推荐批次都会删除，此操作无法撤销。',ok:'清空',danger:true}))return;try{await chrome.storage.local.set({flowHistoryClearedAt:Date.now()});const all=await chrome.storage.local.get(null);const keys=Object.keys(all).filter(k=>k.startsWith('flowHistory:'));await chrome.storage.local.remove(keys);status(`已清空 ${keys.length} 组推荐历史；之后刷到的推荐仍会记录，关闭“保存推荐批次”可停止。`,'ok');}catch(e){status(e.message,'error');}};
+$('statsClear').onclick=async()=>{if(!await dialog({title:'清空观看统计？',text:'所有周报数据（每天的时长、视频数、UP 主和踩刹车次数）都会删除，此操作无法撤销。不影响观看额度的用量。',ok:'清空',danger:true}))return;try{const r=await chrome.runtime.sendMessage({type:'stats-clear'});if(r?.error)throw new Error(r.error);status('已清空观看统计。','ok');}catch(e){status(e.message,'error');}};
 for(const b of document.querySelectorAll('[data-preset]'))b.onclick=()=>{const[m,w,v,sm,br]=b.dataset.preset.split(',').map(Number);save({focusWindowMinutes:m,focusWeeklyHours:w,focusWindowVideos:v,focusSessionMinutes:sm,focusBreakMinutes:br,focusEnabled:true}).then(load);};
 // Changes made elsewhere (popup, quick panel, the lock's own revert) show up here at once.
 chrome.storage.onChanged.addListener((changes,area)=>{
