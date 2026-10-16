@@ -4,7 +4,7 @@
  */
 (function (root) {
   'use strict';
-  const MAX_ITEMS = 300, MAX_LEN = 80;
+  const MAX_ITEMS = 300, MAX_LEN = 80, SYNC_ITEM_BYTES = 7900;
   const defaults = Object.freeze({filterEnabled: true, filterKeywords: [], filterUps: [], filterTags: [], filterDedupe: true});
   const KEYS = Object.freeze(Object.keys(defaults));
 
@@ -44,9 +44,21 @@
   }
 
   /** "/正则/i" is a regular expression; anything else is a plain, case-insensitive substring. */
+  // A quantified group that itself contains a quantifier or an alternation ("(a+)+", "(a|aa)*", "(x{2,})+") can backtrack
+  // exponentially; such a rule (easily pasted in via 导入) would freeze every homepage tab, so it is refused.
+  const RISKY = /\((?:\\.|[^()\\])*(?:[*+}]|\|)(?:\\.|[^()\\])*\)\s*(?:[*+]|\{\d*,)/;
+  const safePattern = src => !RISKY.test(src) && !/\\[1-9]/.test(src);
+  /** Why a "/正则/" keyword cannot be used (shown when adding it), or null for a usable rule / plain keyword. */
+  function regexProblem(k) {
+    const m = /^\/(.+)\/([imsu]*)$/.exec(String(k ?? '').trim());
+    if (!m) return null;
+    if (!safePattern(m[1])) return '这条正则可能让页面卡死（重复的分组里又有重复或「|」），请简化，例如把 (抽奖|开箱)+ 写成 抽奖|开箱';
+    try { new RegExp(m[1], m[2]); return null; } catch (e) { return '正则写法有误：' + String(e.message || e).slice(0, 60); }
+  }
   function keyword(k) {
     const m = /^\/(.+)\/([imsu]*)$/.exec(k);
     if (m) {
+      if (!safePattern(m[1])) return null;
       try { const re = new RegExp(m[1], m[2].includes('i') ? m[2] : m[2] + 'i'); return {label: k, test: t => re.test(t)}; }
       catch (_) { return null; } // An invalid expression simply never matches.
     }
@@ -86,13 +98,16 @@
     if (!fixed) return null;
     const key = kind === 'ups' ? (parseUp(fixed).mid || norm(fixed)) : norm(fixed);
     if (before.some(e => (kind === 'ups' ? (parseUp(e).mid || norm(e)) : norm(e)) === key)) return null;
-    return [...before, fixed].slice(-MAX_ITEMS);
+    const out = [...before, fixed].slice(-MAX_ITEMS);
+    // chrome.storage.sync refuses an item over 8 KB (and the save would fail silently); drop the oldest entries instead.
+    while (out.length > 1 && new TextEncoder().encode(JSON.stringify(out)).length > SYNC_ITEM_BYTES) out.shift();
+    return out;
   }
   const remove = (listRaw, entry) => (Array.isArray(listRaw) ? listRaw : []).filter(e => e !== entry);
   /** Text for chips: "名字" for uid entries that carry one, "UID 123" otherwise. */
   const upLabel = e => { const p = parseUp(e); return p.mid ? (p.name || `UID ${p.mid}`) : p.name; };
 
-  const api = Object.freeze({defaults, KEYS, settings, compile, parseUp, upEntry, upLabel, add, remove, norm, MAX_ITEMS});
+  const api = Object.freeze({defaults, KEYS, settings, compile, parseUp, upEntry, upLabel, add, remove, norm, MAX_ITEMS, safePattern, regexProblem});
   root.__BTR_FILTER_CORE__ = api;
   if (typeof module === 'object') module.exports = api;
 })(globalThis);

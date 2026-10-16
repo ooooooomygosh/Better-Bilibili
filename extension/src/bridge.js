@@ -2,7 +2,7 @@
   "use strict";
 
   const CHANNEL = "__BILI_RANGE_ACCELERATOR_V1__";
-  const VERSION = "2.5.2";
+  const VERSION = "2.6.0";
   const notices = globalThis.__BTR_NOTIFICATION_VIEW__;
   const ERROR_NOTICE_ID = "__bilibili_thread_ripper_error_notice__";
   const ERROR_NOTICE_STYLE_ID = "__bilibili_thread_ripper_error_notice_style__";
@@ -237,6 +237,7 @@
     postSettings();
   });
 
+  let pendingWrite = {}, writeTimer = 0;
   window.addEventListener("message", (event) => {
     if (event.source !== window || event.data?.channel !== CHANNEL) return;
     if (event.data.type === "playback-notice") {
@@ -257,8 +258,15 @@
       if (!input || typeof input !== "object") return;
       const keys = Object.keys(DEFAULTS).filter((key) => Object.prototype.hasOwnProperty.call(input, key));
       if (!keys.length) return;
-      const next = normalizeStoredSettings({ ...latestSettings, ...Object.fromEntries(keys.map((key) => [key, input[key]])) });
-      chrome.storage.sync.set(Object.fromEntries(keys.map((key) => [key, next[key]])));
+      const next = normalizeStoredSettings({ ...latestSettings, ...pendingWrite, ...Object.fromEntries(keys.map((key) => [key, input[key]])) });
+      for (const key of keys) pendingWrite[key] = next[key];
+      // Coalesce bursts (sliders, repeated clicks, or a page script spamming us) into one write: chrome.storage.sync
+      // allows ~120 writes a minute, and running out would also stop the self-discipline lock from reverting changes.
+      clearTimeout(writeTimer);
+      writeTimer = setTimeout(() => {
+        const batch = pendingWrite; pendingWrite = {};
+        chrome.storage.sync.set(batch).catch(() => {});
+      }, 250);
       return;
     }
     if (event.data.type !== "stats") return;
@@ -301,9 +309,4 @@
     syncTakeoverErrorNotice();
   });
 
-  // The toolbar icon of the extension. The settings panel runs in the page.
-  chrome.runtime.onMessage.addListener((message) => {
-    if (message?.type === "openSettings" && window.top === window) window.postMessage({ channel: CHANNEL, type: "open-settings", payload: { toggle: true } }, "*");
-    return false;
-  });
 })();

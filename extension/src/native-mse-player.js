@@ -757,7 +757,8 @@
           // A buffer that just started updating is retried. Say so if it keeps failing.
           candidate.endAttempts = (candidate.endAttempts || 0) + 1;
           if (candidate.endAttempts === 40) options.onLog?.("视频结尾没能正常收尾", `结束媒体流一直失败，播放器可能停在结尾。\n原因：${String(error?.message || error).slice(0, 160)}`, "error", "playback");
-          candidate.endRetryTimer = setTimeout(() => maybeEndStream(candidate), 50);
+          // Back off after the first second of retries so a stream that never ends does not spin a 50 ms timer forever.
+          candidate.endRetryTimer = setTimeout(() => maybeEndStream(candidate), candidate.endAttempts < 20 ? 50 : Math.min(2000, 50 * candidate.endAttempts));
         }
       });
     }
@@ -1298,7 +1299,7 @@
       urlDeadlineSeconds,
       video,
       getDebug: () => ({
-        version: "2.5.2",
+        version: "2.6.0",
         architecture: "bilibili-native-ui-progressive-mse-0.8-core",
         quality: qualityLabel(selectedVideo),
         qualityId: Number(selectedVideo?.id) || 0,

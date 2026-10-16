@@ -1,0 +1,17 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>哔哩节流阀 · 观看周报</title><script src="../src/ui-kit.js"></script><link rel="stylesheet" href="common.css"><link rel="stylesheet" href="report.css"></head><body class="report">
+<header class="r-top"><div class="r-wrap row between"><div class="r-brand"><img src="../icons/icon-48.png" alt="" width="28" height="28"><span><b>观看周报</b><small class="brand">BILITHROTTLE · 哔哩节流阀</small></span></div>
+<nav class="r-weeks" aria-label="切换周"><button type="button" id="prev" class="small" aria-label="上一周">‹ 上一周</button><span id="range" aria-live="polite"></span><button type="button" id="next" class="small" aria-label="下一周">下一周 ›</button></nav>
+<button type="button" id="share" class="primary small">生成分享图</button></div></header>
+<main class="r-wrap" id="main">
+<section class="r-hero" id="hero"><div class="r-total"><p class="r-label" id="label">本周观看</p><p class="r-big" id="total" aria-live="polite"></p><p class="r-line" id="line"></p><span class="r-delta" id="delta"></span></div>
+<dl class="r-tiles"><div><dt>看了</dt><dd id="videos"></dd></div><div><dt>日均</dt><dd id="avg"></dd></div><div><dt>最长一天</dt><dd id="longest"></dd></div><div><dt>踩刹车</dt><dd id="brakes"></dd></div></dl></section>
+<div class="r-grid"><section class="card r-chart"><div class="row between"><h2>每天看了多久</h2><div class="r-legend" aria-hidden="true"><span><i class="cur"></i>本周</span><span><i class="last"></i>上周</span></div></div><div class="r-bars" id="bars"></div><div class="r-tip" id="tip" role="tooltip" hidden></div></section>
+<section class="card r-ups"><div class="row between"><h2>本周最常看的 UP</h2><span class="pill">Top 5</span></div><ol id="ups"></ol></section></div>
+<section class="card r-hours"><div class="row between"><h2>一天里什么时候在看</h2><span class="muted" id="peak"></span></div><div class="r-strip" id="hours" role="img"></div><div class="r-axis" aria-hidden="true"><span>0 点</span><span>6 点</span><span>12 点</span><span>18 点</span><span>24 点</span></div></section>
+<section class="card r-empty" id="empty" hidden><div class="r-empty-icon" aria-hidden="true">📭</div><h2 id="emptyTitle">这周还没有观看记录</h2><p class="muted" id="emptyText">在 B 站看视频时会自动记录真实播放时长（只存这台电脑）。看满 1 分钟，这里就会出现你的第一份周报。</p><div class="actions"><a class="button-link" href="https://www.bilibili.com/" target="_blank" rel="noopener">去 B 站</a><a class="button-link" href="options.html#stats">观看统计设置</a></div></section>
+<p class="fine r-foot">数据只存在这台电脑的浏览器里，不会上传。每周从周一 0 点开始；只统计主播放器真正在播放的时间，首页悬停预览不算。 · <a href="options.html#stats">观看统计设置</a></p>
+</main>
+<div class="modal-back r-share" id="shareBack" hidden><div class="modal" role="dialog" aria-modal="true" aria-labelledby="shareTitle"><h3 id="shareTitle">分享图</h3><p class="muted">1080 × 1440，适合发小红书、B 站动态。</p><div class="r-preview"><canvas id="card" width="1080" height="1440" aria-label="分享图预览"></canvas></div>
+<label class="row r-hide"><span class="switch"><input type="checkbox" role="switch" id="hideUps"><span></span></span>隐藏 UP 主名字</label>
+<p class="fine" id="shareMsg" role="status"></p><div class="actions"><button type="button" id="closeShare">关闭</button><button type="button" id="copy">复制到剪贴板</button><button type="button" class="primary" id="download">下载</button></div></div></div>
+<script src="../src/stats-core.js"></script><script src="report.js"></script></body></html>

@@ -26,8 +26,8 @@
   }
   function pump() {
     while (running < LANES && waiting.length) {
-      const job = waiting.shift(); running++;
-      fetch(`${API}?bvid=${job.bvid}`, {credentials: 'include'}).then(r => r.ok ? r.json() : null).then(j => {
+      const job = waiting.shift(); running++; // each request times out so a hung one cannot hold a lane forever
+      fetch(`${API}?bvid=${job.bvid}`, {credentials: 'include', signal: AbortSignal.timeout?.(8000)}).then(r => r.ok ? r.json() : null).then(j => {
         const tags = j?.code === 0 && Array.isArray(j.data) ? j.data.map(t => String(t?.tag_name || '').trim()).filter(Boolean).slice(0, 30) : null;
         job.resolve(tags);
         if (tags) persist(); else mem.delete(job.bvid); // A failure is retried next time, not cached.

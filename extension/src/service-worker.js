@@ -1,6 +1,6 @@
 "use strict";
 
-importScripts("focus-core.js", "lock-core.js");
+importScripts("focus-core.js", "lock-core.js", "stats-core.js");
 
 const BADGE_COLOR = "#fb7299";
 
@@ -41,19 +41,14 @@ async function prepareExtension() {
   if (Object.keys(missing).length) await chrome.storage.sync.set(missing);
 }
 
-chrome.runtime.onInstalled.addListener(prepareExtension);
+// A failed migration must not surface as an unhandled rejection; it runs again on the next startup.
+const prepareSafely = () => prepareExtension().catch(e => console.warn("BiliThrottle: prepare failed", e));
+chrome.runtime.onInstalled.addListener(prepareSafely);
 // New users get a short tour of what the extension does and where its switches live.
 chrome.runtime.onInstalled.addListener(({reason}) => {
   if (reason === "install") chrome.tabs.create({url: chrome.runtime.getURL("ui/welcome.html")}).catch(() => {});
 });
-chrome.runtime.onStartup.addListener(prepareExtension);
-
-// The settings open inside the bilibili page, the same panel as in the userscript. Other
-// pages have no content script to answer, and nothing happens there.
-chrome.action.onClicked.addListener((tab) => {
-  if (!Number.isInteger(tab?.id)) return;
-  chrome.tabs.sendMessage(tab.id, { type: "openSettings" }).catch(() => {});
-});
+chrome.runtime.onStartup.addListener(prepareSafely);
 
 chrome.runtime.onMessage.addListener((message, sender) => {
   if (message?.type === "setThreadBadge") setThreadBadge(sender.tab?.id, message.enabled === true, message.activeThreads);
@@ -68,6 +63,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (sender.id === chrome.runtime.id && message?.type === 'flow-open-options') {
     const hash = typeof message.hash === "string" && /^[a-z-]{1,20}$/.test(message.hash) ? message.hash : "";
     openExtensionPage("ui/options.html", hash).then(sendResponse, e => sendResponse({ok: false, error: String(e?.message || e)}));
+    return true;
+  }
+  if (sender.id === chrome.runtime.id && message?.type === 'flow-open-report') {
+    openExtensionPage("ui/report.html", "").then(sendResponse, e => sendResponse({ok: false, error: String(e?.message || e)}));
     return true;
   }
   if (sender.id === chrome.runtime.id && message?.type === 'flow-open-welcome') {
@@ -103,6 +102,7 @@ async function openExtensionPage(path, hash) {
 // usage tick can never interleave.
 const focus = self.__BTR_FOCUS_CORE__;
 const lockCore = self.__BTR_LOCK_CORE__;
+const stats = self.__BTR_STATS_CORE__;
 let focusChain = Promise.resolve();
 function serial(job) {
   const run = focusChain.then(job);
@@ -136,17 +136,44 @@ async function effectiveSettings(lock) {
   return focus.settings(lock ? {...sync, ...lock.approved} : sync);
 }
 
-function focusRun(change, id) {
+// `change` may return null to leave the quota untouched (a tick while only the weekly report is on).
+// `played` ({seconds, up}) is real playback for the 观看周报, recorded in the same queue.
+function focusRun(change, id, played) {
   return serial(async () => {
     const now = Date.now();
     const lock = await settleLock(now);
     const s = await effectiveSettings(lock);
     const {focusUsage} = await chrome.storage.local.get("focusUsage");
-    const next = change ? change(focusUsage, now, s) : focus.usage(focusUsage, now, s);
-    if (change) await chrome.storage.local.set({focusUsage: next});
-    return {...focus.evaluate(next, now, s, id), enabled: s.focusEnabled, strict: s.focusStrict,
+    const inBreak = s.focusEnabled && focus.usage(focusUsage, now).breakUntil > now;
+    const changed = change ? change(focusUsage, now, s) : null;
+    const next = changed || focus.usage(focusUsage, now, s);
+    if (changed) await chrome.storage.local.set({focusUsage: next});
+    const result = focus.evaluate(next, now, s, id);
+    await recordStats(now, played && !inBreak ? played : null, id, s.focusEnabled ? result.block : null).catch(e => console.warn("观看统计写入失败", e));
+    return {...result, enabled: s.focusEnabled, strict: s.focusStrict,
       locked: !!lock, lockHasPassword: lockCore.hasPassword(lock)};
   });
+}
+
+// 观看周报: local per-day totals, written only here (inside the serial queue), whether or not the quota is on.
+async function recordStats(now, played, id, block) {
+  const tag = stats.brakeTag(block);
+  if (!played && !tag) return;
+  const {statsEnabled} = stats.settings(await chrome.storage.sync.get(stats.defaults));
+  if (!statsEnabled) return;
+  const {watchStats} = await chrome.storage.local.get("watchStats");
+  let st = watchStats, dirty = false;
+  if (played) { st = stats.tick(st, now, played.seconds, id, played.up); dirty = true; }
+  if (tag && st?.brake !== tag) { st = stats.brake(st, now, tag); dirty = true; }
+  if (dirty) await chrome.storage.local.set({watchStats: st});
+}
+async function statsNotice() {
+  const s = stats.settings(await chrome.storage.sync.get(stats.defaults));
+  if (!s.statsEnabled || !s.statsWeeklyNotice) return {show: false};
+  const now = Date.now(), {watchStats} = await chrome.storage.local.get("watchStats");
+  const r = stats.notice(watchStats, now);
+  if (r.next) await chrome.storage.local.set({watchStats: r.next}); // Marked first, so only one tab shows it.
+  return r.show ? {show: true, seconds: r.seconds, total: stats.fmt(r.seconds), week: r.week, range: stats.range(r.week)} : {show: false};
 }
 
 // Settings requests from the popup, options page, welcome page and quick panel.
@@ -254,10 +281,19 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
     serial(() => focusSet(changes, typeof message.password === "string" ? message.password : "")).then(reply, (error) => reply({error: String(error?.message || error)}));
     return true;
   }
+  if (message.type === "stats-notice" || message.type === "stats-clear") {
+    serial(() => message.type === "stats-clear" ? chrome.storage.local.remove("watchStats").then(() => ({ok: true})) : statsNotice())
+      .then(reply, (error) => reply({error: String(error?.message || error)}));
+    return true;
+  }
   if (!message.type.startsWith("focus-")) return false;
   const id = typeof message.id === "string" ? message.id.slice(0, 120) : null;
   let job;
-  if (message.type === "focus-tick") job = focusRun((u, now, s) => focus.tick(u, now, s, message.seconds, id), id);
+  if (message.type === "focus-tick") {
+    const up = message.up && typeof message.up === "object" ? {mid: String(message.up.mid ?? "").slice(0, 24), name: String(message.up.name ?? "").slice(0, 60)} : null;
+    // The quota only meters while it is on; the weekly report records either way (if statsEnabled).
+    job = focusRun((u, now, s) => s.focusEnabled ? focus.tick(u, now, s, message.seconds, id) : null, id, {seconds: message.seconds, up});
+  }
   else if (message.type === "focus-check") job = focusRun(null, id);
   else if (message.type === "focus-snooze") job = snooze(message, id);
   else if (message.type === "focus-close-tab" && Number.isInteger(sender.tab?.id)) { chrome.tabs.remove(sender.tab.id).catch(() => {}); return false; }

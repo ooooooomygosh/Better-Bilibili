@@ -366,6 +366,7 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
     p.append(group('', undefined, '', sw('focusStrict', '严格模式', '不给“再看 5 分钟 / 跳过休息”'),
       seg('focusSessionMinutes', '番茄钟', () => `连续看满后休息 ${s.focusBreakMinutes} 分钟`, [[0, '关'], [25, '25'], [45, '45']])));
     if (!lock.locked) p.append(btn('🔒 开启自律锁（防止随手放宽额度）', 'wide', () => openOptions('lock')));
+    p.append(btn('📊 本周观看报告', 'wide', () => { close(); openPage('flow-open-report'); }));
     return p;
   }
   let chipKind = 'keywords';
@@ -384,6 +385,7 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
       e.preventDefault();
       const v = input.value.trim(); if (!v) { input.focus(); return; }
       const entry = chipKind === 'ups' && /^\d{3,20}$/.test(v) ? filt.upEntry(v) : v;
+      const bad = chipKind === 'keywords' && filt.regexProblem?.(entry); if (bad) { toast(bad); input.select(); return; }
       const next = filt.add(s[key], entry, chipKind);
       if (!next) { toast('已经在列表里了'); input.select(); return; }
       s[key] = next; save({[key]: next}); input.value = ''; draw(); input.focus();
@@ -463,7 +465,6 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
       sw('liveEnabled', '直播加速')));
     p.append(el('div', 'sub', '空降助手'));
     p.append(sw('sbEnabled', '空降助手', () => isPlayer() && document.documentElement.dataset.btrSbSegments ? `本视频有 ${document.documentElement.dataset.btrSbSegments} 个片段 · 立即生效` : '跳过恰饭、片头片尾 · 立即生效'));
-    const SBO = [['auto', '自动'], ['manual', '手动'], ['show', '仅标记'], ['off', '关']];
     p.append(btn('空降分类、进度条标记与提交', 'wide', () => { close(); openOptions('sponsor'); }));
     if (isPlayer()) p.append(btn('高级播放设置（线程数、播放内核、诊断）', 'wide', () => {
       close();

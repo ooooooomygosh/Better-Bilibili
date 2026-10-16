@@ -1,7 +1,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
-const ui=globalThis.__BTR_UI__,focusCore=globalThis.__BTR_FOCUS_CORE__,homeCore=globalThis.__BTR_HOME_CORE__,lockCore=globalThis.__BTR_LOCK_CORE__,filterCore=globalThis.__BTR_FILTER_CORE__,cleanCore=globalThis.__BTR_CLEAN_CORE__,sbCore=globalThis.__BTR_SB_CORE__;
-const defaults={enabled:true,liveEnabled:true,autoConcurrency:true,smartPolicy:true,strategy:'auto',mode:'auto',maxAutoThreads:32,memoryBudgetMB:64,takeover:'full',...homeCore.defaults,...focusCore.defaults,filterEnabled:true,filterDedupe:true,...cleanCore.defaults,quickFab:true,uiTheme:'bili',...sbCore.defaults};
+const ui=globalThis.__BTR_UI__,focusCore=globalThis.__BTR_FOCUS_CORE__,homeCore=globalThis.__BTR_HOME_CORE__,lockCore=globalThis.__BTR_LOCK_CORE__,filterCore=globalThis.__BTR_FILTER_CORE__,cleanCore=globalThis.__BTR_CLEAN_CORE__,sbCore=globalThis.__BTR_SB_CORE__,statsCore=globalThis.__BTR_STATS_CORE__;
+const defaults={enabled:true,liveEnabled:true,autoConcurrency:true,smartPolicy:true,strategy:'auto',mode:'auto',maxAutoThreads:32,memoryBudgetMB:64,takeover:'full',...homeCore.defaults,...focusCore.defaults,filterEnabled:true,filterDedupe:true,...cleanCore.defaults,quickFab:true,uiTheme:'bili',...sbCore.defaults,...statsCore.defaults};
 const LISTS=['filterKeywords','filterUps','filterTags'];
 const FOCUS=new Set(Object.keys(focusCore.defaults));
 const RELOAD=new Set(['takeover','enabled','liveEnabled']);
@@ -75,14 +75,7 @@ async function save(changes){
    const reload=Object.keys(changes).some(k=>RELOAD.has(k));
    status(reload?'已自动保存。播放内核与加速开关在刷新视频页后生效。':'已自动保存。','ok');
   }
- }catch(e){status(`没保存上：${e.message}`,'error');await /* ---------- 空降助手分类（由分类表生成） ---------- */
-(function(){const box=$('sbCats');if(!box)return;
- for(const c of sbCore.CATEGORIES){const f=document.createElement('div');f.className='field';const l=document.createElement('label'),sw=document.createElement('i'),sel=document.createElement('select');
-  sel.id=sbCore.key(c.name);l.htmlFor=sel.id;sw.className='sb-swatch';sw.style.background=c.color;l.append(sw,c.label);
-  for(const o of sbCore.OPTIONS){if(c.name==='poi_highlight'&&o==='auto')continue;const op=document.createElement('option');op.value=o;op.textContent=sbCore.OPTION_LABEL[o];sel.append(op);}
-  sel.setAttribute('form','settings');f.append(l,sel);box.append(f);}
-})();
-load().catch(()=>{});}
+ }catch(e){status(`没保存上：${e.message}`,'error');await load().catch(()=>{});}
  finally{savingCount--;}
 }
 $('settings').addEventListener('submit',e=>e.preventDefault()); // Enter in a field must not reload the page.
@@ -97,6 +90,7 @@ $('restore').onclick=async()=>{
  await save({...defaults});await load();
 };
 $('clearHistory').onclick=async()=>{if(!await dialog({title:'清空推荐历史？',text:'本扩展保存的全部推荐批次都会删除，此操作无法撤销。',ok:'清空',danger:true}))return;try{await chrome.storage.local.set({flowHistoryClearedAt:Date.now()});const all=await chrome.storage.local.get(null);const keys=Object.keys(all).filter(k=>k.startsWith('flowHistory:'));await chrome.storage.local.remove(keys);status(`已清空 ${keys.length} 组推荐历史；之后刷到的推荐仍会记录，关闭“保存推荐批次”可停止。`,'ok');}catch(e){status(e.message,'error');}};
+$('statsClear').onclick=async()=>{if(!await dialog({title:'清空观看统计？',text:'所有周报数据（每天的时长、视频数、UP 主和踩刹车次数）都会删除，此操作无法撤销。不影响观看额度的用量。',ok:'清空',danger:true}))return;try{const r=await chrome.runtime.sendMessage({type:'stats-clear'});if(r?.error)throw new Error(r.error);status('已清空观看统计。','ok');}catch(e){status(e.message,'error');}};
 for(const b of document.querySelectorAll('[data-preset]'))b.onclick=()=>{const[m,w,v,sm,br]=b.dataset.preset.split(',').map(Number);save({focusWindowMinutes:m,focusWeeklyHours:w,focusWindowVideos:v,focusSessionMinutes:sm,focusBreakMinutes:br,focusEnabled:true}).then(load);};
 // Changes made elsewhere (popup, quick panel, the lock's own revert) show up here at once.
 chrome.storage.onChanged.addListener((changes,area)=>{
@@ -218,8 +212,9 @@ function navUpdate(){
  const line=mid+Math.max(0,span-Math.max(0,remaining));
  let cur=targets[0];
  for(const t of targets){if(t.getBoundingClientRect().top<=line)cur=t;else break;}
- // A section filling more than half of the visible area is always the current one.
- for(const t of targets){const r=t.getBoundingClientRect();if(Math.min(r.bottom,bottom)-Math.max(r.top,top)>span){cur=t;break;}}
+ // A section filling more than half of the visible area is the current one, except over the last stretch, where the
+ // sliding line must be able to light the short sections at the end (快捷面板与外观) below a tall one.
+ if(remaining>=span)for(const t of targets){const r=t.getBoundingClientRect();if(Math.min(r.bottom,bottom)-Math.max(r.top,top)>span){cur=t;break;}}
  if(innerHeight+scrollY>=document.documentElement.scrollHeight-4)cur=targets.at(-1); // Bottom of the page: the last section, even if short.
  setNav(cur);
 }
@@ -236,7 +231,7 @@ const bar=$('savebar');if(bar&&typeof ResizeObserver==='function')new ResizeObse
 for(const a of links)a.addEventListener('click',e=>{const t=document.querySelector(a.getAttribute('href'));if(!t)return;e.preventDefault();navPin={target:t,until:performance.now()+1000};setNav(t);t.scrollIntoView({behavior:ui.reduced.matches?'auto':'smooth',block:'start'});history.replaceState(null,'',a.getAttribute('href'));});
 navUpdate();
 
-load().catch(e=>status(e.message,'error'));refreshLock();focusUsage();setInterval(focusUsage,5000);setInterval(()=>{if(lock.locked)refreshLock();},30000);
+refreshLock();focusUsage();setInterval(focusUsage,5000);setInterval(()=>{if(lock.locked)refreshLock();},30000);
 if(location.hash)requestAnimationFrame(()=>document.querySelector(location.hash)?.scrollIntoView({block:'start'}));
 
 /* ---------- 首页模式 ---------- */
@@ -271,8 +266,11 @@ for(const box of document.querySelectorAll('.list-editor')){
  function add(){
   const v=input.value.trim();if(!v){input.focus();return;}
   const entry=key==='filterUps'&&/^\d{3,20}$/.test(v)?filterCore.upEntry(v):v;
+  // These inputs have no error slot of their own: say it in the save bar and shake the field.
+  const refuse=msg=>{status(msg,'error');shake(input);input.focus();};
+  const bad=key==='filterKeywords'&&filterCore.regexProblem(entry);if(bad){refuse(bad);return;}
   const next=filterCore.add(lists[key],entry,KIND[key]);
-  if(!next){fieldError(input,'已经在列表里了');return;}
+  if(!next){refuse('已经在列表里了');return;}
   input.value='';saveList(key,next);input.focus();}
 }
 $('filterExport').onclick=async()=>{const text=JSON.stringify({bilithrottleFilters:1,...lists},null,1);
@@ -292,4 +290,12 @@ $('filterClear').onclick=async()=>{if(!await dialog({title:'清空全部屏蔽�
    const i=l.querySelector('input');i.id=r.key;const t=document.createElement('span');t.className='lbl';const b=document.createElement('b');b.textContent=r.label;const hn=document.createElement('small');hn.textContent=r.hint;t.append(b,hn);l.append(t);st.append(l);}
   box.append(h,st);}
 })();
-load().catch(()=>{});
+/* ---------- 空降助手分类（由分类表生成） ---------- */
+(function(){const box=$('sbCats');if(!box)return;
+ for(const c of sbCore.CATEGORIES){const f=document.createElement('div');f.className='field';const l=document.createElement('label'),sw=document.createElement('i'),sel=document.createElement('select');
+  sel.id=sbCore.key(c.name);l.htmlFor=sel.id;sw.className='sb-swatch';sw.style.background=c.color;l.append(sw,c.label);
+  for(const o of sbCore.OPTIONS){if(c.name==='poi_highlight'&&o==='auto')continue;const op=document.createElement('option');op.value=o;op.textContent=sbCore.OPTION_LABEL[o];sel.append(op);}
+  sel.setAttribute('form','settings');f.append(l,sel);box.append(f);}
+})();
+// One load, after every generated control (clean rules, 空降助手 categories) exists.
+load().catch(e=>status(e.message,'error'));
