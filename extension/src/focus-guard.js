@@ -35,6 +35,9 @@
 
   function apply(res) {
     if (!res || typeof res !== 'object') return;
+    // The service worker answers with the values the self-discipline lock actually allows; they win over raw sync
+    // settings, so a loosening write that the lock is about to revert never lifts the overlay in the meantime.
+    if (typeof res.enabled === 'boolean') settings = {...settings, focusEnabled: res.enabled, focusStrict: !!res.strict};
     state = res;
     // Only playable pages are covered; search, dynamics and messages stay usable.
     if (blocked() && currentId) { pauseAll(); show(state.block.kind); }
@@ -294,6 +297,7 @@ button:focus-visible{outline:2px solid var(--btr-brand);outline-offset:2px}
     const next = {...settings};
     for (const k of Object.keys(core.defaults)) if (changes[k]) next[k] = changes[k].newValue;
     settings = core.settings(next); warned.clear();
-    if (!settings.focusEnabled) { state = null; hide(); } else check();
+    // Always ask the service worker: under a lock, "off" here may not be allowed yet (apply() adopts its answer).
+    send({type: 'focus-check', id: currentId}).then(res => { apply(res); if (!settings.focusEnabled) { state = null; hide(); } }).catch(() => {});
   });
 })();

@@ -34,7 +34,7 @@ ${ui.scoped('.root')}
   font:13px/1.45 var(--btr-font);color:var(--btr-text1)}
 .toast{pointer-events:auto;display:flex;align-items:center;gap:10px;max-width:360px;padding:9px 10px 9px 14px;border-radius:12px;background:var(--btr-bg-float);
   box-shadow:var(--btr-shadow);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--btr-line)}
-.dot{width:10px;height:10px;border-radius:3px;flex:none;box-shadow:0 0 0 1px rgba(0,0,0,.15) inset}
+.dot{width:10px;height:10px;border-radius:3px;flex:none;box-shadow:0 0 0 1px rgba(0,0,0,.15) inset,0 0 0 1px var(--btr-line)}
 .msg{flex:1;min-width:0}.msg b{font-weight:600}.msg small{display:block;color:var(--btr-text3);font-size:12px}
 button{font:inherit;font-size:12px;border:0;border-radius:999px;padding:5px 12px;cursor:pointer;background:var(--btr-soft);color:var(--btr-text1);
   transition:background var(--btr-fast) var(--btr-ease),transform var(--btr-fast) var(--btr-ease)}
@@ -80,9 +80,11 @@ button:focus-visible{outline:2px solid var(--btr-brand-ring);outline-offset:2px}
     const x = h('button', 'x', '✕'); x.setAttribute('aria-label', '关闭'); x.onclick = e => { e.stopPropagation(); if (toastSeg) done.add(toastSeg.UUID); hideToast(); }; t.append(x);
     if (seconds) {
       const bar = h('i', 'timer'); bar.style.width = '100%'; t.append(bar);
-      ui.animate(bar, [{transform: 'scaleX(1)'}, {transform: 'scaleX(0)'}], {duration: seconds * 1000, easing: 'linear', fill: 'forwards'});
-      const tt = setTimeout(() => { if (toastEl === t) hideToast(); }, seconds * 1000);
-      t.addEventListener('pointerenter', () => clearTimeout(tt), {once: true});
+      const anim = ui.animate(bar, [{transform: 'scaleX(1)'}, {transform: 'scaleX(0)'}], {duration: seconds * 1000, easing: 'linear', fill: 'forwards'});
+      // Hovering holds the toast (and its timer bar); leaving gives it the full time again.
+      let tt = setTimeout(() => { if (toastEl === t) hideToast(); }, seconds * 1000);
+      t.addEventListener('pointerenter', () => { clearTimeout(tt); anim?.pause(); });
+      t.addEventListener('pointerleave', () => { clearTimeout(tt); if (anim) { anim.currentTime = 0; anim.play(); } tt = setTimeout(() => { if (toastEl === t) hideToast(); }, seconds * 1000); });
     }
     rootEl.append(t); toastEl = t; toastSeg = seg;
     ui.animate(t, [{opacity: 0, transform: 'translateY(6px) scale(.98)'}, {opacity: 1, transform: 'none'}], {duration: ui.MOTION.mid});
@@ -91,16 +93,26 @@ button:focus-visible{outline:2px solid var(--btr-brand-ring);outline-offset:2px}
   const range = seg => `${sb.fmt(seg.start)} – ${sb.fmt(seg.end)}`;
 
   /* ---------- progress-bar markers ---------- */
+  // Markers are laid out against the player's own timeline, not the media: for 充电 / 会员 trial clips the <video> is only a
+  // few minutes long while the progress bar spans the whole video (same fix as upstream commit 7305fda).
+  function timelineDuration() {
+    const txt = document.querySelector('.bpx-player-ctrl-time-duration')?.textContent?.trim() || '';
+    const parts = /^\d+(:\d{1,2}){1,2}$/.test(txt) ? txt.split(':').map(Number) : null;
+    const shown = parts ? parts.reduce((a, n) => a * 60 + n, 0) : NaN;
+    const media = video.duration;
+    return Number.isFinite(shown) && shown > 0 && !(Number.isFinite(media) && Math.abs(shown - media) <= 2) ? shown : media;
+  }
   function drawBar() {
     bar?.remove(); bar = null;
     if (!s.sbEnabled || !s.sbShowBar || !segs.length || !video) return;
-    const d = video.duration; if (!Number.isFinite(d) || d <= 0) return;
+    const d = timelineDuration(); if (!Number.isFinite(d) || d <= 0) return;
     const track = document.querySelector('.bpx-player-progress-schedule') || document.querySelector('.bpx-player-progress');
     if (!track) return;
     if (getComputedStyle(track).position === 'static') track.style.position = 'relative';
     bar = document.createElement('div'); bar.id = 'btr-sb-bar'; bar.dataset.btrFlowOwned = '';
     bar.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:3';
     for (const g of segs) {
+      if (g.start >= d) continue; // past the end of what this player shows (e.g. a trial clip): nothing to mark
       const m = document.createElement('div'), poi = g.actionType === 'poi';
       const l = Math.min(100, g.start / d * 100), w = poi ? 0 : Math.max(.25, (Math.min(g.end, d) - g.start) / d * 100);
       m.className = 'btr-sb-seg'; m.dataset.category = g.category; m.title = `${label(g)} ${range(g)}`;
@@ -146,14 +158,17 @@ button:focus-visible{outline:2px solid var(--btr-brand-ring);outline-offset:2px}
   }
   async function load() {
     const id = sb.parseBvid(location.href), my = ++loadId;
-    bvid = id; cid = null; raw = null; segs = []; done = new Set(); poiShown = false; hideToast(); drawBar(); draft = null;
+    releaseMute(); bvid = id; cid = null; raw = null; segs = []; done = new Set(); poiShown = false; hideToast(); drawBar(); draft = null;
     if (!id || !s.sbEnabled) return;
-    const [c, data] = await Promise.all([getCid(id), sb.hashPrefix(id).then(px => fetch(`${sb.SERVER}/api/skipSegments/${px}`, {credentials: 'omit'}))
+    const [c, data] = await Promise.all([getCid(id), sb.hashPrefix(id).then(px => sb.request(`/api/skipSegments/${px}`))
       .then(r => r.status === 200 ? r.json() : []).catch(() => [])]);
     if (my !== loadId) return;
     cid = c; raw = data; refilter();
   }
+  // A mute segment muted the video; give the sound back whenever the segment list is rebuilt or cleared.
+  function releaseMute() { if (mutedBy && mutedBy !== 'already' && video) video.muted = false; mutedBy = null; }
   function refilter() {
+    releaseMute();
     segs = s.sbEnabled ? sb.pickSegments(raw, bvid, cid, s) : [];
     document.documentElement.dataset.btrSbSegments = String(segs.length);
     drawBar(); tick();
@@ -172,13 +187,14 @@ button:focus-visible{outline:2px solid var(--btr-brand-ring);outline-offset:2px}
     cancel.onclick = () => { draft = null; ui.fadeOut(c, ui.MOTION.fast); };
     send.onclick = async () => {
       if (!draft.category) { info.textContent = '先选一个分类'; info.className = 'err'; return; }
+      if (cid == null) { cid = await getCid(bvid); if (cid == null) { info.textContent = '没拿到这个视频的分 P 信息，刷新页面后再试'; info.className = 'err'; return; } }
       if (draft.category !== 'poi_highlight' && (draft.end == null || draft.end - draft.start < .5)) { info.textContent = '片段太短，或还没标记结束'; info.className = 'err'; return; }
       send.disabled = true; info.textContent = '正在提交…';
       try {
         let {sbUserID} = await chrome.storage.local.get('sbUserID');
         if (!sbUserID) { sbUserID = sb.newUserId(); await chrome.storage.local.set({sbUserID}); }
         const body = sb.submission({bvid, cid, userID: sbUserID, duration: video.duration, start: draft.start, end: draft.end, category: draft.category, version: VERSION});
-        const r = await fetch(`${sb.SERVER}/api/skipSegments`, {method: 'POST', credentials: 'omit', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+        const r = await sb.request('/api/skipSegments', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
         if (!r.ok) throw new Error(`${r.status} ${(await r.text()).slice(0, 80)}`);
         info.textContent = '已提交，谢谢！'; draft = null; setTimeout(() => ui.fadeOut(c, ui.MOTION.mid), 1200);
         raw = null; load();
@@ -189,8 +205,9 @@ button:focus-visible{outline:2px solid var(--btr-brand-ring);outline-offset:2px}
     draft.repaint = paint;
   }
   function onKey(e) {
-    if (!video || !s.sbEnabled || e.ctrlKey || e.metaKey || e.altKey) return;
-    const tg = e.target; if (tg && (tg.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName))) return;
+    if (!video || !s.sbEnabled || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+    // B 站's comment box is a shadow-DOM component, so look at the real target, not the retargeted host.
+    const tg = e.composedPath?.()[0] || e.target; if (tg && (tg.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName))) return;
     if (e.key === 'Enter' && toastEl?.dataset.kind === 'skip' && toastSeg) { e.preventDefault(); e.stopPropagation(); skip(toastSeg); }
     else if (e.key === ';' && bvid) {
       e.preventDefault();
@@ -203,13 +220,13 @@ button:focus-visible{outline:2px solid var(--btr-brand-ring);outline-offset:2px}
   function attach(v) {
     if (v === video) return;
     if (video) { video.removeEventListener('seeked', tick); video.removeEventListener('durationchange', drawBar); }
-    video = v; mutedBy = null;
+    releaseMute(); video = v;
     if (!v) return;
     v.addEventListener('seeked', tick); v.addEventListener('durationchange', drawBar); v.addEventListener('loadedmetadata', drawBar);
     drawBar();
   }
   function poll() {
-    if (!isVideoPage()) { if (bvid) { bvid = null; segs = []; drawBar(); hideToast(); } return; }
+    if (!isVideoPage()) { if (bvid) { releaseMute(); bvid = null; segs = []; drawBar(); hideToast(); } return; }
     const v = document.querySelector('.bpx-player-video-wrap video, .bpx-player-video-area video, video');
     if (v !== video) attach(v);
     if (location.href !== href) { const prev = sb.parseBvid(href), pp = sb.parsePage(href); href = location.href; if (sb.parseBvid(href) !== prev || sb.parsePage(href) !== pp) load(); }

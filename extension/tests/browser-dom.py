@@ -139,7 +139,7 @@ with sync_playwright() as p:
  markup=(ROOT/'ui/options.html').read_text();markup=re.sub(r'<script[^>]*>.*?</script>','',markup,flags=re.S);markup=re.sub(r'<link[^>]*>','',markup)
  option.set_content(markup);option.add_style_tag(content=(ROOT/'ui/common.css').read_text())
  script(option,'tests/browser-shim.js');option.evaluate("window.chrome=window.chromeMock;0")  # extension page: ui-kit reads chrome.storage for the theme
- for f in ['src/ui-kit.js','src/home-core.js','src/focus-core.js','src/lock-core.js','src/filter-core.js','src/clean-core.js']:script(option,f)
+ for f in ['src/ui-kit.js','src/home-core.js','src/focus-core.js','src/lock-core.js','src/filter-core.js','src/clean-core.js','src/sb-core.js']:script(option,f)
  # The service worker owns watch-limit writes (self-discipline lock); mock it as "no lock".
  option.evaluate("chromeMock.runtime.sendMessage=async m=>{if(m.type==='lock-state')return {locked:false};if(m.type==='focus-set'){await chromeMock.storage.sync.set(m.changes);return {applied:m.changes,deferred:{}};}return {};};0")
  option.evaluate("code=>new Function('chrome',code)(window.chromeMock)",(ROOT/'ui/options.js').read_text())

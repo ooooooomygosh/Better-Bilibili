@@ -49,7 +49,7 @@ kbd{padding:1px 6px;border-radius:5px;border:1px solid var(--btr-line);backgroun
 .w-feature div{padding:16px 18px 18px}
 .w-feature h3{font-size:16px;margin-bottom:4px}
 .w-feature p{color:var(--btr-text2);font-size:13px}
-.w-more{list-style:none;padding:0;margin:16px 0 0;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.w-more{list-style:none;padding:0;margin:16px 0 0;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 .w-more li{padding:14px 16px;border-radius:14px;background:var(--btr-bg);border:1px solid var(--btr-line);color:var(--btr-text2);font-size:13px}
 .w-more b{display:block;color:var(--btr-text1);margin-bottom:2px}
 .w-faq details{padding:14px 18px;margin-bottom:8px;background:var(--btr-bg);border-radius:14px;border:1px solid var(--btr-line)}
@@ -68,5 +68,11 @@ kbd{padding:1px 6px;border-radius:5px;border:1px solid var(--btr-line);backgroun
 .w-modes button[aria-checked=true] b{color:var(--btr-brand-hover)}
 /* 空降助手 choice */
 #sbChoice{grid-template-columns:repeat(2,1fr)}
+/* The third setup card spans the row (text left, choice right) so the grid has no empty cell. */
+#sbCard{grid-column:1/-1;display:grid;grid-template-columns:1fr 1.4fr;column-gap:22px;align-items:center}
+#sbCard h3,#sbCard p{grid-column:1}
+#sbCard #sbChoice{grid-column:2;grid-row:1/span 2;margin-top:0}
+@media (max-width:980px){.w-more{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:760px){.w-more{grid-template-columns:1fr}#sbCard{display:block}#sbCard #sbChoice{margin-top:14px}}
 #sbChoice button[aria-checked=true]{border-color:var(--btr-brand);background:var(--btr-brand-soft);color:var(--btr-brand-hover)}
 #sbChoice button[aria-checked=true] b{color:var(--btr-brand-hover)}

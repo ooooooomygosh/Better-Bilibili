@@ -30,6 +30,8 @@
 <a href="#english">English</a>
 </p>
 
+<p><sub>觉得好用？点右上角的 ⭐ <b>Star</b> 让更多人看到它，也是我继续更新的动力。</sub></p>
+
 <!-- 宣传片：B 站发布后取消下一行注释并填入 BV 号（GitHub 不能内嵌播放器，用封面图 + 链接） -->
 <!-- <a href="https://www.bilibili.com/video/BV________"><img src="docs/media/promo-cover.jpg" width="80%" alt="▶ 观看 2 分半宣传片"></a> -->
 
@@ -79,20 +81,24 @@
 </table>
 
 > [!TIP]
-> **🆕 2.5.0：空降助手来了**
-> - 🪂 **整合 [BilibiliSponsorBlock](https://github.com/hanydd/BilibiliSponsorBlock)**：只装哔哩节流阀一个扩展，就能自动跳过恰饭、片头片尾等 11 类片段，进度条按颜色标出，跳过后一键撤销。
-> - 🔘 **弹窗一键开关**，立即生效；首次安装的欢迎页会问你要不要开。
-> - 🔒 **隐私**：查询只发送 BV 号哈希的前 4 位，不带 Cookie，不新增权限。
+> **🆕 2.5.x 更新了什么**
+> - 🪂 **空降助手**（整合 [BilibiliSponsorBlock](https://github.com/hanydd/BilibiliSponsorBlock)）：只装哔哩节流阀一个扩展，就能自动跳过恰饭、片头片尾等 11 类片段，进度条按颜色标出，跳过后一键撤销。查询只发送 BV 号哈希的前 4 位，不带 Cookie，不新增权限。
+> - 🎬 **悬停视频预览**：无限下滑里鼠标停在封面上就静音播放，像 B 站原生卡片一样；右下角喇叭一点开声音，全局记住。弹窗里可换成逐帧预览或关闭。
+> - 🛟 **首页不再偶发空白**：等 B 站页面渲染完成再动手；万一 6–12 秒还没有视频，自动撤掉本扩展对首页的改动并提示刷新。
+> - 🚦 **自适应请求**：无限下滑失败自动退避重试，遇到风控立刻熔断冷却，刷新页面也绕不过冷却，账号更安全。
 > - ⚖️ **许可证改为 GPL-3.0**（2.4.0 及以前仍为 MIT），致谢见[文末](#credits)。
 
-> [!NOTE]
-> **🆕 2.4.0 更新了什么**
-> - 🔀 **两种首页模式，第一次打开先选**：「换一批」和「无限下滑」各走各的，不再混在一起；随时可以换。
-> - 🚫 **屏蔽关键词 / UP 主 / B 站标签**：每次刷新都先过滤再去重，被屏蔽的永远不会占位；支持 `/正则/`，设置跟着 B 站账号所在的浏览器同步。
-> - 🧽 **全站净化开关**：首页轮播广告、直播卡片、楼层推广，视频页广告和直播小窗，搜索 / 动态里的广告，「检测到广告拦截」提示……每一项都能单独开关。
-> - 🛡️ **能和 AdGuard 一起用**：实测加载 AdGuard 的过滤规则后两者互不干扰；同时开启时，B 站可能会提示「检测到广告拦截」，在「净化」里关掉它即可。
->
-> 完整记录见 [CHANGELOG](extension/CHANGELOG.md)。
+<details>
+<summary><b>2.4.0 更新了什么</b></summary>
+
+- 🔀 **两种首页模式，第一次打开先选**：「换一批」和「无限下滑」各走各的，不再混在一起；随时可以换。
+- 🚫 **屏蔽关键词 / UP 主 / B 站标签**：每次刷新都先过滤再去重，被屏蔽的永远不会占位；支持 `/正则/`，设置跟着 B 站账号所在的浏览器同步。
+- 🧽 **全站净化开关**：首页轮播广告、直播卡片、楼层推广，视频页广告和直播小窗，搜索 / 动态里的广告，「检测到广告拦截」提示……每一项都能单独开关。
+- 🛡️ **能和 AdGuard 一起用**：实测加载 AdGuard 的过滤规则后两者互不干扰；同时开启时，B 站可能会提示「检测到广告拦截」，在「净化」里关掉它即可。
+
+</details>
+
+完整记录见 [CHANGELOG](extension/CHANGELOG.md)。
 
 <a id="modes"></a>
 
@@ -173,8 +179,6 @@ B 站的「换一换」**每次只换两行**，点一下，上一批就没了�
 
 默认只打开明确的广告类；直播、楼层、登录提示这些「看个人喜好」的默认关闭。
 
-<a id="quick"></a>
-
 <a id="sponsor"></a>
 
 ## 🪂 空降助手：恰饭片段，自动跳过
@@ -199,6 +203,8 @@ B 站的「换一换」**每次只换两行**，点一下，上一批就没了�
 </table>
 
 <sub>截图在无登录的无痕浏览器里拍摄，画面已模糊、弹幕已隐藏；示例视频 BV1Yo3sz6EbG（30–46 秒有社区标注的恰饭片段）。</sub>
+
+<a id="quick"></a>
 
 ## 🎛️ 快捷面板：常用开关，一个按钮全搞定
 
@@ -384,6 +390,11 @@ B 站每个页面的右下角都有一个粉色的油门按钮，点开（或按
 关键词和 UP 主是立刻判断的；标签要先向 B 站查询这条视频的标签，查询失败（比如被限流）时为了不让推荐区空掉会先放行，下次刷新再查。频繁出现时可以改用关键词屏蔽。
 </details>
 
+<details><summary><b>番剧、影视页面能加速吗？</b></summary>
+
+暂时不能。加载加速目前只接管普通视频（BV 号页面）；番剧 / 影视走的是另一套播放接口，这些页面交给 B 站自己的播放器，首页净化、屏蔽、空降助手和观看额度不受影响。
+</details>
+
 <details><summary><b>能和线程撕裂者一起用吗？</b></summary>
 
 不行。不要同时启用另一份线程撕裂者扩展或它的用户脚本，两套播放器拦截会互相冲突。
@@ -410,7 +421,7 @@ extension/          可直接「加载已解压」的扩展本体（manifest.jso
   ui/               弹窗、设置页、欢迎页
   tests/            Node 单元测试 + Chromium 回归测试
 docs/               审计报告、发布说明、截图
-scripts/build.sh    打包为 dist/BiliThrottle-<版本>.zip
+scripts/build.sh    打包为 dist/BiliThrottle-<版本>.zip（不含 tests/ 和预览图）
 ```
 
 ```bash
@@ -444,13 +455,26 @@ CHROMIUM_PATH=/path/to/chrome python3 extension/tests/browser-quick.py   # 任�
 | 🌗 **Dark mode** | The panel, overlays and feed cards follow Bilibili's own theme live; popup, options and welcome pages can follow Bilibili, follow the system, or stay light / dark. |
 | 🐢 **Slow-network guard** | If no media segment arrives within 20 s of taking over, playback is handed back to Bilibili's own player (with a *Take over again* button) instead of a long black screen. |
 
-**New in 2.5.0:** built-in segment skipping (空降助手) from BilibiliSponsorBlock; the project is now **GPL-3.0-or-later** (2.4.0 and earlier remain MIT).
+**New in 2.5.x:** built-in segment skipping (空降助手) from BilibiliSponsorBlock; inline hover video preview with a remembered mute toggle; a fix for the occasionally blank homepage; adaptive, back-off-aware requests for the infinite feed. The project is now **GPL-3.0-or-later** (2.4.0 and earlier remain MIT).
 
 **2.4.0:** a homepage mode chooser, keyword / uploader / tag block lists with de-duplication, and site-wide cleanup switches. Works alongside AdGuard and uBlock Origin (tested with AdGuard's real filter lists); if Bilibili shows an "ad blocker detected" notice, switch it off under *Cleanup*. See the [changelog](extension/CHANGELOG.md) (Chinese).
 
 **Install:** download `BiliThrottle-x.y.z.zip` from [Releases](https://github.com/ooooooomygosh/Better-Bilibili/releases/latest), unzip, open `chrome://extensions` (or `edge://extensions`), enable *Developer mode*, click *Load unpacked* and pick the folder. Chrome / Edge 114+.
 
 **Privacy:** the only required permission is `storage`. Everything (feed history, usage, lock) stays local; no analytics. The segment-skip feature (from BilibiliSponsorBlock) sends only a 4-char SHA-256 prefix of the video id to bsbsb.top. The infinite feed calls Bilibili's own recommendation API with your existing session; the extension never stores cookies.
+
+## ⭐ 支持这个项目
+
+- 点一下右上角的 **Star**，Release 更新时选 **Watch → Custom → Releases** 就能收到通知。
+- 遇到问题或想要新功能，欢迎[提 Issue](https://github.com/ooooooomygosh/Better-Bilibili/issues/new/choose)；视频页的快捷面板 →「油门」→「高级播放设置」里可以「复制诊断信息」，附上会更快定位。
+- 给视频[标注空降片段](#sponsor)（按 <kbd>;</kbd>）能直接帮到所有 BilibiliSponsorBlock 用户。
+
+<a href="https://star-history.com/#ooooooomygosh/Better-Bilibili&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=ooooooomygosh/Better-Bilibili&type=Date&theme=dark">
+    <img alt="Star History" src="https://api.star-history.com/svg?repos=ooooooomygosh/Better-Bilibili&type=Date" width="600">
+  </picture>
+</a>
 
 <a id="credits"></a>
 

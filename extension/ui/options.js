@@ -75,14 +75,7 @@ async function save(changes){
    const reload=Object.keys(changes).some(k=>RELOAD.has(k));
    status(reload?'已自动保存。播放内核与加速开关在刷新视频页后生效。':'已自动保存。','ok');
   }
- }catch(e){status(`没保存上：${e.message}`,'error');await /* ---------- 空降助手分类（由分类表生成） ---------- */
-(function(){const box=$('sbCats');if(!box)return;
- for(const c of sbCore.CATEGORIES){const f=document.createElement('div');f.className='field';const l=document.createElement('label'),sw=document.createElement('i'),sel=document.createElement('select');
-  sel.id=sbCore.key(c.name);l.htmlFor=sel.id;sw.className='sb-swatch';sw.style.background=c.color;l.append(sw,c.label);
-  for(const o of sbCore.OPTIONS){if(c.name==='poi_highlight'&&o==='auto')continue;const op=document.createElement('option');op.value=o;op.textContent=sbCore.OPTION_LABEL[o];sel.append(op);}
-  sel.setAttribute('form','settings');f.append(l,sel);box.append(f);}
-})();
-load().catch(()=>{});}
+ }catch(e){status(`没保存上：${e.message}`,'error');await load().catch(()=>{});}
  finally{savingCount--;}
 }
 $('settings').addEventListener('submit',e=>e.preventDefault()); // Enter in a field must not reload the page.
@@ -218,8 +211,9 @@ function navUpdate(){
  const line=mid+Math.max(0,span-Math.max(0,remaining));
  let cur=targets[0];
  for(const t of targets){if(t.getBoundingClientRect().top<=line)cur=t;else break;}
- // A section filling more than half of the visible area is always the current one.
- for(const t of targets){const r=t.getBoundingClientRect();if(Math.min(r.bottom,bottom)-Math.max(r.top,top)>span){cur=t;break;}}
+ // A section filling more than half of the visible area is the current one, except over the last stretch, where the
+ // sliding line must be able to light the short sections at the end (快捷面板与外观) below a tall one.
+ if(remaining>=span)for(const t of targets){const r=t.getBoundingClientRect();if(Math.min(r.bottom,bottom)-Math.max(r.top,top)>span){cur=t;break;}}
  if(innerHeight+scrollY>=document.documentElement.scrollHeight-4)cur=targets.at(-1); // Bottom of the page: the last section, even if short.
  setNav(cur);
 }
@@ -236,7 +230,7 @@ const bar=$('savebar');if(bar&&typeof ResizeObserver==='function')new ResizeObse
 for(const a of links)a.addEventListener('click',e=>{const t=document.querySelector(a.getAttribute('href'));if(!t)return;e.preventDefault();navPin={target:t,until:performance.now()+1000};setNav(t);t.scrollIntoView({behavior:ui.reduced.matches?'auto':'smooth',block:'start'});history.replaceState(null,'',a.getAttribute('href'));});
 navUpdate();
 
-load().catch(e=>status(e.message,'error'));refreshLock();focusUsage();setInterval(focusUsage,5000);setInterval(()=>{if(lock.locked)refreshLock();},30000);
+refreshLock();focusUsage();setInterval(focusUsage,5000);setInterval(()=>{if(lock.locked)refreshLock();},30000);
 if(location.hash)requestAnimationFrame(()=>document.querySelector(location.hash)?.scrollIntoView({block:'start'}));
 
 /* ---------- 首页模式 ---------- */
@@ -271,8 +265,11 @@ for(const box of document.querySelectorAll('.list-editor')){
  function add(){
   const v=input.value.trim();if(!v){input.focus();return;}
   const entry=key==='filterUps'&&/^\d{3,20}$/.test(v)?filterCore.upEntry(v):v;
+  // These inputs have no error slot of their own: say it in the save bar and shake the field.
+  const refuse=msg=>{status(msg,'error');shake(input);input.focus();};
+  const bad=key==='filterKeywords'&&filterCore.regexProblem(entry);if(bad){refuse(bad);return;}
   const next=filterCore.add(lists[key],entry,KIND[key]);
-  if(!next){fieldError(input,'已经在列表里了');return;}
+  if(!next){refuse('已经在列表里了');return;}
   input.value='';saveList(key,next);input.focus();}
 }
 $('filterExport').onclick=async()=>{const text=JSON.stringify({bilithrottleFilters:1,...lists},null,1);
@@ -292,4 +289,12 @@ $('filterClear').onclick=async()=>{if(!await dialog({title:'清空全部屏蔽�
    const i=l.querySelector('input');i.id=r.key;const t=document.createElement('span');t.className='lbl';const b=document.createElement('b');b.textContent=r.label;const hn=document.createElement('small');hn.textContent=r.hint;t.append(b,hn);l.append(t);st.append(l);}
   box.append(h,st);}
 })();
-load().catch(()=>{});
+/* ---------- 空降助手分类（由分类表生成） ---------- */
+(function(){const box=$('sbCats');if(!box)return;
+ for(const c of sbCore.CATEGORIES){const f=document.createElement('div');f.className='field';const l=document.createElement('label'),sw=document.createElement('i'),sel=document.createElement('select');
+  sel.id=sbCore.key(c.name);l.htmlFor=sel.id;sw.className='sb-swatch';sw.style.background=c.color;l.append(sw,c.label);
+  for(const o of sbCore.OPTIONS){if(c.name==='poi_highlight'&&o==='auto')continue;const op=document.createElement('option');op.value=o;op.textContent=sbCore.OPTION_LABEL[o];sel.append(op);}
+  sel.setAttribute('form','settings');f.append(l,sel);box.append(f);}
+})();
+// One load, after every generated control (clean rules, 空降助手 categories) exists.
+load().catch(e=>status(e.message,'error'));

@@ -196,6 +196,7 @@
     .btr-close { position: sticky; bottom: 12px; display: block; width: calc(100% - 32px); margin: 0 16px 16px; padding: 8px; border: 1px solid #444b57; border-radius: 6px; background: #292d35; color: #d9dee8; font: inherit; font-size: 13px; cursor: pointer; box-shadow: 0 -6px 12px #17191f; }
     .btr-close:hover { border-color: #fb7299; }
     .btr-close:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+      @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; } }
   `;
 
   const LAUNCHER_CSS = `
@@ -206,6 +207,7 @@
     @media (max-width: 700px) { .btr-launcher { width: 40px; height: 40px; font-size: 12px; } }
     /* The quick panel (and the homepage toolbar) replace this launcher; the host's inline all:initial!important defeats page CSS, so hide from inside. */
     :host-context(html[data-btr-home-ui]) .btr-launcher, :host-context(html[data-btr-quick]) .btr-launcher { display: none !important; }
+    @media (prefers-reduced-motion: reduce) { .btr-launcher, .btr-launcher.dragging { transition: none !important; transform: none !important; } }
   `;
 
   let current = null;

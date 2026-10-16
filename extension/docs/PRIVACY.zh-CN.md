@@ -47,7 +47,7 @@ Debug 面板的“复制诊断信息”仅在用户点击时生成文本并尝�
 
 ## 空降助手（BilibiliSponsorBlock）
 
-- 打开视频页时，向 `https://www.bsbsb.top/api/skipSegments/<前缀>` 查询片段；`<前缀>` 只是 BV 号 SHA-256 的前 4 位十六进制，同一前缀覆盖大量视频，服务器无法确定你在看哪个视频。请求不带 Cookie。
+- 打开视频页时，向 `https://bsbsb.top/api/skipSegments/<前缀>`（不通时改用 `www.bsbsb.top`） 查询片段；`<前缀>` 只是 BV 号 SHA-256 的前 4 位十六进制，同一前缀覆盖大量视频，服务器无法确定你在看哪个视频。请求不带 Cookie。
 - 为了区分分 P，会请求 B 站公开的 `api.bilibili.com/x/player/pagelist`（不带 Cookie）。
 - 只有你主动按 ; 提交片段时，才会在本机生成匿名 ID（存 `chrome.storage.local`，不同步），并与 BV 号、cid、时间点、分类一起发送给 bsbsb.top。
 - 在弹窗关闭空降助手后不再发出任何上述请求。

@@ -41,19 +41,14 @@ async function prepareExtension() {
   if (Object.keys(missing).length) await chrome.storage.sync.set(missing);
 }
 
-chrome.runtime.onInstalled.addListener(prepareExtension);
+// A failed migration must not surface as an unhandled rejection; it runs again on the next startup.
+const prepareSafely = () => prepareExtension().catch(e => console.warn("BiliThrottle: prepare failed", e));
+chrome.runtime.onInstalled.addListener(prepareSafely);
 // New users get a short tour of what the extension does and where its switches live.
 chrome.runtime.onInstalled.addListener(({reason}) => {
   if (reason === "install") chrome.tabs.create({url: chrome.runtime.getURL("ui/welcome.html")}).catch(() => {});
 });
-chrome.runtime.onStartup.addListener(prepareExtension);
-
-// The settings open inside the bilibili page, the same panel as in the userscript. Other
-// pages have no content script to answer, and nothing happens there.
-chrome.action.onClicked.addListener((tab) => {
-  if (!Number.isInteger(tab?.id)) return;
-  chrome.tabs.sendMessage(tab.id, { type: "openSettings" }).catch(() => {});
-});
+chrome.runtime.onStartup.addListener(prepareSafely);
 
 chrome.runtime.onMessage.addListener((message, sender) => {
   if (message?.type === "setThreadBadge") setThreadBadge(sender.tab?.id, message.enabled === true, message.activeThreads);

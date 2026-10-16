@@ -311,7 +311,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     const inf=infiniteMode();
     // 换一批 mode: browse batches. 无限下滑 mode: no batch buttons at all; the feed below is the batches.
     for(const k of ['back','next','count','sep','refresh'])refs[k].hidden=inf;
-    if(!inf)refs.back.hidden=refs.next.hidden=refs.count.hidden=!settings.homeHistory;
+    if(!inf)refs.back.hidden=refs.next.hidden=refs.count.hidden=refs.sep.hidden=!settings.homeHistory; // no lone divider when history is off
     refs.mode.replaceChildren(...(inf?[el('b','♾ 无限下滑'),document.createTextNode(' · 第 1 批 · 往下滑自动加载')]:[el('b','换一批模式'),document.createTextNode(settings.homeHistory?' · 可回看上一批':'')]));
     const n=filtered.length;refs.blocked.hidden=!n;
     if(n){refs.blocked.textContent=`已屏蔽 ${n} 个`;refs.blocked.title=filtered.slice(0,12).map(f=>`「${f.title.slice(0,24)}」— ${f.why}`).join('\n')+(n>12?`\n……共 ${n} 个`:'')+'\n点击管理屏蔽规则';}
@@ -604,7 +604,7 @@ button{transition:background-color .16s ease,color .16s ease,border-color .16s e
     if(e.data.channel==='__BTR_FLOW_V1__'&&e.data.type==='telemetry')
       telemetry={policy:{name:String(p.policy?.name||'').slice(0,60),cap:n(p.policy?.cap),ahead:n(p.policy?.ahead),decodeWarning:p.policy?.decodeWarning===true},ahead:n(p.ahead),stalls:n(p.stalls),bitrate:n(p.bitrate),received:n(p.received),errors:n(p.errors),droppedRatio:n(p.droppedRatio)};
     if(e.data.channel==='__BILI_RANGE_ACCELERATOR_V1__'&&e.data.type==='stats')
-      stats={activeThreads:n(p.activeThreads),totalSpeedBps:n(p.totalSpeedBps),bufferedAhead:n(p.bufferedAhead),quality:String(p.quality||'').slice(0,30),playerState:String(p.playerState||'').slice(0,30)};
+      stats={activeThreads:n(p.activeThreads),totalSpeedBps:n(p.totalSpeedBps),bufferedAhead:n(p.bufferedAhead),quality:String(p.quality||'').slice(0,30),playerState:String(p.playerState||'').slice(0,30),lastError:String(p.lastError||'').slice(0,160)}; // lastError feeds the popup's warning line
   });
   chrome.runtime.onMessage.addListener((m,sender,reply)=>{
     if(sender.id!==chrome.runtime.id)return false;

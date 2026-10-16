@@ -37,7 +37,12 @@
         "src/cleaner.js"
       ],
       "run_at": "document_start",
-      "world": "ISOLATED"
+      "world": "ISOLATED",
+      "exclude_matches": [
+        "https://passport.bilibili.com/*",
+        "https://pay.bilibili.com/*",
+        "https://account.bilibili.com/*"
+      ]
     },
     {
       "matches": [
@@ -85,7 +90,10 @@
       "exclude_matches": [
         "https://www.bilibili.com/*",
         "https://m.bilibili.com/*",
-        "https://live.bilibili.com/*"
+        "https://live.bilibili.com/*",
+        "https://passport.bilibili.com/*",
+        "https://pay.bilibili.com/*",
+        "https://account.bilibili.com/*"
       ],
       "js": [
         "src/range-core.js",
@@ -101,7 +109,10 @@
         "https://*.bilibili.com/*"
       ],
       "exclude_matches": [
-        "https://live.bilibili.com/*"
+        "https://live.bilibili.com/*",
+        "https://passport.bilibili.com/*",
+        "https://pay.bilibili.com/*",
+        "https://account.bilibili.com/*"
       ],
       "js": [
         "src/notification-view.js",
@@ -167,7 +178,12 @@
         "src/quick-panel.js"
       ],
       "run_at": "document_idle",
-      "world": "ISOLATED"
+      "world": "ISOLATED",
+      "exclude_matches": [
+        "https://passport.bilibili.com/*",
+        "https://pay.bilibili.com/*",
+        "https://account.bilibili.com/*"
+      ]
     },
     {
       "matches": [

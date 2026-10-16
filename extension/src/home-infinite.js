@@ -71,11 +71,11 @@
 :is(#btr-flow-feed,[data-btr-fill]) .bili-video-card__cover img.btr-loaded{opacity:1}
 /* Watch later & not interested: shown on hover, like the native card. */
 :is(#btr-flow-feed,[data-btr-fill]) .bili-watch-later{display:none;cursor:pointer}
-:is(#btr-flow-feed,[data-btr-fill]) .bili-video-card:hover .bili-watch-later,:is(#btr-flow-feed,[data-btr-fill]) .bili-watch-later.btr-done{display:flex}
+:is(#btr-flow-feed,[data-btr-fill]) .bili-video-card:hover .bili-watch-later,:is(#btr-flow-feed,[data-btr-fill]) .bili-video-card:focus-within .bili-watch-later,:is(#btr-flow-feed,[data-btr-fill]) .bili-watch-later.btr-done{display:flex}
 :is(#btr-flow-feed,[data-btr-fill]) .bili-watch-later__tip--lab{display:none}
 :is(#btr-flow-feed,[data-btr-fill]) .bili-watch-later:hover .bili-watch-later__tip--lab,:is(#btr-flow-feed,[data-btr-fill]) .bili-watch-later.btr-done .bili-watch-later__tip--lab{display:block}
 :is(#btr-flow-feed,[data-btr-fill]) .bili-video-card__info--no-interest{display:none;cursor:pointer}
-:is(#btr-flow-feed,[data-btr-fill]) .bili-video-card:hover .bili-video-card__info--no-interest,:is(#btr-flow-feed,[data-btr-fill]) .bili-video-card.btr-menu-open .bili-video-card__info--no-interest{display:flex}
+:is(#btr-flow-feed,[data-btr-fill]) .bili-video-card:hover .bili-video-card__info--no-interest,:is(#btr-flow-feed,[data-btr-fill]) .bili-video-card:focus-within .bili-video-card__info--no-interest,:is(#btr-flow-feed,[data-btr-fill]) .bili-video-card.btr-menu-open .bili-video-card__info--no-interest{display:flex}
 :is(#btr-flow-feed,[data-btr-fill]) .bili-video-card__info{position:relative}
 :is(#btr-flow-feed,[data-btr-fill]) .bili-video-card__wrap{position:relative}
 /* ⋮ menu, styled like B 站's own card popover. */
@@ -126,6 +126,11 @@
 [data-btr-grid]>.btr-gone-card[data-btr-fill]{position:relative;min-width:0;display:flex;flex-direction:column;cursor:default;user-select:none;margin-top:0!important}
 `;
 
+  /** The URL if it is https on one of these host suffixes (checked on the parsed hostname, not with a prefix regex). */
+  function onHost(u, suffixes) {
+    try { const x = new URL(String(u).replace(/^\/\//, 'https://').replace(/^http:/, 'https:')); return x.protocol === 'https:' && suffixes.some(h => x.hostname === h || x.hostname.endsWith('.' + h)) ? x.href : null; }
+    catch (_) { return null; }
+  }
   function el(tag, cls, text) { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
   const svgNS = 'http://www.w3.org/2000/svg';
   function svg(path, cls, box = '0 0 24 24') {
@@ -613,7 +618,7 @@
       if (/^[\d.]+%$/.test(ratio)) cov.style.aspectRatio = String(100 / parseFloat(ratio));
       const img = v.querySelector('img'), src = img?.currentSrc || img?.src || '';
       const bg = el('div', 'btr-gone-bg');
-      if (/^https:\/\/[^/"')\s]*hdslb\.com\/[^"')\s]*$/.test(src)) bg.style.backgroundImage = `url("${src}")`;
+      if (onHost(src, ['hdslb.com']) && !/["')\s\\]/.test(src)) bg.style.backgroundImage = `url("${src}")`;
       const layer = el('div', 'btr-gone'); layer.setAttribute('role', 'status');
       const msg = el('div', null, kind === 'up' ? '已屏蔽该 UP 主' : kind === 'tag' ? `已屏蔽标签「${c.blockedTag}」` : '已减少此类推荐');
       const undo = el('button', 'undo', '撤销'); undo.type = 'button';
@@ -741,7 +746,7 @@
       const p = fetch(`${SHOT}?bvid=${c.bvid}&index=1`, {credentials: 'include'}).then(r => r.json()).then(j => {
         const d = j?.code === 0 ? j.data : null;
         if (!d || !Array.isArray(d.image) || !d.image.length || !d.img_x_len || !d.img_y_len) return null;
-        const per = d.img_x_len * d.img_y_len, sheets = d.image.map(u => String(u).replace(/^\/\//, 'https://')).filter(u => /^https:\/\/[^/]*hdslb\.com\//.test(u));
+        const per = d.img_x_len * d.img_y_len, sheets = d.image.map(u => String(u).replace(/^\/\//, 'https://')).filter(u => onHost(u, ['hdslb.com']));
         if (!sheets.length) return null;
         const total = Math.max(1, Math.min(sheets.length * per, Array.isArray(d.index) && d.index.length > 1 ? d.index.length - 1 : sheets.length * per));
         return {sheets, x: d.img_x_len, y: d.img_y_len, per, total};
@@ -787,7 +792,7 @@
         }
         const j = await getJSON(`${PLAY}?${feed.signWbi(params, await wbiKeys(false))}`);
         const u = j?.code === 0 ? (j.data?.durl?.[0]?.url || j.data?.durl?.[0]?.backup_url?.[0]) : '';
-        return /^https:\/\/[^/]+\.(?:bilivideo\.(?:com|cn)|akamaized\.net|hdslb\.com)\//.test(String(u).replace(/^http:/, 'https:')) ? String(u).replace(/^http:/, 'https:') : null;
+        return u ? onHost(u, ['bilivideo.com', 'bilivideo.cn', 'akamaized.net', 'hdslb.com']) : null;
       })().catch(() => null);
       clips.set(c.bvid, {at: Date.now(), p});
       return p;
@@ -955,7 +960,8 @@
       if (!nums.length) for (const sec of sections) { if (sec.getBoundingClientRect().top < innerHeight / 2) n = Number(sec.dataset.batch); else break; }
       updateSide(n);
       place();
-      side.classList.toggle('off', top > innerHeight * .6 && !nums.length);
+      const off = top > innerHeight * .6 && !nums.length;
+      side.classList.toggle('off', off); side.tabIndex = off ? -1 : 0; // invisible must also mean unreachable by Tab
     }
 
     // Sit in the page gutter beside the feed when there is room; otherwise shrink against the edge.

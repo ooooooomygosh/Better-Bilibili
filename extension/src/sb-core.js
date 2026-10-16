@@ -13,7 +13,10 @@
   'use strict';
   if (root.__BTR_SB_CORE__) return;
 
-  const SERVER = 'https://www.bsbsb.top';
+  // Upstream moved the primary host to the bare domain (hanydd/BilibiliSponsorBlock 8c0ae60); the old www host stays as
+  // a fallback so lookups keep working if either name is unreachable or refuses CORS from bilibili.com.
+  const SERVERS = Object.freeze(['https://bsbsb.top', 'https://www.bsbsb.top']);
+  const SERVER = SERVERS[0];
   // name, Chinese label (from their zh_CN locale), bar colour, default option (their defaults).
   const CATEGORIES = [
     ['sponsor', '赞助/恰饭', '#00d400', 'auto'],
@@ -120,9 +123,26 @@
       segments: [{segment: [start, poi ? start : end], category, actionType: poi ? 'poi' : 'skip'}]};
   }
 
+  /** fetch() against SERVERS in order. Moves on after a network/CORS error (the request never reached a server) and,
+   * for GET only, after a 5xx; any other response is returned as is. Each attempt gives up after `timeout` ms. */
+  async function request(path, init = {}, {fetchImpl = root.fetch, timeout = 8000} = {}) {
+    const get = !init.method || init.method === 'GET';
+    let last;
+    for (const base of SERVERS) {
+      try {
+        const signal = typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? AbortSignal.timeout(timeout) : undefined;
+        const r = await fetchImpl(base + path, {credentials: 'omit', ...init, signal});
+        if (get && r.status >= 500 && base !== SERVERS[SERVERS.length - 1]) { last = r; continue; }
+        return r;
+      } catch (e) { last = e; }
+    }
+    if (last instanceof Error) throw last;
+    return last;
+  }
+
   const fmt = t => { t = Math.max(0, Math.round(t)); const m = Math.floor(t / 60), s = t % 60; return `${m}:${String(s).padStart(2, '0')}`; };
 
-  const api = Object.freeze({SERVER, CATEGORIES, BY_NAME, OPTIONS, OPTION_LABEL, key, defaults, settings, optionFor, sha256, hashPrefix,
+  const api = Object.freeze({SERVER, SERVERS, request, CATEGORIES, BY_NAME, OPTIONS, OPTION_LABEL, key, defaults, settings, optionFor, sha256, hashPrefix,
     parseBvid, parsePage, pickSegments, decide, skipTarget, newUserId, submission, fmt});
   root.__BTR_SB_CORE__ = api;
   if (typeof module === 'object' && module.exports) module.exports = api;

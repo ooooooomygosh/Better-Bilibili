@@ -31,3 +31,17 @@ test('home mode choice flag defaults to unchosen; manifest loads the new scripts
  const cl=m.content_scripts.find(e=>e.js.includes('src/cleaner.js'));assert.deepEqual(cl.js,['src/clean-core.js','src/cleaner.js']);assert.equal(cl.run_at,'document_start');
  const h=all.find(j=>j.includes('src/home-enhancer.js'));assert(h.indexOf('src/filter-core.js')<h.indexOf('src/home-infinite.js')&&h.indexOf('src/tag-source.js')<h.indexOf('src/home-infinite.js'));
  const q=all.find(j=>j.includes('src/quick-panel.js'));assert(q.includes('src/filter-core.js')&&q.includes('src/clean-core.js'));assert.deepEqual(m.permissions.filter(p=>p!=='storage'),[]);});
+test('regex rules that can backtrack exponentially are refused, with a reason for the UI', () => {
+  const f = require('../src/filter-core.js');
+  for (const r of ['(a+)+$', '(a|aa)*', '(x{2,})+', '(.*)\\1']) { assert.equal(f.safePattern(r), false, r); assert.ok(f.regexProblem(`/${r}/`), r); }
+  for (const r of ['抽奖|开箱', '(抽奖|开箱)', '^【.*切片】', '第\\d+集']) assert.equal(f.regexProblem(`/${r}/`), null, r);
+  assert.equal(f.regexProblem('普通关键词'), null); assert.match(f.regexProblem('/(/'), /正则写法有误/);
+  const c = f.compile({filterKeywords: ['/(a+)+$/', '开箱']});
+  assert.equal(c.match({title: 'a'.repeat(40) + '!'}), null);
+});
+test('a block list never grows past the 8 KB chrome.storage.sync item limit', () => {
+  const f = require('../src/filter-core.js');
+  let l = []; for (let i = 0; i < 300; i++) l = f.add(l, `一个比较长的屏蔽关键词用来测试同步存储上限${i}`, 'keywords') || l;
+  assert.ok(new TextEncoder().encode(JSON.stringify(l)).length <= 8192 - 20);
+  assert.ok(l.at(-1).endsWith('299'));
+});

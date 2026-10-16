@@ -67,3 +67,19 @@ test('license: GPL-3.0 with third-party notices and file headers', () => {
   const n = read('THIRD_PARTY_NOTICES.md'); assert.match(n, /hanydd\/BilibiliSponsorBlock/); assert.match(n, /ajayyy\/SponsorBlock/); assert.match(n, /MIT License/);
   for (const f of ['src/sb-core.js', 'src/sponsorblock.js']) { const h = read(f).slice(0, 1200); assert.match(h, /BilibiliSponsorBlock/); assert.match(h, /SponsorBlock/); assert.match(h, /General Public License v3/); }
 });
+test('server: bare bsbsb.top first, www fallback on network error or GET 5xx, POST never retried on a response', async () => {
+  assert.deepEqual(sb.SERVERS, ['https://bsbsb.top', 'https://www.bsbsb.top']);
+  const calls = [], ok = {status: 200};
+  const net = async u => { calls.push(u); if (u.startsWith('https://bsbsb.top')) throw new TypeError('Failed to fetch'); return ok; };
+  assert.equal(await sb.request('/api/skipSegments/abcd', {}, {fetchImpl: net}), ok);
+  assert.deepEqual(calls, ['https://bsbsb.top/api/skipSegments/abcd', 'https://www.bsbsb.top/api/skipSegments/abcd']);
+  const opts = []; await sb.request('/x', {}, {fetchImpl: async (u, i) => { opts.push(i); return ok; }}); assert.equal(opts[0].credentials, 'omit');
+  let n = 0; const r5 = await sb.request('/x', {}, {fetchImpl: async () => ({status: ++n === 1 ? 502 : 200})}); assert.equal(r5.status, 200);
+  n = 0; const p = await sb.request('/x', {method: 'POST'}, {fetchImpl: async () => { n++; return {status: 503}; }}); assert.equal(p.status, 503); assert.equal(n, 1);
+  await assert.rejects(sb.request('/x', {}, {fetchImpl: async () => { throw new TypeError('offline'); }}), /offline/);
+});
+test('options page builds the category selects at top level (not inside an error handler)', () => {
+  const js = read('ui/options.js'), i = js.indexOf("const box=$('sbCats')");
+  assert(i > 0); assert(!/await\s*\/\*/.test(js));
+  assert(js.lastIndexOf('catch', i) < js.lastIndexOf('})();', i), 'sbCats builder must not be nested in a catch block');
+});
