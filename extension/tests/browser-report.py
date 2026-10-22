@@ -4,7 +4,7 @@ is complete, and checks light + dark at 1280×900: key numbers, the week switche
 the empty state, and that a real focus-tick from an extension page is recorded by the service worker (stats on,
 quota off). SHOTS=1 also writes the promo screenshots to docs/media/."""
 import pathlib,json,os,tempfile,base64,random
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 ROOT=pathlib.Path(__file__).resolve().parents[1];REPO=ROOT.parent
 results=[]
 def ok(n):results.append({'test':n,'passed':True});print('PASS',n,flush=True)
@@ -71,24 +71,24 @@ with sync_playwright() as p:
   pg.uncheck('#hideUps');hidden=pg.evaluate("document.querySelector('#card').toDataURL('image/png')");assert hidden!=c['url'],'hiding UP names must change the card'
   pg.check('#hideUps')
   pg.evaluate("Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async t=>{window.copiedReport=t},write:async()=>{throw Error('fixture denied')}}})")
-  pg.click('#copyText');pg.wait_for_function("typeof copiedReport==='string'")
+  pg.click('#copyText');expect(pg.locator('#shareMsg')).to_contain_text('文字已复制')
   assert '芝士焗饭研究所' not in pg.evaluate('copiedReport')
   pg.uncheck('#hideUps');pg.click('#copyText');assert '芝士焗饭研究所' in pg.evaluate('copiedReport')
   pg.check('#hideUps')
   # Keep the preview and exported text stable when storage changes behind the modal.
   changed=json.loads(json.dumps(SEED));changed['days']['2026-10-18']['s']+=600
   sw.evaluate("s=>chrome.storage.local.set({watchStats:s})",changed)
-  pg.wait_for_function("document.querySelector('#total').textContent==='6小时50分'")
+  expect(pg.locator('#total')).to_have_text('6小时50分')
   pg.click('#copyText');assert '6 小时 40 分' in pg.evaluate('copiedReport')
   pg.evaluate("()=>{navigator.clipboard.writeText=async()=>{throw Error('fixture denied')}}")
   pg.click('#copyText');pg.wait_for_selector('#shareTextFallback:not([hidden])')
   assert '6 小时 40 分' in pg.input_value('#shareTextFallback') and '芝士焗饭研究所' not in pg.input_value('#shareTextFallback')
   pg.uncheck('#hideUps');pg.check('#hideUps');assert pg.is_hidden('#shareTextFallback')
   sw.evaluate("s=>chrome.storage.local.set({watchStats:s})",SEED)
-  pg.wait_for_function("document.querySelector('#total').textContent==='6小时40分'")
+  expect(pg.locator('#total')).to_have_text('6小时40分')
   pg.focus('#download');pg.keyboard.press('Tab');assert pg.evaluate("document.activeElement.id")=='hideUps'
   pg.keyboard.press('Shift+Tab');assert pg.evaluate("document.activeElement.id")=='download'
-  r=pg.evaluate("document.querySelector('#copy').click()");pg.wait_for_function("()=>document.querySelector('#shareMsg').textContent",timeout=3000)
+  pg.click('#copy');expect(pg.locator('#shareMsg')).to_contain_text('浏览器没允许复制图片')
   pg.keyboard.press('Escape');assert pg.is_hidden('#shareBack')
   ok(f'{theme}: share card is a {len(png)//1024} KB 1080×1440 PNG; 隐藏 UP 主名字 redraws it; copy answers ({pg.text_content("#shareMsg")}); Esc closes')
   # Week switcher
@@ -138,7 +138,7 @@ with sync_playwright() as p:
  pg=page('light')
  pg.evaluate("chrome.runtime.sendMessage({type:'stats-clear'})")
  sw.evaluate("chrome.storage.sync.set({statsEnabled:true})")
- pg.wait_for_function("document.querySelector('#emptyTitle').textContent==='这周还没有观看记录'")
+ expect(pg.locator('#emptyTitle')).to_have_text('这周还没有观看记录')
  assert pg.is_visible('#empty') and pg.is_hidden('#hero') and pg.text_content('#emptyTitle')=='这周还没有观看记录'
  r=pg.evaluate("""async()=>{for(let i=0;i<3;i++)await chrome.runtime.sendMessage({type:'focus-tick',seconds:5,id:'BV1xx411c7mD',up:{mid:'3546101',name:'芝士焗饭研究所'}});
   const {watchStats,focusUsage}=await chrome.storage.local.get(['watchStats','focusUsage']);const d=Object.values(watchStats.days)[0];return {s:d.s,n:d.n,up:d.up,q:focusUsage||null}}""")

@@ -2,7 +2,7 @@
 The browser has a fresh profile. Bilibili responses are local fixtures; no account is used.
 """
 import json, os, pathlib, tempfile
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 results = []
@@ -103,7 +103,7 @@ with sync_playwright() as p, tempfile.TemporaryDirectory() as profile:
     assert options.locator('#sbCat_jumpscare option:checked').inner_text() == '自动静音'
     assert options.locator('#episodeEnabled').is_checked()
     popup = ctx.new_page(); popup.on('pageerror', lambda e: errors.append(str(e))); popup.goto(f'chrome-extension://{eid}/ui/popup.html')
-    popup.click('[data-scene-mode="study"]'); options.wait_for_function("document.querySelector('[data-scene-mode=study]').getAttribute('aria-pressed')==='true'")
+    popup.click('[data-scene-mode="study"]'); expect(options.locator('[data-scene-mode=study]')).to_have_attribute('aria-pressed','true')
     for page in [options, popup]:
         assert not page.evaluate('document.documentElement.scrollWidth>innerWidth')
     if os.environ.get('SHOTS') == '1':
