@@ -318,7 +318,7 @@ button:focus-visible{outline:2px solid var(--btr-brand);outline-offset:2px}
     send({type: 'stats-notice'}).then(r => {
       if (!r?.show || !ui?.toast) return;
       ui.toast({key: 'btr-weekly', title: `上周观看报告出炉了：${r.total || core.fmt(r.seconds)}`, text: `${r.range} · 看看这周刹车踩得怎么样`, timeout: 15000,
-        actions: [{label: '查看', primary: true, fn: () => send({type: 'flow-open-report'}).catch(() => {})}]});
+        actions: [{label: '查看', primary: true, fn: () => send({type: 'flow-open-report', week: r.week}).catch(() => {})}]});
     }).catch(() => {});
   }
   chrome.storage.sync.get({statsEnabled: true, statsWeeklyNotice: true}).then(s => {

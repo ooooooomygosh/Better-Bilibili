@@ -122,7 +122,7 @@
   }
 
   // 自动线程数. One controller for the whole page: the thread count starts at 8 and climbs a
-  // ladder towards 32 on every sign that the download is not keeping up with playback
+  // ladder towards 64 on every sign that the download is not keeping up with playback
   // (the player stalls; a low buffer stops growing while bytes keep arriving; a
   // connection waits too long for its first byte while every slot is busy). Every step up
   // is a trial: ten seconds later the bytes per second must have grown, otherwise the
@@ -130,7 +130,7 @@
   // connections that bring nothing only add risk. A server refusing the load (412, 429)
   // steps it back too, and nothing climbs past a refused level until it has rested. The
   // level is kept across videos on the same page; a new page starts at 8 again.
-  const AUTO_LADDER = Object.freeze([8, 12, 16, 24, 32]);
+  const AUTO_LADDER = Object.freeze([8, 12, 16, 24, 32, 48, 64]);
   const AUTO_STARTUP_LEVEL = 2;
   const AUTO_STARTUP_COMFORT_SECONDS = 15;
   const AUTO_STARTUP_MAX_MS = 30000;

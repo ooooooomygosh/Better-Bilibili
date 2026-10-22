@@ -29,7 +29,8 @@
     ['preview', '回顾/概要', '#008fd6', 'show'],
     ['padding', '填充内容/前黑/后黑', '#222222', 'auto'],
     ['filler', '离题闲聊/玩笑', '#7300ff', 'off'],
-    ['music_offtopic', '音乐:非音乐部分', '#ff9900', 'auto']
+    ['music_offtopic', '音乐:非音乐部分', '#ff9900', 'auto'],
+    ['jumpscare', '惊吓片段', '#e53935', 'auto']
   ].map(([name, label, color, def]) => Object.freeze({name, label, color, def}));
   const BY_NAME = Object.fromEntries(CATEGORIES.map(c => [c.name, c]));
   const OPTIONS = ['auto', 'manual', 'show', 'off'];
@@ -76,7 +77,7 @@
     if (s.sbMute) actions.add('mute');
     return entry.segments
       .filter(x => x && Array.isArray(x.segment) && x.segment.length === 2 && BY_NAME[x.category])
-      .filter(x => cid == null || x.cid == null || String(x.cid) === String(cid))
+      .filter(x => x.cid == null || (cid != null && String(x.cid) === String(cid)))
       .filter(x => actions.has(x.actionType || 'skip') && optionFor(s, x.category) !== 'off')
       .filter(x => x.actionType === 'poi' || (x.segment[1] - x.segment[0]) >= (s.sbMinDuration || 0))
       .map(x => ({UUID: x.UUID, category: x.category, actionType: x.actionType || 'skip', start: Number(x.segment[0]), end: Number(x.segment[1]),
@@ -93,13 +94,17 @@
     for (const g of segs) {
       if (g.actionType === 'poi') continue;
       if (t < g.start || t >= g.end) continue;
-      if (g.actionType === 'mute') { if (!done.has(g.UUID)) mute = g; continue; }
+      if (g.actionType === 'mute') {
+        if (!done.has(g.UUID) && g.option === 'auto') mute = g;
+        else if (!done.has(g.UUID) && g.option === 'manual' && !prompt) prompt = g;
+        continue;
+      }
       if (done.has(g.UUID)) continue;
       if (g.option === 'auto' && t < g.end - 0.3) return {type: 'skip', seg: g};
       if (g.option === 'manual' && !prompt) prompt = g;
     }
-    if (prompt) return {type: 'prompt', seg: prompt};
     if (mute) return {type: 'mute', seg: mute};
+    if (prompt) return {type: 'prompt', seg: prompt};
     return {type: null, seg: null};
   }
   /** Chain overlapping/adjacent auto segments so one skip clears all of them. */
@@ -120,7 +125,7 @@
   function submission({bvid, cid, userID, duration, start, end, category, version}) {
     const poi = category === 'poi_highlight';
     return {videoID: bvid, cid: String(cid), userID, videoDuration: duration, userAgent: `BiliThrottle/v${version}`,
-      segments: [{segment: [start, poi ? start : end], category, actionType: poi ? 'poi' : 'skip'}]};
+      segments: [{segment: [start, poi ? start : end], category, actionType: poi ? 'poi' : category === 'jumpscare' ? 'mute' : 'skip'}]};
   }
 
   /** fetch() against SERVERS in order. Moves on after a network/CORS error (the request never reached a server) and,

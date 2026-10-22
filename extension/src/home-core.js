@@ -7,13 +7,14 @@
     // Hover preview on infinite-feed cards: 'video' plays the video inline like B 站's own cards; 'frames' scrubs storyboard frames.
     homePreview:'video', homePreviewMuted:true,
     // The two homepage modes (换一批 / 无限下滑) are chosen once, the first time the homepage opens.
-    homeModeChosen:false});
+    homeModeChosen:false, sceneMode:"normal"});
   function settings(raw = {}) {
     const out = {...defaults};
     for (const k of Object.keys(defaults)) {
       if (typeof defaults[k] === 'boolean') out[k] = raw[k] !== undefined ? raw[k] === true : defaults[k];
     }
     // 1.0's light/dark/auto/off all return to Bilibili's own theme, never force a theme on upgrade.
+    out.sceneMode = raw.sceneMode === 'study' || raw.sceneMode === 'food' ? raw.sceneMode : 'normal';
     out.homeTheme = raw.homeTheme === 'oled' ? 'oled' : 'native';
     out.homePreview = raw.homePreview === 'frames' || raw.homePreview === 'off' ? raw.homePreview : 'video';
     const num = (v, lo, hi, d) => { const n = Math.round(Number(v)); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d; };

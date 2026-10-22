@@ -14,9 +14,9 @@ function setThreadBadge(tabId, enabled, activeThreads) {
   ]).catch((error) => console.error("无法更新线程徽标", error));
 }
 
-async function prepareExtension() {
+async function prepareExtension(reason) {
   const s = await chrome.storage.sync.get(null);
-  const defaults = {mode:"auto", smartPolicy:true, strategy:"auto", memoryBudgetMB:64, maxAutoThreads:32};
+  const defaults = {liveEnabled: reason === "update", episodeEnabled: true, mode:"auto", smartPolicy:true, strategy:"auto", memoryBudgetMB:64, maxAutoThreads:32};
   // The old "海外访问" proxy section was removed in 2.3.0 (Chrome never allowed `proxy` as an
   // optional permission, so it could not be granted); drop its saved address, if any.
   chrome.storage.local.remove("flowProxy").catch(() => {});
@@ -42,7 +42,7 @@ async function prepareExtension() {
 }
 
 // A failed migration must not surface as an unhandled rejection; it runs again on the next startup.
-const prepareSafely = () => prepareExtension().catch(e => console.warn("BiliThrottle: prepare failed", e));
+const prepareSafely = ({reason} = {}) => prepareExtension(reason).catch(e => console.warn("BiliThrottle: prepare failed", e));
 chrome.runtime.onInstalled.addListener(prepareSafely);
 // New users get a short tour of what the extension does and where its switches live.
 chrome.runtime.onInstalled.addListener(({reason}) => {
@@ -66,7 +66,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if (sender.id === chrome.runtime.id && message?.type === 'flow-open-report') {
-    openExtensionPage("ui/report.html", "").then(sendResponse, e => sendResponse({ok: false, error: String(e?.message || e)}));
+    const requested = typeof message.week === 'string' ? message.week : '';
+    const current = stats.weekKey(Date.now());
+    const week = stats.weekKey(requested) === requested && requested <= current && requested >= stats.addDays(current, -7 * (stats.WEEKS_KEPT - 1)) ? requested : '';
+    openExtensionPage("ui/report.html", week).then(sendResponse, e => sendResponse({ok: false, error: String(e?.message || e)}));
     return true;
   }
   if (sender.id === chrome.runtime.id && message?.type === 'flow-open-welcome') {

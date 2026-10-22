@@ -57,7 +57,7 @@
         <label><input type="radio" name="takeover" value="full"><span>全接管</span></label>
         <label><input type="radio" name="takeover" value="compat"><span>兼容模式</span></label>
       </section>
-      <p class="takeover-note">Safari 用户建议使用兼容模式。<br>全接管：视频由插件自己来放，下载和缓冲都由插件安排，速度最快。<br>兼容模式：当遇到播放问题或设置不生效时，尝试使用兼容模式。</p>
+      <p class="takeover-note">全接管：视频由插件自己来放，下载和缓冲都由插件安排，由插件管理。<br>兼容模式：当遇到播放问题或设置不生效时，尝试使用兼容模式。</p>
 
       <section class="controls">
         <div class="control-title">
@@ -78,7 +78,7 @@
       </section>
 
       <section class="notice-controls" aria-label="提示设置">
-        <div class="notice-row"><label for="live-enabled">直播加速（实验性）</label><label class="switch"><input id="live-enabled" type="checkbox" aria-label="直播加速（实验性）"><span></span></label></div>
+        <div class="notice-row"><label for="episode-enabled">剧集加速<small>仅兼容模式，保留版权保护。</small></label><label class="switch"><input id="episode-enabled" type="checkbox" aria-label="剧集加速"><span></span></label></div><div class="auto-row"><label for="live-enabled">直播加速（实验性）</label><label class="switch"><input id="live-enabled" type="checkbox" aria-label="直播加速（实验性）"><span></span></label></div>
         <div class="notice-row"><label for="error-notices">显示错误</label><label class="switch"><input id="error-notices" type="checkbox" aria-label="显示错误"><span></span></label></div>
         <div class="notice-row"><label for="debug-notices">Debug 模式</label><label class="switch"><input id="debug-notices" type="checkbox" aria-label="Debug 模式"><span></span></label></div>
         <div class="notice-row"><label for="floating-button">悬浮按钮</label><label class="switch"><input id="floating-button" type="checkbox" aria-label="悬浮按钮"><span></span></label></div>
@@ -218,7 +218,7 @@
     const safely = (f) => { try { return f(); } catch (_) { return "不可读取"; } };
     const parse = (s) => { try { return JSON.parse(s); } catch (_) { return String(s); } };
     const sections = [
-      ["环境", {BiliThrottle:"2.6.0",upstream:"2026.10.4.1",package:"BiliThrottle / MV3 extension",browser:navigator.userAgent,page:location.origin+location.pathname,at:new Date().toISOString()}],
+      ["环境", {BiliThrottle:"2.7.0",upstream:"2026.10.19.2",package:"BiliThrottle / MV3 extension",browser:navigator.userAgent,page:location.origin+location.pathname,at:new Date().toISOString()}],
       ["设置",latestSettings || "未加载"]
     ];
     if (root.__biliThreadRipperDebug?.report) sections.push(["视频接管",safely(()=>parse(root.__biliThreadRipperDebug.report()))]);
@@ -273,6 +273,7 @@
     const errorNotices = $("error-notices");
     const debugNotices = $("debug-notices");
     const liveEnabled = $("live-enabled");
+    const episodeEnabled = $("episode-enabled");
     const floatingButton = $("floating-button");
     const debugFilters = $("debug-filters");
     const debugCategoryInputs = [...shadow.querySelectorAll("[data-debug-category]")];
@@ -352,7 +353,8 @@
       setMode(settings.mode);
       customHosts = settings.customHosts;
       renderHosts();
-      liveEnabled.checked = settings.liveEnabled !== false;
+      liveEnabled.checked = settings.liveEnabled === true;
+      episodeEnabled.checked = settings.episodeEnabled !== false;
       floatingButton.checked = settings.floatingButton !== false;
       errorNotices.checked = settings.errorNotices;
       debugNotices.checked = settings.debugNotices;
@@ -362,6 +364,7 @@
 
     const saveDebugCategories = () => save({ debugCategories: Object.fromEntries(debugCategoryInputs.map((input) => [input.dataset.debugCategory, input.checked])) });
     enabled.addEventListener("change", () => save({ enabled: enabled.checked }));
+    episodeEnabled.addEventListener("change", () => save({ episodeEnabled: episodeEnabled.checked }));
     liveEnabled.addEventListener("change", () => save({ liveEnabled: liveEnabled.checked }));
     floatingButton.addEventListener("change", () => save({ floatingButton: floatingButton.checked }));
     concurrency.addEventListener("input", () => {

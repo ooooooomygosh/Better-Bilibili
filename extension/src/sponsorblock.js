@@ -152,7 +152,9 @@ button:focus-visible{outline:2px solid var(--btr-brand-ring);outline-offset:2px}
     const p = sb.parsePage(location.href);
     try {
       const r = await fetch(`https://api.bilibili.com/x/player/pagelist?bvid=${id}`, {credentials: 'omit'});
-      const j = await r.json(); const page = j?.data?.[p - 1] || j?.data?.[0];
+      if (!r.ok) return null;
+      const j = await r.json(); if (j?.code !== 0 || !Array.isArray(j.data)) return null;
+      const page = j.data[p - 1];
       return page?.cid ?? null;
     } catch (_) { return null; }
   }

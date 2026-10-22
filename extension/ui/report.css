@@ -101,3 +101,5 @@ body.report.is-empty .r-hero,body.report.is-empty .r-grid,body.report.is-empty .
 :root[data-theme=dark] .r-hero{background:radial-gradient(130% 150% at 0% 0%,#b5527f 0%,#8a3b68 45%,#3c2546 100%);box-shadow:0 18px 44px rgba(0,0,0,.4)}
 :root[data-theme=dark] .r-tip{box-shadow:0 8px 22px rgba(0,0,0,.5)}
 @media(prefers-color-scheme:dark){:root:not([data-theme]) .r-hero{background:radial-gradient(130% 150% at 0% 0%,#b5527f 0%,#8a3b68 45%,#3c2546 100%);box-shadow:0 18px 44px rgba(0,0,0,.4)}:root:not([data-theme]) .r-tip{box-shadow:0 8px 22px rgba(0,0,0,.5)}}
+
+.r-share .actions{flex-wrap:wrap}.r-share textarea{width:100%;font:inherit;resize:vertical}.r-weeks{flex-wrap:wrap}

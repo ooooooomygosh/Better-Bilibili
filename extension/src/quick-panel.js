@@ -11,7 +11,8 @@
   if (!home || !focus || !ui || !filt || !clean || !sbc || window.top !== window || globalThis.__BTR_QUICK__) return;
 
   const VERSION = chrome.runtime.getManifest().version;
-  const PLAY = {enabled: true, mode: 'auto', strategy: 'auto', liveEnabled: true, quickFab: true};
+  const scene = globalThis.__BTR_SCENE_CORE__;
+  const PLAY = {commentLocation: true, sceneStudyComments: false, enabled: true, mode: 'auto', strategy: 'auto', liveEnabled: false, episodeEnabled: true, quickFab: true};
   const DEFAULTS = {...home.defaults, ...focus.defaults, ...filt.defaults, ...clean.defaults, ...sbc.defaults, ...PLAY};
   const norm = raw => ({...raw, ...home.settings(raw), ...focus.settings(raw), ...filt.settings(raw), ...clean.settings(raw), ...sbc.settings(raw)});
   const FOCUS_KEYS = new Set(Object.keys(focus.defaults));
@@ -422,6 +423,7 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
   function homepage() {
     const p = el('div', 'page');
     p.append(el('p', 'lead', isHome() ? '改动立即作用在当前首页。' : '这些设置作用在 B 站首页。'));
+    p.append(seg('sceneMode', '观看场景', '学习 / 美食使用主题入口，退出后恢复原首页', [['normal', '日常'], ['study', '学习'], ['food', '美食']]));
     p.append(modeCards());
     p.append(s.homeInfinite
       ? group('', () => s.homeEnabled, '开启「首页净化与操作栏」后生效',
@@ -447,6 +449,8 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
   function cleaner() {
     const p = el('div', 'page');
     p.append(el('p', 'lead', '去掉 B 站各处的广告和烦人的东西。只按明确的广告标记和广告位隐藏，不按标题判断。'));
+    p.append(sw('commentLocation', '评论 IP 属地', '显示 B 站已公开的省份 / 地区，不查询精确 IP'));
+    p.append(sw('sceneStudyComments', '学习模式保留评论', '想看讨论或做笔记时打开'));
     for (const {group: name, rules} of clean.groups()) {
       if (name === '首页') continue; // Those live in the 首页 tab, next to the cards they hide.
       p.append(el('div', 'sub', name));
@@ -458,10 +462,18 @@ button:focus-visible{outline:2px solid var(--pink);outline-offset:2px}
   function throttle() {
     const p = el('div', 'page');
     p.append(el('p', 'lead', '多 CDN / Range 并发加速，清晰度仍由 B 站播放器决定。'));
+    p.append(seg('sceneMode', '观看场景', '收起相关推荐；学习模式默认也收起评论', [['normal', '日常'], ['study', '学习'], ['food', '美食']]));
+    if (scene?.shareURL(location.href)) {
+      p.append(btn('复制干净视频链接', 'outline', async () => {
+        try { await navigator.clipboard.writeText(scene.shareURL(location.href)); ui.toast({text: '链接已复制，已移除追踪参数。', kind: 'ok', timeout: 2500}); }
+        catch (_) { ui.toast({text: '复制失败，请从地址栏复制链接。', kind: 'error', timeout: 4000}); }
+      }));
+    }
     p.append(sw('enabled', '视频加速', '出现黑屏时先关掉这里试试'));
     p.append(group('', () => s.enabled, '开启「视频加速」后这些选项才生效',
       seg('mode', 'CDN 路线', null, [['auto', '自动'], ['mainland', '大陆'], ['overseas', '海外']]),
       seg('strategy', '观看策略', null, [['auto', '自动'], ['smooth', '稳播'], ['fast', '起播'], ['economy', '省流']]),
+      sw('episodeEnabled', '剧集加速', '番剧 / 影视仅兼容模式，保留版权保护'),
       sw('liveEnabled', '直播加速')));
     p.append(el('div', 'sub', '空降助手'));
     p.append(sw('sbEnabled', '空降助手', () => isPlayer() && document.documentElement.dataset.btrSbSegments ? `本视频有 ${document.documentElement.dataset.btrSbSegments} 个片段 · 立即生效` : '跳过恰饭、片头片尾 · 立即生效'));

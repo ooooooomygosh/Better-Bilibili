@@ -1,0 +1,126 @@
+{
+  "environment": "Chromium renderer, local fixtures; upstream MIT tests against fork sources",
+  "results": [
+    {
+      "test": "native-core-lock",
+      "passed": true,
+      "result": {
+        "checks": {
+          "locksEveryBuffer": true,
+          "coreCannotStart": true,
+          "locksLaterBuffers": true,
+          "requestsGoOutAndAreCounted": true,
+          "handBackRestores": true,
+          "handBackStartsCore": true,
+          "notCountedWithoutTakeover": true,
+          "compatLeavesCoreAlone": true,
+          "retakesUnderCover": true,
+          "coverEnds": true
+        },
+        "pass": true
+      }
+    },
+    {
+      "test": "bangumi-navigation",
+      "passed": true,
+      "result": {
+        "calls": [
+          {
+            "kind": "compat",
+            "marker": "ep101",
+            "identity": {
+              "aid": 0,
+              "bvid": "",
+              "epId": 101,
+              "part": 1,
+              "key": "ep101:p1",
+              "videoKey": "ep101"
+            },
+            "destroyed": true
+          },
+          {
+            "kind": "compat",
+            "marker": "ep202",
+            "identity": {
+              "aid": 0,
+              "bvid": "",
+              "epId": 202,
+              "part": 1,
+              "key": "ep202:p1",
+              "videoKey": "ep202"
+            },
+            "destroyed": true
+          }
+        ],
+        "apiRequests": [
+          "/ogv/player/playview?csrf=test",
+          "/ogv/player/playview?csrf=test",
+          "/pgc/player/web/v2/playurl?ep_id=202&qn=127&fnval=4048&fnver=0&fourk=1",
+          "/pgc/player/web/v2/playurl?ep_id=303&qn=127&fnval=4048&fnver=0&fourk=1"
+        ],
+        "playerState": "native-fallback",
+        "bootUsedEmbeddedPlayinfo": true,
+        "staleEpisodeIgnored": true,
+        "switchedByPlayview": true,
+        "previousReleased": true,
+        "compatOnly": true,
+        "drmLeftNative": true,
+        "pass": true
+      }
+    },
+    {
+      "test": "playback-diagnostics",
+      "passed": true,
+      "result": {
+        "checks": {
+          "noWatchWithoutDebug": true,
+          "cancelsZeroId": true,
+          "separatesFrameAndClock": true,
+          "reportsQuality": true,
+          "oneOutstandingCallback": true,
+          "noQualityApi": true,
+          "releasesWatch": true,
+          "noFrameApi": true,
+          "noVideo": true
+        },
+        "pass": true
+      }
+    },
+    {
+      "test": "buffer-window",
+      "passed": true,
+      "result": {
+        "errors": [],
+        "filledAhead": 46,
+        "lateStarts": [],
+        "removalsAfterJump": {
+          "video": 1,
+          "audio": 1
+        },
+        "removalsAfterSmallStep": {
+          "video": 1,
+          "audio": 1
+        },
+        "removalsAfterLargeStep": {
+          "video": 2,
+          "audio": 2
+        },
+        "seek": {
+          "headersBeforeSeek": 4,
+          "headersAfterSeek": 4,
+          "sessions": 1,
+          "lastSeekMs": 305,
+          "startedAtTarget": true
+        },
+        "seekKeptHeaders": true,
+        "pausedBeforeUnderflow": true,
+        "resumedAfterRefill": true,
+        "ownsFiles": true,
+        "filled": true,
+        "keptWindowFull": true,
+        "prunedOncePerStep": true,
+        "pass": true
+      }
+    }
+  ]
+}

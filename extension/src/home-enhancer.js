@@ -30,7 +30,7 @@
   const storageKey = 'flowHistory:' + tabKey;
   const isHome = () => /^\/(?:index\.html)?$/.test(location.pathname);
   let fallback = false; // Set when the homepage ended up without a single visible video: we step aside for this page.
-  const active = () => ready && !fallback && isHome() && settings.homeEnabled;
+  const active = () => ready && !fallback && isHome() && settings.homeEnabled && settings.sceneMode === 'normal';
   // Never touch Vue's tree before hydration has finished (see hydration-signal.js for why).
   const hydrated = () => document.documentElement?.hasAttribute('data-btr-hydrated');
   let hydrationWatch = null;
@@ -74,7 +74,7 @@
   const skin = el('style'); skin.id='btr-flow-home-style'; skin.dataset.btrFlowOwned='';
   skin.textContent = `
 /* Only homepage surfaces are touched. Preserve Bilibili's column count, titles and previews. */
-html[data-btr-home-clean][data-btr-hide-carousel] :is(.recommended-container_floor-aside,.recommended-container) .recommended-swipe{display:none!important}
+html[data-btr-home-clean][data-btr-hide-carousel] :is(.recommended-container_floor-aside,.recommended-container) .recommended-swipe{grid-column:auto!important;grid-row:auto!important;display:none!important}
 html[data-btr-home-clean][data-btr-hide-carousel] :is(.recommended-container_floor-aside,.recommended-container) .container{grid-template-areas:none!important;grid-template-rows:none!important;grid-auto-rows:auto!important;grid-auto-flow:row!important}
 html[data-btr-home-clean][data-btr-hide-carousel] :is(.recommended-container_floor-aside,.recommended-container) .container > :is(.feed-card,.bili-video-card,.video-card-reco,.floor-single-card){margin-top:0!important;grid-area:auto!important;align-self:start}
 html[data-btr-home-clean][data-btr-hide-carousel] [data-btr-grid] > .feed-card[data-btr-ready]:not([data-btr-ad],[data-btr-filtered],[data-btr-dup]){display:block!important}

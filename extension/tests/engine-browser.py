@@ -51,7 +51,7 @@ with sync_playwright() as p:
  panel.evaluate("postMessage({channel:'__BILI_RANGE_ACCELERATOR_V1__',type:'settings',payload:{debugNotices:true}},'*')")
  panel.wait_for_timeout(100);panel.evaluate('__BTR_SETTINGS_PANEL__.open()')
  panel.locator('#debug-copy').click();panel.wait_for_function("typeof copied==='string'")
- copied=panel.evaluate('copied');assert '1.1.0' in copied and '2026.10.4.1' in copied and 'MV3' in copied
+ copied=panel.evaluate('copied');assert '1.1.0' in copied and '2026.10.19.2' in copied and 'MV3' in copied
  assert 'upsig' not in copied and 'private' not in copied and 'x.m4s' not in copied
  assert panel.locator('#github-link').get_attribute('target')=='_blank'
  ok('diagnostic copy includes fork/upstream versions and redacts signed media addresses')

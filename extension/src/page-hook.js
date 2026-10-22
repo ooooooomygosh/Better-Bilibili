@@ -83,7 +83,7 @@
   });
 
   const stats = {
-    version: "2.6.0",
+    version: "2.7.0",
     architecture: "bilibili-native-ui-progressive-mse-0.8-core",
     mode: settings.mode,
     playerState: "waiting",
@@ -113,6 +113,32 @@
     const video = player?.video || document.querySelector("#bilibili-player video, .bpx-player-container video");
     pageEvents.push({ at: Math.round(performance.now()), time: Math.round((Number(video?.currentTime) || 0) * 10) / 10, what, detail: String(detail).slice(0, 120) });
     if (pageEvents.length > 60) pageEvents.shift();
+  }
+
+  // A media clock alone cannot show a stale picture (#45). Keep the most recently
+  // presented frame's timestamp only while Debug is enabled; no canvas/readback involved.
+  let frameWatch = null;
+  function stopFrameWatch() {
+    const previous = frameWatch;
+    frameWatch = null;
+    if (previous?.id != null) previous.video.cancelVideoFrameCallback?.(previous.id);
+  }
+  function syncFrameWatch(video = player?.video) {
+    if (!settings.enabled || !settings.debugNotices || typeof video?.requestVideoFrameCallback !== "function") {
+      stopFrameWatch();
+      return;
+    }
+    if (frameWatch?.video === video) return;
+    stopFrameWatch();
+    const watch = frameWatch = { video, id: null, last: null };
+    const sample = (_now, metadata) => {
+      if (frameWatch !== watch) return;
+      watch.last = { mediaTime: metadata.mediaTime, mediaClock: video.currentTime,
+        observedAtMs: performance.now(), expectedDisplayTimeMs: metadata.expectedDisplayTime,
+        presentedFrames: metadata.presentedFrames };
+      watch.id = video.requestVideoFrameCallback(sample);
+    };
+    watch.id = video.requestVideoFrameCallback(sample);
   }
 
   function clearTakeoverFailure() {
@@ -360,6 +386,9 @@
     const match = /\/video\/(BV[0-9A-Za-z]+|av\d+)/i.exec(location.pathname);
     if (match) return match[1];
 
+    const episode = /^\/bangumi\/play\/(ep\d+|ss\d+)/i.exec(location.pathname);
+    if (episode) return episode[1];
+
     if (/^\/list\//i.test(location.pathname)) {
       const bvid = new URLSearchParams(location.search).get("bvid") || "";
       if (/^BV[0-9A-Za-z]+$/i.test(bvid)) return bvid;
@@ -371,6 +400,14 @@
   function routeIdentity() {
     const pathId = urlPathId();
     if (!pathId) return null;
+    if (/^(ep|ss)/i.test(pathId)) {
+      // A season address plays the episode its embedded playinfo names.
+      const embedded = normalizePlayinfo(root.__playinfo__);
+      const epId = /^ep/i.test(pathId) ? Number(pathId.slice(2)) || 0
+        : embedded?.season === Number(pathId.slice(2)) ? embedded.episode : 0;
+      if (!epId) return null;
+      return { aid: 0, bvid: "", epId, part: 1, key: `ep${epId}:p1`, videoKey: `ep${epId}` };
+    }
     const podBvid = activePodBvid();
     const pathVideoKey = /^BV/i.test(pathId) ? pathId.toLowerCase() : `av${Number(pathId.slice(2)) || 0}`;
     const podVideoKey = podBvid ? podBvid.toLowerCase() : "";
@@ -427,6 +464,30 @@
     return Boolean((playinfo?.data || playinfo)?.dash);
   }
 
+  const PLAYURL_PATTERN = /\/x\/player\/(?:wbi\/)?playurl/i;
+  const EPISODE_PLAYURL_PATTERN = /\/ogv\/player\/playview|\/pgc\/player\/web\/(?:v2\/)?playurl/i;
+  const isPlayurl = (url) => PLAYURL_PATTERN.test(String(url)) || EPISODE_PLAYURL_PATTERN.test(String(url));
+
+  // Bangumi answers put the stream in video_info, next to the episode's arc (aid, cid, bvid)
+  // and, in the playinfo embedded in the page, the episode and season it belongs to.
+  function normalizePlayinfo(payload) {
+    const body = payload?.data || payload?.result;
+    if (!body?.video_info) return payload;
+    return {
+      code: payload.code,
+      data: body.video_info,
+      arc: body.arc || null,
+      episode: Number(body.supplement?.ogv_episode_info?.episode_id) || 0,
+      season: Number(body.supplement?.ogv_season_info?.season_id) || 0
+    };
+  }
+
+  function unsupportedEpisode(playinfo) {
+    if (playinfo?.data?.is_drm) return "这一集有数字版权保护，交给 B 站自己的播放器。";
+    if (playinfo?.data?.is_preview) return "这一集只能试看，交给 B 站自己的播放器。";
+    return "";
+  }
+
   const routePlayinfo = new Map();
   const routeCids = new Map();
   const bootRouteKey = routeIdentity()?.key || "";
@@ -469,6 +530,12 @@
   function currentPlayinfo(identity) {
     const cached = routePlayinfo.get(identity?.key);
     if (isDashPlayinfo(cached)) return cached;
+    if (identity?.epId) {
+      const embedded = normalizePlayinfo(root.__playinfo__);
+      const playinfo = embedded?.episode === identity.epId ? embedded : null;
+      if (unsupportedEpisode(playinfo)) return playinfo;
+      return cachePlayinfo(identity, playinfo, playinfo?.arc?.cid) ? playinfo : null;
+    }
     try {
       const initialIdentity = stateIdentity(root.__INITIAL_STATE__);
       if (identity?.key === bootRouteKey && initialIdentity?.videoKey === identity?.videoKey && isDashPlayinfo(root.__playinfo__)) {
@@ -507,8 +574,25 @@
     catch (_error) { return 0; }
   }
 
-  function capturePlayinfoRequest(url) {
-    if (!/\/x\/player\/(?:wbi\/)?playurl/i.test(String(url))) return null;
+  // playview names the episode in its JSON body, the older playurl in its query.
+  function requestedEpisode(url, body) {
+    try {
+      const fromQuery = Number(new URL(String(url), location.href).searchParams.get("ep_id")) || 0;
+      if (fromQuery) return fromQuery;
+      return typeof body === "string" ? Number(JSON.parse(body)?.video_index?.ogv_episode_id) || 0 : 0;
+    } catch (_error) {
+      return 0;
+    }
+  }
+
+  function capturePlayinfoRequest(url, body) {
+    if (EPISODE_PLAYURL_PATTERN.test(String(url))) {
+      const identity = routeIdentity();
+      const epId = requestedEpisode(url, body);
+      if (!identity?.epId || epId !== identity.epId) return null;
+      return { routeKey: identity.key, videoKey: identity.videoKey, epId, cid: 0 };
+    }
+    if (!PLAYURL_PATTERN.test(String(url))) return null;
     const identity = routeIdentity();
     const videoKey = requestedVideoKey(url);
     const cid = requestedCid(url);
@@ -519,7 +603,9 @@
   }
 
   function observePlayinfo(url, payload, requestContext = null) {
-    if (!/\/x\/player\/(?:wbi\/)?playurl/i.test(String(url)) || !isDashPlayinfo(payload)) return;
+    if (!isPlayurl(url)) return;
+    payload = normalizePlayinfo(payload);
+    if (!isDashPlayinfo(payload)) return;
     const context = requestContext || capturePlayinfoRequest(url);
     const identity = routeIdentity();
     if (!context || !identity || context.videoKey !== identity.videoKey) return;
@@ -528,6 +614,13 @@
       return;
     }
     if (context.routeKey !== identity.key) return;
+    // The episode ID in the route already tells episodes apart, so no CID check is needed.
+    if (identity.epId) {
+      if (unsupportedEpisode(payload)) return;
+      cachePlayinfo(identity, payload, payload.arc?.cid);
+      usePlayinfo(identity, payload);
+      return;
+    }
     const cid = Number(context.cid) || 0;
     const expectedCid = routeCids.get(identity.key) || 0;
     // The same BVID can contain many parts. A late response from the previous
@@ -537,6 +630,10 @@
     if (!cid || (expectedCid && cid !== expectedCid)) return;
     if (!expectedCid) routeCids.set(identity.key, cid);
     cachePlayinfo(identity, payload, cid);
+    usePlayinfo(identity, payload);
+  }
+
+  function usePlayinfo(identity, payload) {
     if (player && playerRoute === identity.key) {
       const observedLifecycle = playerLifecycle;
       player.updatePlayinfo?.(payload).catch((error) => {
@@ -558,13 +655,27 @@
   }
 
   function observeFetchResponse(url, response, requestContext) {
-    if (!/\/x\/player\/(?:wbi\/)?playurl/i.test(String(url))) return;
+    if (!isPlayurl(url)) return;
     response.clone().json().then((payload) => observePlayinfo(url, payload, requestContext)).catch(() => {});
+  }
+
+  // Requests for this video's own files that reach the network while the takeover plays
+  // can only come from Bilibili's own core, which lockNativeBuffers keeps from downloading
+  // (#49). They are let through and only counted for the diagnostic report: holding them
+  // back instead made its core cancel and retry them every few seconds, and soon reload the
+  // video. BTR's own downloads use the fetch saved at start-up and never pass through here.
+  const nativeMedia = { requests: 0 };
+  function countNativeMedia(url) {
+    try {
+      if (player && !player.nativeTransport && playerContainer?.dataset.btrMseActive === "true"
+        && typeof player.ownsMediaUrl === "function" && player.ownsMediaUrl(url)) nativeMedia.requests += 1;
+    } catch (_error) {}
   }
 
   root.fetch = function (...args) {
     const url = typeof args[0] === "string" || args[0] instanceof URL ? String(args[0]) : String(args[0]?.url || "");
-    const requestContext = capturePlayinfoRequest(url);
+    countNativeMedia(url);
+    const requestContext = capturePlayinfoRequest(url, args[1]?.body);
     const pending = nativeFetch(...args);
     pending.then((response) => observeFetchResponse(response.url || url, response, requestContext)).catch(() => {});
     return pending;
@@ -584,11 +695,13 @@
     };
     xhrPrototype.send = function (...args) {
       const url = xhrUrls.get(this) || "";
-      if (/\/x\/player\/(?:wbi\/)?playurl/i.test(url)) {
+      countNativeMedia(url);
+      if (isPlayurl(url)) {
+        const requestContext = xhrContexts.get(this) || capturePlayinfoRequest(url, args[0]);
         this.addEventListener("load", () => {
           try {
             const payload = this.responseType === "json" ? this.response : JSON.parse(this.responseText);
-            observePlayinfo(this.responseURL || url, payload, xhrContexts.get(this));
+            observePlayinfo(this.responseURL || url, payload, requestContext);
           } catch (_error) {}
         }, { once: true });
       }
@@ -649,6 +762,9 @@
   // refresh: new addresses for the video that is already playing. Its CID is known by then,
   // so the video information is not asked for again, and the takeover notices stay quiet.
   async function fetchRoutePlayinfo(identity, signal, refresh = false) {
+    if (identity.epId) return fetchEpisodePlayinfo(identity, signal, refresh);
+    // A branch of an interactive video carries its own CID; the video information only
+    // names the first branch.
     let cid = Number(identity.cid) || (refresh ? Number(routeCids.get(identity.key)) || 0 : 0);
     let canonicalBvid = String(identity.bvid || "");
     let canonicalAid = Number(identity.aid) || 0;
@@ -682,6 +798,23 @@
     if (Number(playinfo?.code) !== 0 || !isDashPlayinfo(playinfo)) throw new Error(playinfo?.message || "新视频没有 DASH 播放清单");
     if (signal?.aborted) throw signal.reason || new DOMException("播放清单请求已取消", "AbortError");
     cachePlayinfo(identity, playinfo, cid);
+    if (!refresh) notices?.log("已经拿到视频下载地址", "接下来开始准备多线程下载。", "success", "", identity.key, "takeover");
+    return playinfo;
+  }
+
+  async function fetchEpisodePlayinfo(identity, signal, refresh) {
+    const response = await nativeFetch(`${BILIBILI_API_ORIGIN}/pgc/player/web/v2/playurl?ep_id=${identity.epId}&qn=127&fnval=4048&fnver=0&fourk=1`, {
+      credentials: "include",
+      signal
+    });
+    if (!response.ok) throw new Error(`读取播放清单失败（HTTP ${response.status}）`);
+    const payload = await response.json();
+    const playinfo = normalizePlayinfo(payload);
+    if (Number(payload?.code) !== 0 || !playinfo?.data) throw new Error(payload?.message || "读取播放清单失败");
+    if (signal?.aborted) throw signal.reason || new DOMException("播放清单请求已取消", "AbortError");
+    if (unsupportedEpisode(playinfo)) return playinfo;
+    if (!isDashPlayinfo(playinfo)) throw new Error("这一集没有 DASH 播放清单");
+    cachePlayinfo(identity, playinfo);
     if (!refresh) notices?.log("已经拿到视频下载地址", "接下来开始准备多线程下载。", "success", "", identity.key, "takeover");
     return playinfo;
   }
@@ -765,7 +898,7 @@
     const style = document.createElement("style");
     style.id = SETTINGS_STYLE_ID;
     style.textContent = `
-      #${SETTINGS_ID}{margin:0 0 20px;color:#fff;font-size:12px}
+      #${SETTINGS_ID}{margin:0 0 20px;color:#fff;font-size:12px;user-select:none;-webkit-user-select:none}
       #${SETTINGS_ID} .btr-native-setting-group{margin:0 0 16px}
       #${SETTINGS_ID} .btr-native-setting-title{margin:0 0 8px;color:#fff}
       #${SETTINGS_ID} .bui-radio-group{display:flex!important;flex-wrap:wrap!important;gap:8px!important;margin:0!important}
@@ -855,6 +988,7 @@
 
   function stopPlayer(resumeNative = true) {
     nativeCoreWait = null;
+    stopFrameWatch();
     const current = player;
     if (current) remember(resumeNative ? "handed back to Bilibili" : "player stopped", stats.playerState);
     // While a session loads or has failed the element is paused whatever the viewer wants;
@@ -867,8 +1001,12 @@
     playerRoute = "";
     playerContainer = null;
     current?.destroy({ resumeNative });
+    // Bilibili's core may download again: for its next source, or for the video it plays.
+    unlockNativeBuffers();
     // The suppressed native schedulers must run again once Bilibili owns playback.
     if (resumeNative && current && !current.nativeTransport) resumeNativeSchedulers();
+    // Bilibili plays the video itself now, so its error panel may show again.
+    if (resumeNative) uncoverNativeErrors();
     if (settings.enabled) stats.playerState = "waiting";
     else stats.playerState = "disabled";
     publish();
@@ -907,6 +1045,25 @@
     restartTimer = setTimeout(startPlayer, 650);
   }
 
+  // When Bilibili reloads the video after an error of its own core, its error panel can
+  // come up in the moment before BTR takes the video over again, where the takeover no
+  // longer hides it. The panel stays hidden across that gap, five seconds at most: a
+  // takeover that does not come back leaves the panel to Bilibili.
+  let retakingCover = null;
+  function uncoverNativeErrors() {
+    if (!retakingCover) return;
+    clearTimeout(retakingCover.timer);
+    delete retakingCover.container.dataset.btrRetaking;
+    retakingCover = null;
+  }
+  function coverNativeErrorsWhileRetaking(container) {
+    uncoverNativeErrors();
+    if (!container?.isConnected) return;
+    container.dataset.btrRetaking = "true";
+    const cover = { container, timer: setTimeout(() => { if (retakingCover === cover) uncoverNativeErrors(); }, 5000) };
+    retakingCover = cover;
+  }
+
   function handleNativeSourceChange(route, lifecycle) {
     setTimeout(() => {
       if (lifecycle !== playerLifecycle || !player || playerRoute !== route) return;
@@ -917,9 +1074,11 @@
       startingRoute = "";
       failedRoute = "";
       clearTimeout(restartTimer);
+      const container = playerContainer;
       // The native player already installed its next source. Do not restore or
       // overwrite it; wait briefly for the transition to settle, then retake it.
       stopPlayer(false);
+      coverNativeErrorsWhileRetaking(container);
       restartTimer = setTimeout(startPlayer, 650);
     }, 0);
   }
@@ -1009,8 +1168,41 @@
   }
 
   const stoppedSchedulers = new WeakSet();
+
+  // Stopping the controllers once a second still let them download: every seek or play woke
+  // them before the next stop, each time for several megabytes at 4K under their own ten
+  // seconds. Those downloads failed often enough for the core to show 错误码 6006 and reload
+  // the video (#49), and in a background tab the stop came only once a minute. Bilibili's
+  // dash core asks one question before it downloads anything: its schedule controller
+  // refuses to start, and stops scheduling, once the buffer controller says buffering is
+  // completed. While BTR plays the video, every native buffer controller says so, and the
+  // core asks its nodes for nothing; the original answer comes back with the video. A core
+  // without this method keeps the stop above.
+  const lockedBuffers = new Map();
+  function lockNativeBuffers() {
+    for (const processor of nativeStreamProcessors()) {
+      try {
+        const buffer = processor?.getBufferController?.();
+        if (!buffer || lockedBuffers.has(buffer) || typeof buffer.getIsBufferingCompleted !== "function") continue;
+        lockedBuffers.set(buffer, buffer.getIsBufferingCompleted);
+        buffer.getIsBufferingCompleted = function () { return true; };
+        // Its own wake-ups are refused from now on, so it is started again with the video.
+        const scheduler = processor.getScheduleController?.();
+        if (scheduler) stoppedSchedulers.add(scheduler);
+        remember("native buffer locked", String(processor.getType?.() || ""));
+      } catch (_error) {}
+    }
+  }
+  function unlockNativeBuffers() {
+    for (const [buffer, original] of lockedBuffers) {
+      try { buffer.getIsBufferingCompleted = original; } catch (_error) {}
+    }
+    lockedBuffers.clear();
+  }
+
   function suppressNativeSchedulers() {
     if (!player || player.nativeTransport || playerContainer?.dataset.btrMseActive !== "true") return;
+    lockNativeBuffers();
     for (const processor of nativeStreamProcessors()) {
       try {
         const scheduler = processor?.getScheduleController?.();
@@ -1181,7 +1373,8 @@
       return;
     }
     const identity = routeIdentity();
-    if (!settings.enabled || !identity) {
+    // 剧集加速 switched off leaves episode pages to Bilibili, like the master switch does.
+    if (!settings.enabled || !identity || (identity.epId && settings.episodeEnabled === false)) {
       pendingPodSwitch = null;
       clearTakeoverFailure();
       stats.lastError = "";
@@ -1209,7 +1402,10 @@
     const container = findContainer();
     // Bilibili's playback core appears a moment after its player. The compatibility mode
     // needs it, so each video waits briefly for it instead of falling back at once.
-    const rangeTransport = settings.takeover === "compat" ? root.__BILI_NATIVE_RANGE_PLAYER_FACTORY__ : null;
+    // Episodes are only ever sped up in the compatibility mode: Bilibili's own player keeps
+    // playing them, whatever the takeover setting says.
+    const compat = settings.takeover === "compat" || Boolean(identity.epId);
+    const rangeTransport = compat ? root.__BILI_NATIVE_RANGE_PLAYER_FACTORY__ : null;
     if (container && rangeTransport && !rangeTransport.supports(container)) {
       if (nativeCoreWait?.route !== route) nativeCoreWait = { route, at: Date.now() };
       if (Date.now() - nativeCoreWait.at < 3000) {
@@ -1223,6 +1419,16 @@
       stats.playerState = stats.takeoverError?.route === route ? "error" : "waiting";
       schedulePublish();
       restartTimer = setTimeout(startPlayer, 350);
+      return;
+    }
+    // Where the compatibility mode cannot hold Bilibili's core, an episode is left to
+    // Bilibili rather than taken over in full.
+    if (identity.epId && !rangeTransport?.supports(container)) {
+      failedRoute = route;
+      notices?.log("没有接管这一集", "剧集只用兼容模式加速，但现在接不上 B 站的播放器，这一集交给 B 站自己播放。", "info", "", route, "takeover");
+      if (player) stopPlayer(true);
+      stats.playerState = "native-fallback";
+      publish();
       return;
     }
     const generation = routeGeneration;
@@ -1249,6 +1455,15 @@
       }
       if (generation !== routeGeneration || routeIdentity()?.key !== route) return;
     }
+    const unsupported = identity.epId ? unsupportedEpisode(playinfo) : "";
+    if (unsupported) {
+      failedRoute = route;
+      notices?.log("没有接管这一集", unsupported, "info", "", route, "takeover");
+      if (player) stopPlayer(true);
+      stats.playerState = "native-fallback";
+      publish();
+      return;
+    }
     if (player) stopPlayer(false);
     stats.playerState = "loading";
     stats.lastError = "";
@@ -1266,10 +1481,9 @@
     const resumeAfterStop = takeResumeHint(autoRetakeRoute === route && autoRetakeCount > 0);
     for (const meter of Object.values(speedMeters)) meter.shown = 0;
     try {
-      // The compatibility mode needs Bilibili's own playback core; without it the video is
-      // taken over as usual.
-      const transport = settings.takeover === "compat" ? root.__BILI_NATIVE_RANGE_PLAYER_FACTORY__ : null;
-      const factory = transport?.supports(container) ? transport : playerFactory;
+      // The compatibility mode needs Bilibili's own playback core; without it an ordinary
+      // video is taken over as usual (an episode never gets this far without it).
+      const factory = rangeTransport?.supports(container) ? rangeTransport : playerFactory;
       const nextPlayer = factory.createNativePlayer({
         container,
         identity,
@@ -1367,6 +1581,7 @@
       codecPlayer = nextPlayer;
       syncedCodec = preferredCodec;
       notices?.attach(nextPlayer.video, route, lifecycle, () => lifecycle === playerLifecycle && player === nextPlayer && playerRoute === routeIdentity()?.key && playerContainer?.isConnected && !["error", "native-fallback", "disabled"].includes(stats.playerState));
+      syncFrameWatch(nextPlayer.video);
       if (isPodSwitch) {
         trustedPodVideoKey = identity.videoKey;
         pendingPodSwitch = null;
@@ -1399,23 +1614,26 @@
       settings = core.normalizeSettings(event.data.payload);
       settingsLoaded = true;
       notices?.configure(settings);
+      syncFrameWatch();
       const serversChanged = settings.mode === "custom" && previous.customHosts.join(",") !== settings.customHosts.join(",");
       if (!hadLoadedSettings || previous.enabled !== settings.enabled || previous.takeover !== settings.takeover || previous.mode !== settings.mode || previous.concurrency !== settings.concurrency || previous.autoConcurrency !== settings.autoConcurrency || serversChanged) {
         const cdn = settings.mode === "auto" ? "自动 CDN" : settings.mode === "overseas" ? "海外 CDN"
           : settings.mode !== "custom" ? "大陆 CDN"
             : settings.customHosts.length ? `自定义的 ${settings.customHosts.length} 个服务器` : "大陆 CDN（自定义里还没选服务器）";
-        const threads = settings.autoConcurrency ? `线程数自动调整（当前 ${autoThreads?.threads() || 8}，8 到 32）` : `开启 ${settings.concurrency} 条下载线程`;
+        const threads = settings.autoConcurrency ? `线程数自动调整（当前 ${autoThreads?.threads() || 8}，8 到 64）` : `开启 ${settings.concurrency} 条下载线程`;
         notices?.log("设置已经生效", `${settings.takeover === "compat" ? "兼容模式" : "全接管"}，使用${cdn}，${threads}。`, "success", "", undefined, "settings");
       }
       stats.autoThreads = settings.autoConcurrency ? autoThreads?.threads() || 0 : 0;
       stats.mode = settings.mode;
       syncSettingsMenu();
-      if (!settings.enabled) {
+      // 剧集加速 only matters on an episode page; elsewhere the video playing is left alone.
+      const episodeSwitched = previous.episodeEnabled !== settings.episodeEnabled && Boolean(routeIdentity()?.epId);
+      if (!settings.enabled || (episodeSwitched && settings.episodeEnabled === false)) {
         clearTakeoverFailure();
         stats.lastError = "";
         stopPlayer(true);
       }
-      else if (!previous.enabled || previous.takeover !== settings.takeover) {
+      else if (!previous.enabled || previous.takeover !== settings.takeover || episodeSwitched) {
         restartPlayer(true);
       }
       else {
@@ -1498,13 +1716,27 @@
       report: () => {
         const debug = player?.getDebug?.() || {};
         const { timeline = [], ...rest } = debug;
-        // Node names and states only: no download address or account data.
+        const video = player?.video || findContainer()?.querySelector("video");
+        syncFrameWatch(video);
+        const frame = frameWatch && frameWatch.video === video ? frameWatch.last : null;
+        let frames = null;
+        try {
+          const quality = video?.getVideoPlaybackQuality?.();
+          if (quality) frames = { total: quality.totalVideoFrames, dropped: quality.droppedVideoFrames };
+        } catch (_error) {}
+        // Playback state and node names only: no download address or account data.
         return JSON.stringify({
-          version: stats.version, upstreamVersion: "2026.10.4.1", distribution: "BiliThrottle MV3", at: Math.round(performance.now()), settings: { takeover: settings.takeover, mode: settings.mode, customHosts: settings.customHosts.slice(), concurrency: settings.concurrency, codec: nativeCodec() || "default" },
+          version: stats.version, upstreamVersion: "2026.10.19.2", distribution: "BiliThrottle MV3", at: Math.round(performance.now()), settings: { takeover: settings.takeover, mode: settings.mode, customHosts: settings.customHosts.slice(), concurrency: settings.concurrency, codec: nativeCodec() || "default" },
+          actualTakeover: !player ? "native" : player.nativeTransport ? "compat" : "full",
+          nativeCore: { buffersLocked: lockedBuffers.size, mediaRequests: nativeMedia.requests },
+          playback: video ? { currentTime: video.currentTime, duration: video.duration, ended: video.ended,
+            paused: video.paused, seeking: video.seeking, readyState: video.readyState, playbackRate: video.playbackRate,
+            width: video.videoWidth, height: video.videoHeight, visibility: document.visibilityState, frames,
+            lastPresentedFrame: frame ? { ...frame, ageMs: Math.max(0, performance.now() - frame.observedAtMs) } : null } : null,
           state: stats.playerState, lastError: stats.lastError, player: rest, nodes: stats.cdnHosts.map((item) => ({ ...item })), bannedNodes: cdnBans?.hosts?.() || [], page: pageEvents.slice(), timeline
         }, null, 1);
       },
-      version: "2.6.0"
+      version: "2.7.0"
     })
   });
   publish();
