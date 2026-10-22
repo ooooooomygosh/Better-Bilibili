@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "哔哩节流阀 · BiliThrottle",
   "short_name": "BiliThrottle",
-  "version": "2.6.0",
-  "description": "B 站的油门和刹车：多 CDN 加速、首页净化、无限下滑推荐，再加上像 Claude Code 一样的 5 小时与每周观看额度，内置空降助手跳过恰饭片段。",
+  "version": "2.7.0",
+  "description": "B 站的油门和刹车：多 CDN 加速、学习 / 美食一键场景、评论 IP 属地、观看周报与分享、观看额度，内置空降助手。",
   "minimum_chrome_version": "114",
   "permissions": [
     "storage"
@@ -175,6 +175,7 @@
         "src/filter-core.js",
         "src/clean-core.js",
         "src/sb-core.js",
+        "src/scene-core.js",
         "src/quick-panel.js"
       ],
       "run_at": "document_idle",
@@ -196,8 +197,41 @@
       ],
       "run_at": "document_idle",
       "world": "ISOLATED"
+    },
+    {
+      "matches": [
+        "https://*.bilibili.com/*"
+      ],
+      "exclude_matches": [
+        "https://passport.bilibili.com/*",
+        "https://pay.bilibili.com/*",
+        "https://account.bilibili.com/*"
+      ],
+      "js": [
+        "src/ui-kit.js",
+        "src/scene-core.js",
+        "src/scene.js"
+      ],
+      "run_at": "document_idle",
+      "world": "ISOLATED"
+    },
+    {
+      "matches": [
+        "https://*.bilibili.com/*"
+      ],
+      "exclude_matches": [
+        "https://passport.bilibili.com/*",
+        "https://pay.bilibili.com/*",
+        "https://account.bilibili.com/*"
+      ],
+      "js": [
+        "src/comment-core.js",
+        "src/comment-location.js"
+      ],
+      "run_at": "document_idle",
+      "world": "MAIN"
     }
   ],
-  "version_name": "2.6.0 · 观看周报",
+  "version_name": "2.7.0 · 场景模式与周报升级",
   "options_page": "ui/options.html"
 }

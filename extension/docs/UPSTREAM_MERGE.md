@@ -1,5 +1,22 @@
 # 上游核对与回移记录
 
+## 2.7.0 核对：2026-10-23
+
+| 项目 | 本次固定提交 | 处理 |
+| --- | --- | --- |
+| [Bilibili-thread-ripper](https://github.com/MrTangLuyao/Bilibili-thread-ripper) | `ee3adaa8cc1afbb29a3d7153e1295e09e42b29e2` · 2026.10.19.2 | 从 bbf4d3d 合并适用内核、CDN、剧集、诊断修复；保留 MV3 和本分支观看策略 |
+| [BilibiliSponsorBlock](https://github.com/hanydd/BilibiliSponsorBlock) | `14697261ea532a46793443b07ae64cbf1655cc02` | 核对新增惊吓分类、默认静音、时间轴和服务器变化；后两项已有适用实现 |
+| [bilibili-cleaner](https://github.com/festoney8/bilibili-cleaner) | `7ba39d77de42c22f2edb32c768fe6d8967c5fcac` · v4.5.14 | 复核轮播和网格规则，补齐 grid-column / grid-row 自动布局 |
+| [biliplus](https://github.com/0xlau/biliplus) | `0bd6c26a68e829709ef24b0aaea591257990634c` | 与旧固定基线一致，无新增同步 |
+
+线程撕裂者新增 64 线程档位，但默认上限仍为 32，智能观看策略继续约束实际并发。原生缓冲锁停止时还原，避免双重下载；音视频低缓冲保护覆盖整个会话。中转链接不改写成普通 CDN 路径。番剧 / 影视走兼容接管并保留 DRM / 试看回退，新安装直播加速关闭，升级保留旧状态。上游四组内核、番剧、诊断、缓冲窗口回归随源码保留 MIT 归属。
+
+**未直接搬入的部分：** 用户脚本的 GM 存储与注入适配不适用于 MV3；SponsorBlock 的自动远程规则更新、云端身份迁移、完整设置框架和画中画 UI 不属于本分支的运行架构，不为追齐代码而新增远程执行或权限。cleaner 与 biliplus 仅用于首页规则参考，没有打包它们的完整发行物。
+
+开发工具 Playwright 固定为 1.64.0，CI 使用 Node 24。Actions 固定到 checkout v7.0.1、setup-node v7.1.0、upload-artifact v7.0.2、action-gh-release v3.0.3 对应提交。没有 npm 运行时依赖，不适用 npm audit。
+
+## 历史记录（2026-10-06）
+
 核对日期：2026-10-06。固定版本：2026.10.4.1；固定提交：`bbf4d3dee502a16e424232ae6a51705f52b0e60d`。
 
 这是对既有 BTR Flow 1.0.0 的适用代码回移，不是用官方整包覆盖后假装无差异，也不是作者新发行的 MV3 插件。

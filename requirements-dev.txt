@@ -1,0 +1,2 @@
+# Browser tests only; the shipped extension has no runtime package dependencies.
+playwright==1.64.0

@@ -1,53 +1,69 @@
 name: Release
 
-# Publishes a Release whenever extension/manifest.json carries a version that has no Release yet
-# (on main or a working branch), or when a v* tag is pushed. Re-runs for an existing version are skipped.
+# A working branch never publishes. Every release repeats the same CI on the exact commit.
 on:
   push:
-    branches: ["main", "claude/**"]
+    branches: [main]
     paths: ["extension/manifest.json", ".github/workflows/release.yml"]
     tags: ["v*"]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
 
 jobs:
+  verify:
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/ci.yml
   release:
+    needs: verify
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-      - name: Skip if this version is already released
+      - name: Require a main-branch commit and matching tag
+        run: |
+          git merge-base --is-ancestor HEAD origin/main
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            test "v$(node -p "require('./extension/manifest.json').version")" = "$GITHUB_REF_NAME"
+          fi
+      - name: Skip an existing release
         id: check
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           v="v$(node -p "require('./extension/manifest.json').version")"
-          if gh release view "$v" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "exists=true" >> "$GITHUB_OUTPUT"; else echo "exists=false" >> "$GITHUB_OUTPUT"; fi
-      - name: Unit tests
-        if: steps.check.outputs.exists == 'false'
-        run: node --test extension/tests/*.test.cjs
-      - name: Check tag matches manifest version
-        if: steps.check.outputs.exists == 'false' && startsWith(github.ref, 'refs/tags/')
-        run: test "v$(node -p "require('./extension/manifest.json').version")" = "${GITHUB_REF_NAME}"
+          if gh release view "$v" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Package
         if: steps.check.outputs.exists == 'false'
         id: pkg
         run: |
+          python3 scripts/checksums.py
           ./scripts/build.sh
           echo "version=$(node -p "require('./extension/manifest.json').version")" >> "$GITHUB_OUTPUT"
-      - name: Extract release notes
-        if: steps.check.outputs.exists == 'false'
-        run: awk '/^## /{n++} n==1' extension/CHANGELOG.md > release-notes.md
-      - uses: softprops/action-gh-release@v2
+          awk '/^## /{n++} n==1' extension/CHANGELOG.md > release-notes.md
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         if: steps.check.outputs.exists == 'false'
         with:
           tag_name: v${{ steps.pkg.outputs.version }}
           target_commitish: ${{ github.sha }}
           make_latest: true
+          fail_on_unmatched_files: true
           name: 哔哩节流阀 BiliThrottle ${{ steps.pkg.outputs.version }}
           body_path: release-notes.md
           files: |

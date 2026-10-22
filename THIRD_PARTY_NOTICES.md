@@ -8,7 +8,7 @@
 - 项目：https://github.com/hanydd/BilibiliSponsorBlock
 - Copyright (C) hanydd and BilibiliSponsorBlock contributors
 - 许可证：GNU General Public License v3.0
-- 本仓库 `extension/src/sb-core.js`、`extension/src/sponsorblock.js` 移植自其 `src/requests/background/segmentRequest.ts`、`src/utils/hash.ts`、`src/config.ts`、`src/content/skipScheduler.ts`、`skipNotification.ts`、`previewBarManager.ts`、`segmentSubmission.ts`（参照提交 1b78cd4），改写为纯 JS 并换用本扩展的界面样式。分类名称与颜色取自其配置与中文语言包。
+- 本仓库 `extension/src/sb-core.js`、`extension/src/sponsorblock.js` 移植自其 `src/requests/background/segmentRequest.ts`、`src/utils/hash.ts`、`src/config.ts`、`src/content/skipScheduler.ts`、`skipNotification.ts`、`previewBarManager.ts`、`segmentSubmission.ts`（初始参照提交 1b78cd4；2.7.0 核对至 1469726，更新惊吓分类与静音决策），改写为纯 JS 并换用本扩展的界面样式。分类名称与颜色取自其配置与中文语言包。
 - 片段数据来自其公共服务器 https://www.bsbsb.top（社区贡献数据），API 文档：https://github.com/hanydd/BilibiliSponsorBlock/wiki/API
 
 ## SponsorBlock
@@ -20,7 +20,7 @@
 
 ## Bilibili-thread-ripper（原 MIT 部分）
 
-本项目衍生自 Bilibili-thread-ripper。原 MIT 许可证声明如下，予以保留：
+本项目衍生自 Bilibili-thread-ripper。2.7.0 回移至版本 2026.10.19.2（ee3adaa），保留 MV3 存储桥和本项目的并发 / 内存策略。`extension/tests/upstream/` 的四组回归夹具也源自该提交的 `dev/`，依原 MIT 许可保留。原 MIT 许可证声明如下，予以保留：
 
 ```
 MIT License

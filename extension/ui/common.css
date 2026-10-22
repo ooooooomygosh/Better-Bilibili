@@ -198,3 +198,5 @@ button.primary:hover{box-shadow:0 4px 14px color-mix(in srgb,var(--btr-brand) 32
 .sb-cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px 16px}
 .sb-cats .field label{display:flex;align-items:center;gap:8px}
 .sb-swatch{width:10px;height:10px;border-radius:3px;flex:none;box-shadow:0 0 0 1px rgba(0,0,0,.15) inset,0 0 0 1px var(--btr-line)}
+
+.scene-controls{padding:14px 0}.scene-controls [aria-pressed="true"]{background:var(--btr-brand-soft);color:var(--btr-brand)}.scene-controls .row{flex-wrap:wrap}

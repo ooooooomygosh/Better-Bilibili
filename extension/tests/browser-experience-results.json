@@ -1,0 +1,29 @@
+{
+  "environment": "Unpacked MV3 in fresh Chromium profile; routed Bilibili fixtures",
+  "results": [
+    {
+      "test": "学习模式以课程搜索入口替换推荐，停止本扩展无限下滑，搜索正确编码",
+      "passed": true
+    },
+    {
+      "test": "学习视频收起相关推荐；可独立恢复评论，现代 Shadow DOM 评论显示公开属地",
+      "passed": true
+    },
+    {
+      "test": "美食入口与评论正常；场景切换不改个人首页设置、额度或自律锁",
+      "passed": true
+    },
+    {
+      "test": "退出模式恢复原首页与视频布局，并同步所有已打开页面",
+      "passed": true
+    },
+    {
+      "test": "属地支持延迟加载 / 子评论 / 节点复用 / 原生去重；关闭即时清理，没有属地查询请求",
+      "passed": true
+    },
+    {
+      "test": "弹窗 / 设置页同步场景状态，新分类与剧集开关可用；无未捕获异常或横向溢出",
+      "passed": true
+    }
+  ]
+}

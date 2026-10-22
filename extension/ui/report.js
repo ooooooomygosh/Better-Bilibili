@@ -3,7 +3,8 @@
 const $=id=>document.getElementById(id);
 const ui=globalThis.__BTR_UI__,st=globalThis.__BTR_STATS_CORE__;
 const SVG='http://www.w3.org/2000/svg',WD='一二三四五六日';
-let data=null,cfg=st.settings({}),offset=0,view=null;
+let loadSequence=0;
+let data=null,cfg=st.settings({}),offset=0,view=null,shareView=null;
 const pad=n=>String(n).padStart(2,'0');
 // "1h05m" / "38m": compact labels for bars and tiles; full sentences use st.fmt.
 const short=sec=>{const m=Math.round(sec/60);return m<60?`${m}m`:`${Math.floor(m/60)}h${m%60?pad(m%60)+'m':''}`;};
@@ -13,19 +14,40 @@ const el=(tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className
 const svg=(tag,attrs={},text)=>{const n=document.createElementNS(SVG,tag);for(const[k,v]of Object.entries(attrs))n.setAttribute(k,v);if(text!=null)n.textContent=text;return n;};
 
 async function load(){
+ const sequence=++loadSequence;
  const [{watchStats},s]=await Promise.all([chrome.storage.local.get('watchStats'),chrome.storage.sync.get(st.defaults)]);
- data=st.normalize(watchStats,Date.now());cfg=st.settings(s);render();
+ if(sequence!==loadSequence)return;
+ data=st.normalize(watchStats,Date.now());cfg=st.settings(s);readWeekHash();render();
 }
 
+function readWeekHash(){
+ const requested=location.hash.slice(1),current=st.weekKey(Date.now());
+ if(st.weekKey(requested)!==requested||requested>current){offset=0;return;}
+ // Calendar weeks can include a DST change; round the timestamp difference to weeks.
+ const n=Math.round((new Date(requested+'T12:00:00')-new Date(current+'T12:00:00'))/(7*86400000));
+ offset=Math.max(-(st.WEEKS_KEPT-1),Math.min(0,n));
+}
+readWeekHash();
+addEventListener('hashchange',()=>{readWeekHash();if(data)render();});
+function selectWeek(next){
+ offset=Math.max(-(st.WEEKS_KEPT-1),Math.min(0,next));
+ history.replaceState(null,'',location.pathname+(offset?'#'+st.addDays(st.weekKey(Date.now()),offset*7):''));render();
+}
 function compute(){
  const now=Date.now(),wk=st.addDays(st.weekKey(now),7*offset),cur=offset===0,today=cur?(new Date(now).getDay()+6)%7:6;
- const prevWk=st.addDays(wk,-7),W=st.week(data,wk,today),P=st.week(data,prevWk,today),Pfull=st.week(data,prevWk,6);
- return {wk,cur,today,W,P,Pfull,cmp:st.compare(W,P,cur&&today<6)};
+ const prevWk=st.addDays(wk,-7),W=st.week(data,wk,today),Pfull=st.week(data,prevWk,6);
+ // In-progress days are excluded on BOTH sides. A half-finished Sunday must not be
+ // compared to last Sunday's full day and presented as a fall in viewing.
+ const upto=cur?today-1:6,compared=st.week(data,wk,upto),P=st.week(data,prevWk,upto);
+ const cmp=st.compare(compared,P,cur);
+ if(cur)cmp.text=today===0?'本周刚开始，明天再比较完整日的观看时长':`截至昨天，${cmp.text}`;
+ return {wk,cur,today,W,P,Pfull,cmp};
 }
 
 function render(){
  const v=view=compute(),{W,P,Pfull,cmp,cur,today}=v;
  $('range').textContent=`${offset===0?'本周':offset===-1?'上周':`${-offset} 周前`} · ${st.range(v.wk)}`;
+ $('current').hidden=cur;$('paused').hidden=cfg.statsEnabled;$('exportCSV').disabled=!W.seconds;
  $('prev').disabled=offset<=-(st.WEEKS_KEPT-1);$('next').disabled=offset>=0;
  const empty=!W.seconds&&!Pfull.seconds;
  document.body.classList.toggle('is-empty',empty);$('empty').hidden=!empty;$('share').disabled=empty;
@@ -37,7 +59,7 @@ function render(){
  $('label').textContent=cur?(today<6?'本周到目前为止':'本周观看'):offset===-1?'上周观看':'这一周观看';
  $('total').innerHTML=bigHTML(W.seconds);
  $('line').textContent=cmp.text;
- const span=cur&&today<6?'上周同期':'上周';
+ const span=cur?'上周同期（不含今天）':'上周';
  $('delta').textContent=P.seconds?`${cmp.mood==='flat'?'≈':cmp.delta<0?'↓':'↑'} ${Math.abs(cmp.pct)}% · ${span} ${st.fmt(P.seconds)}`:'';
  $('videos').innerHTML=`${W.videos}<small>个视频</small>`;
  $('avg').textContent=short(W.seconds/(today+1));
@@ -98,7 +120,7 @@ function hours(W){
 
 /* ---------- share card: 1080 × 1440 PNG ---------- */
 function drawCard(cv,hide){
- const {W,P,Pfull,cmp,cur,today,wk}=view,c=cv.getContext('2d'),w=1080,h=1440,F=ui.FONT;
+ const {W,P,Pfull,cmp,cur,today,wk}=shareView||view,c=cv.getContext('2d'),w=1080,h=1440,F=ui.FONT;
  const font=(wt,px)=>{c.font=`${wt} ${px}px ${F}`;};
  const rr=(x,y,ww,hh,r)=>{c.beginPath();c.roundRect(x,y,ww,hh,r);};
  c.clearRect(0,0,w,h);c.letterSpacing='0px';c.textAlign='left';c.textBaseline='alphabetic';
@@ -116,11 +138,11 @@ function drawCard(cv,hide){
  let x=X-6;for(const[t,num]of parts){c.fillStyle=num?'#18191c':'#fb7299';font(num?800:700,num?176:56);c.fillText(t,x,602);x+=c.measureText(t).width+(num?6:22);}
  // Delta pill
  if(P.seconds){
-  const t=`${cmp.mood==='flat'?'≈':cmp.delta<0?'↓':'↑'} ${Math.abs(cmp.pct)}%   ${cur&&today<6?'上周同期':'上周'} ${st.fmt(P.seconds)}`;
+  const t=`${cmp.mood==='flat'?'≈':cmp.delta<0?'↓':'↑'} ${Math.abs(cmp.pct)}%   ${cur?'上周同期（不含今天）':'上周'} ${st.fmt(P.seconds)}`;
   font(700,30);const tw=c.measureText(t).width;c.fillStyle='rgba(251,114,153,.13)';rr(X,640,tw+48,58,29);c.fill();c.fillStyle='#e8618a';c.fillText(t,X+24,680);
  }
  // One-liner, shrunk to fit
- let px=44;font(800,px);while(c.measureText(cmp.text).width>R-X&&px>28){px-=2;font(800,px);}
+ let px=38;font(800,px);while(c.measureText(cmp.text).width>R-X&&px>20){px-=2;font(800,px);}
  c.fillStyle='#18191c';c.fillText(cmp.text,X,786);
  // Mini bar chart: this week (pink) next to last week (grey)
  const top=Math.max(1,...W.days.map(d=>d.seconds),...Pfull.days.map(d=>d.seconds)),bt=850,bb=1040,gw=(R-X)/7,bw=34;
@@ -150,21 +172,50 @@ function drawCard(cv,hide){
 const blob=cv=>new Promise((res,rej)=>cv.toBlob(b=>b?res(b):rej(new Error('生成图片失败')),'image/png'));
 const shareSay=(t,k)=>ui.flash($('shareMsg'),t,k);
 let before=null;
-function openShare(){before=document.activeElement;$('shareBack').hidden=false;$('shareMsg').textContent='';drawCard($('card'),$('hideUps').checked);document.querySelector('main').inert=true;$('download').focus();
+function openShare(){shareView=structuredClone(view);before=document.activeElement;$('shareBack').hidden=false;$('shareMsg').textContent='';$('shareTextFallback').hidden=true;drawCard($('card'),$('hideUps').checked);document.querySelector('main').inert=true;document.querySelector('header').inert=true;$('download').focus();
  ui.animate($('shareBack').firstElementChild,[{opacity:0,transform:'translateY(10px) scale(.98)'},{opacity:1,transform:'none'}],{duration:ui.MOTION.mid});}
-function closeShare(){$('shareBack').hidden=true;document.querySelector('main').inert=false;before?.focus?.();}
+function closeShare(){$('shareBack').hidden=true;document.querySelector('main').inert=false;document.querySelector('header').inert=false;before?.focus?.();shareView=null;}
 $('share').onclick=openShare;$('closeShare').onclick=closeShare;
 $('shareBack').addEventListener('click',e=>{if(e.target===$('shareBack'))closeShare();});
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('shareBack').hidden)closeShare();});
-$('hideUps').onchange=()=>{try{localStorage.setItem('btr-report-hide',$('hideUps').checked?'1':'');}catch(_){}drawCard($('card'),$('hideUps').checked);};
-try{$('hideUps').checked=localStorage.getItem('btr-report-hide')==='1';}catch(_){}
-$('download').onclick=async()=>{try{const b=await blob($('card')),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`哔哩节流阀-观看周报-${view.wk}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);shareSay('已开始下载。','ok');}catch(e){shareSay(e.message,'error');}};
+document.addEventListener('keydown',e=>{
+ if($('shareBack').hidden)return;
+ if(e.key==='Escape'){e.preventDefault();closeShare();}
+ if(e.key==='Tab'){
+  const items=[...$('shareBack').querySelectorAll('button,input,textarea')].filter(n=>!n.disabled&&!n.hidden),first=items[0],last=items.at(-1);
+  if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+  else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+ }
+});
+$('hideUps').onchange=()=>{try{localStorage.setItem('btr-report-hide-v2',$('hideUps').checked?'1':'0');}catch(_){}drawCard($('card'),$('hideUps').checked);$('shareTextFallback').hidden=true;$('shareTextFallback').value='';};
+$('hideUps').checked=true;
+try{$('hideUps').checked=localStorage.getItem('btr-report-hide-v2')!=='0';}catch(_){}
+$('download').onclick=async()=>{try{const wk=(shareView||view).wk,b=await blob($('card')),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=`哔哩节流阀-观看周报-${wk}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);shareSay('已开始下载。','ok');}catch(e){shareSay(e.message,'error');}};
 $('copy').onclick=async()=>{
  try{if(!navigator.clipboard?.write||typeof ClipboardItem!=='function')throw new Error('unsupported');await navigator.clipboard.write([new ClipboardItem({'image/png':blob($('card'))})]);shareSay('已复制，去粘贴吧 ✨','ok');}
  catch(_){shareSay('浏览器没允许复制图片，请用「下载」保存后再发。','error');}
 };
-$('prev').onclick=()=>{offset--;render();};$('next').onclick=()=>{offset++;render();};
+function downloadBlob(b,name){const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000);}
+$('copyText').onclick=async()=>{
+ const v=shareView||view,text=st.shareText(v.W,{hideUps:$('hideUps').checked,comparison:v.cmp.text});
+ try{await navigator.clipboard.writeText(text);shareSay('文字已复制，可以直接粘贴分享。','ok');}
+ catch(_){const box=$('shareTextFallback');box.value=text;box.hidden=false;box.focus();box.select();shareSay('无法自动复制，请复制下方已选中的文字。','error');}
+};
+$('systemShare').hidden=typeof navigator.share!=='function';
+$('systemShare').onclick=async()=>{
+ try{
+  const wk=shareView.wk;
+  const file=new File([await blob($('card'))],`观看周报-${wk}.png`,{type:'image/png'});
+  if(!navigator.canShare?.({files:[file]})){shareSay('此浏览器不支持图片分享，请下载或复制。','error');return;}
+  await navigator.share({files:[file],title:'我的 B 站观看周报'});
+  shareSay('已完成系统分享。','ok');
+ }catch(e){if(e.name!=='AbortError')shareSay('系统分享不可用，请下载或复制。','error');}
+};
+$('exportCSV').onclick=()=>{const v=compute();downloadBlob(new Blob([st.weekCSV(v.W,v.today)],{type:'text/csv;charset=utf-8'}),`观看周报-${v.wk}.csv`);};
+$('current').onclick=()=>selectWeek(0);
+$('prev').onclick=()=>selectWeek(offset-1);$('next').onclick=()=>selectWeek(offset+1);
 chrome.storage.onChanged.addListener((c,area)=>{if((area==='local'&&c.watchStats)||(area==='sync'&&c.statsEnabled))load().catch(()=>{});});
 // Re-render on resize so the tooltip math and the hover layer stay aligned.
+setInterval(()=>{if(!document.hidden)load().catch(()=>{});},60000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)load().catch(()=>{});});
 addEventListener('resize',()=>{$('tip').hidden=true;});
 load().catch(e=>{document.body.classList.add('is-empty');$('empty').hidden=false;$('emptyText').textContent=`读取统计失败：${e.message}`;});

@@ -2,11 +2,15 @@
  "environment": "unpacked extension in Playwright Chromium (headless), real report.html, clock pinned to 2026-10-18 21:40",
  "results": [
   {
-   "test": "light: 6 小时 40 分 vs 上周 9 小时 10 分 (↓27%, 节流成功), 3 次踩刹车, 最长一天周三, top UP, 7+7 bars, 22 点 peak, bar tooltip, no horizontal scroll",
+   "test": "light: 6 小时 40 分 vs 上周 9 小时 10 分 (完整日对比 ↓21%, 节流成功), 3 次踩刹车, 最长一天周三, top UP, 7+7 bars, 22 点 peak, bar tooltip, no horizontal scroll",
    "passed": true
   },
   {
-   "test": "light: share card is a 724 KB 1080×1440 PNG; 隐藏 UP 主名字 redraws it; copy answers (已复制，去粘贴吧 ✨); Esc closes",
+   "test": "light: share card is a 618 KB 1080×1440 PNG; 隐藏 UP 主名字 redraws it; copy answers (浏览器没允许复制图片，请用「下载」保存后再发。); Esc closes",
+   "passed": true
+  },
+  {
+   "test": "light: share snapshot stays stable; clipboard denial offers selected text; CSV downloads without identities; paused state and mobile layout work",
    "passed": true
   },
   {
@@ -14,11 +18,15 @@
    "passed": true
   },
   {
-   "test": "dark: 6 小时 40 分 vs 上周 9 小时 10 分 (↓27%, 节流成功), 3 次踩刹车, 最长一天周三, top UP, 7+7 bars, 22 点 peak, bar tooltip, no horizontal scroll",
+   "test": "dark: 6 小时 40 分 vs 上周 9 小时 10 分 (完整日对比 ↓21%, 节流成功), 3 次踩刹车, 最长一天周三, top UP, 7+7 bars, 22 点 peak, bar tooltip, no horizontal scroll",
    "passed": true
   },
   {
-   "test": "dark: share card is a 724 KB 1080×1440 PNG; 隐藏 UP 主名字 redraws it; copy answers (已复制，去粘贴吧 ✨); Esc closes",
+   "test": "dark: share card is a 618 KB 1080×1440 PNG; 隐藏 UP 主名字 redraws it; copy answers (浏览器没允许复制图片，请用「下载」保存后再发。); Esc closes",
+   "passed": true
+  },
+  {
+   "test": "dark: share snapshot stays stable; clipboard denial offers selected text; CSV downloads without identities; paused state and mobile layout work",
    "passed": true
   },
   {
@@ -26,7 +34,7 @@
    "passed": true
   },
   {
-   "test": "B 站 page: weekly notice \"上周观看报告出炉了：7 小时10月5日 – 10月11日 · 看看这周刹车踩得怎么样\" shows once, 查看 opens ui/report.html via the service worker",
+   "test": "B 站 page: weekly notice \"上周观看报告出炉了：7 小时10月12日 – 10月18日 · 看看这周刹车踩得怎么样\" shows once, 查看 opens ui/report.html via the service worker",
    "passed": true
   },
   {

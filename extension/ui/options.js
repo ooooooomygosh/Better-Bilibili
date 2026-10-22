@@ -1,7 +1,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const ui=globalThis.__BTR_UI__,focusCore=globalThis.__BTR_FOCUS_CORE__,homeCore=globalThis.__BTR_HOME_CORE__,lockCore=globalThis.__BTR_LOCK_CORE__,filterCore=globalThis.__BTR_FILTER_CORE__,cleanCore=globalThis.__BTR_CLEAN_CORE__,sbCore=globalThis.__BTR_SB_CORE__,statsCore=globalThis.__BTR_STATS_CORE__;
-const defaults={enabled:true,liveEnabled:true,autoConcurrency:true,smartPolicy:true,strategy:'auto',mode:'auto',maxAutoThreads:32,memoryBudgetMB:64,takeover:'full',...homeCore.defaults,...focusCore.defaults,filterEnabled:true,filterDedupe:true,...cleanCore.defaults,quickFab:true,uiTheme:'bili',...sbCore.defaults,...statsCore.defaults};
+const defaults={enabled:true,liveEnabled:false,episodeEnabled:true,autoConcurrency:true,smartPolicy:true,strategy:'auto',mode:'auto',maxAutoThreads:32,memoryBudgetMB:64,takeover:'full',...homeCore.defaults,...focusCore.defaults,filterEnabled:true,filterDedupe:true,...cleanCore.defaults,quickFab:true,uiTheme:'bili',...sbCore.defaults,...statsCore.defaults,...globalThis.__BTR_SCENE_CORE__.defaults};
 const LISTS=['filterKeywords','filterUps','filterTags'];
 const FOCUS=new Set(Object.keys(focusCore.defaults));
 const RELOAD=new Set(['takeover','enabled','liveEnabled']);
@@ -294,7 +294,7 @@ $('filterClear').onclick=async()=>{if(!await dialog({title:'清空全部屏蔽�
 (function(){const box=$('sbCats');if(!box)return;
  for(const c of sbCore.CATEGORIES){const f=document.createElement('div');f.className='field';const l=document.createElement('label'),sw=document.createElement('i'),sel=document.createElement('select');
   sel.id=sbCore.key(c.name);l.htmlFor=sel.id;sw.className='sb-swatch';sw.style.background=c.color;l.append(sw,c.label);
-  for(const o of sbCore.OPTIONS){if(c.name==='poi_highlight'&&o==='auto')continue;const op=document.createElement('option');op.value=o;op.textContent=sbCore.OPTION_LABEL[o];sel.append(op);}
+  for(const o of sbCore.OPTIONS){if(c.name==='poi_highlight'&&o==='auto')continue;const op=document.createElement('option');op.value=o;op.textContent=c.name==='jumpscare'&&o==='auto'?'自动静音':sbCore.OPTION_LABEL[o];sel.append(op);}
   sel.setAttribute('form','settings');f.append(l,sel);box.append(f);}
 })();
 // One load, after every generated control (clean rules, 空降助手 categories) exists.

@@ -91,11 +91,12 @@
       smartPolicy: source.smartPolicy !== false,
       strategy: ["auto", "smooth", "fast", "economy"].includes(source.strategy) ? source.strategy : "auto",
       memoryBudgetMB: [32,64,96,128].includes(Number(source.memoryBudgetMB)) ? Number(source.memoryBudgetMB) : 64,
-      maxAutoThreads: [4,8,16,32].includes(Number(source.maxAutoThreads)) ? Number(source.maxAutoThreads) : 32,
-      autoThreadCap: [4,8,16,32].includes(Number(source.maxAutoThreads)) ? Number(source.maxAutoThreads) : 32, prefetchWindow: 3, startupMaxSeconds: 10, rangeTimeoutMs: 60000,
+      maxAutoThreads: [4,8,16,32,64].includes(Number(source.maxAutoThreads)) ? Number(source.maxAutoThreads) : 32,
+      autoThreadCap: [4,8,16,32,64].includes(Number(source.maxAutoThreads)) ? Number(source.maxAutoThreads) : 32, prefetchWindow: 3, startupMaxSeconds: 10, rangeTimeoutMs: 60000,
       enabled: source.enabled !== false,
       // The live module on live.bilibili.com; the master switch above still rules.
-      liveEnabled: source.liveEnabled !== false,
+      liveEnabled: source.liveEnabled === true,
+      episodeEnabled: source.episodeEnabled !== false,
       // "full" replaces Bilibili's playback core; "compat" leaves it in charge and only
       // downloads its media requests.
       takeover: source.takeover === "compat" ? "compat" : "full",
@@ -115,7 +116,7 @@
       errorNotices: source.errorNotices === true,
       debugCategories: Object.fromEntries(["takeover", "playback", "download", "buffer", "settings", "other"].map(key => [key, source.debugCategories?.[key] !== false])),
       concurrency: allowed.includes(requested) ? requested : 8,
-      // 自动线程数: the downloader picks the thread count itself, between 8 and 32, and
+      // 自动线程数: the downloader picks the thread count itself, between 8 and 64, and
       // `concurrency` above is only what the viewer set by hand. Off unless asked for.
       autoConcurrency: source.autoConcurrency === true,
       minChunkBytes: 64 * 1024,
