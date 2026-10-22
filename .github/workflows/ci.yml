@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -27,10 +27,17 @@ jobs:
       - name: Verify source checksums
         run: python3 scripts/checksums.py
       - name: Install browser test tools
+        timeout-minutes: 6
         run: |
+          # The hosted runner's Azure HTTP mirror can stall for minutes per font package.
+          # Keep normal apt signature verification, using Ubuntu's official HTTPS mirror.
+          sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+          printf 'Acquire::Retries "2";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' | sudo tee /etc/apt/apt.conf.d/80-bilithrottle-ci > /dev/null
           python3 -m pip install -r requirements-dev.txt
           python3 -m playwright install --with-deps chromium
       - name: Browser regression
+        env:
+          BROWSER_RESULTS_DIR: ${{ runner.temp }}/browser-regression
         run: python3 scripts/browser-tests.py
       - name: Package and verify reproducibility
         run: |
@@ -46,4 +53,4 @@ jobs:
         if: always()
         with:
           name: browser-regression
-          path: extension/tests/*-results.json
+          path: ${{ runner.temp }}/browser-regression/*
